@@ -66,6 +66,7 @@ The following enemies may the agent encounter:
 - Landmines - Lives: infinite, Weapon: mine, LoS: none (impact), Speed: 0
 Legend:
 LoS - line of sight
+Soldier, Super soldier, Drone, Robodog and Robot sometimes drop free ammo pack
 
 ### Soldier (Super soldier)
 
@@ -80,6 +81,7 @@ There are following items available across levels that activates automatically:
 - Health kit - adds a life
 - Bullet - adds 10 ammo
 - Infra goggles - changes visual to infra red and reveals hidden platforms
+- Bulletproof vest - saves 1 life, then is destroyed
 
 These items activate manually:
 - Briefcase (disguise)
@@ -111,21 +113,27 @@ with a pistol):
 - Plasma shot - (turret) takes a life, moves 2x speed of agent
 - Rocket - takes a life, moves 1x speed of agent
 - Arrow - takes a life, moves 2x speed of agent
+Ammo is transfered across levels.
 
 ## Economics
 
 ### Shop
-In the shop the agent finds items to buy and use in the levels. 
+In the shop the agent finds items to buy and use in the levels:
 - Briefcase (20 coins)
 - Hacking tool (30 coins)
 - Extra life (50 coins)
 - Chainsaw (20 coins, default weapon)
 - Pistol (20 coins, default weapon, 20 ammo)
+- 10 ammo pack (5 coins)
 
 ## Hacking
 
 ## Controls
 
+### Notes
+- The agent jumps 2.5 tiles above (or hits his head sooner)
+- Agent jumps up to 5 tiles to sides
+
 ## Settings
-- Difficulty
+- Difficulty (Low, Medium, Hard)
 - Change controls
