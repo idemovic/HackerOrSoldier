@@ -232,3 +232,25 @@ Contains buttons:
 - Exit game
 
 ## Level editor
+The level editor opens from the main menu (Create level) and lets the user build levels from the objects defined in this
+design. The editor works on a tile grid; the agent is 1 tile, so all objects snap to tiles. The editor switches between
+edit mode and play mode at any time.
+
+### Edit mode
+- Object palette grouped by category: Terrain, Machines / Devices, Movables, Enemies, Items, Collectibles, Weapons
+- Objects are placed on the grid and can be moved or deleted afterwards
+- Some objects have properties set on placement:
+  - Door / Door key - color (matching pairs)
+  - Computer / USB key - number (matching pairs)
+  - Teleport - capsules are placed as a joined pair
+  - Elevator / moving platform - movement range (start and end tile)
+  - Switch / Computer - the laser beam / floor it switches off
+- Every level must contain exactly one agent start position and at least one exit door
+
+### Play mode
+- Runs the level from the agent start position to test it
+- Returning to edit mode restores the level to its state before playing (enemies, items and the agent reset)
+
+### Saving
+- The level is saved with a name and description, which are shown in the level briefing
+- Saved levels can be reopened for editing
