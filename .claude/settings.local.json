@@ -1,0 +1,11 @@
+{
+  "permissions": {
+    "allow": [
+      "WebSearch", "WebFetch", "Bash", "Read", "Write",
+      "Edit", "Glob", "Grep", "Task", "TodoWrite", "PowerShell"
+    ],
+    "deny": [],
+    "defaultMode": "bypassPermissions"
+  },
+  "skipDangerousModePermissionPrompt": true
+}
