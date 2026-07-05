@@ -29,26 +29,38 @@ Placeholder colored rects stand in for art until the systems are done.
 - Headless smoke test of the whole loop (scenes/smoke_test.tscn):
   Godot_v4.7-stable_mono_win64_console.exe --headless --path . res://scenes/smoke_test.tscn
 
-## Milestone 2 - core game systems (next)
+### Milestone 2 - core game systems
+- PlaySession (scripts/PlaySession.cs) owns one play-through: agent, lives,
+  ammo, inventory, hazard clock, HUD; freeing it restores the level
+- Lives (default 3) with HUD during play; losing a life respawns at the agent
+  start but keeps level state (opened doors stay open, picked items stay
+  picked); losing all lives returns to edit mode
+- Killing terrain: lava and spear instant kill, spikes raised during the last
+  2s of each 10s cycle, electric floor takes a life after each 3s of contact,
+  kill plane below the level bounds
+- Water: half horizontal speed, capped sink/swim speed while submerged, full
+  jump velocity when jumping from the top water tile (surface line)
+- Doors and keys with color matching (red/blue/yellow/magenta); the palette
+  shows a color picker when a door or key brush is selected (first object
+  property UI); a key is not consumed and opens every door of its color
+- Item pickups: health kit (+1 life), ammo pack (+10), bulletproof vest
+  (absorbs one hit), briefcase and infra goggles held until activated with C
+  (goggles take priority when both are held; 30s each)
+- Hidden platform tile on its own tilemap layer: semi-transparent in edit
+  mode, invisible but solid in play mode, revealed while goggles are active
+- Shooting: pistol (default 10 ammo), bullets at 2x agent speed, destructible
+  walls destroyed per cell by a bullet and restored on returning to edit mode
+- Smoke test covers all of the above (lives/fail path, vest, kill plane and
+  respawn, key + door + shooting course, water caps and surface jump, spike
+  cycle, electric floor timing, goggles activation)
 
-First slice, "dying":
-- Lives on the agent (default 3), HUD counter during play
-- Killing terrain behavior: lava and spear instant kill, spikes on a 10s cycle,
-  electric floor takes a life every 3 seconds
-- Kill plane below the level bounds
-- Losing a life respawns at the agent start; losing all lives ends the run
-  (in the editor: back to edit mode)
-- Water: slower horizontal movement, jump boost calculated from the surface line
+Known simplifications (revisit with milestone 3):
+- Bullets pass through locked doors (they only collide with tiles so far)
+- Briefcase disguise is a timer + HUD entry only until enemies and cameras
+  exist
+- Alarm floor is a plain solid tile until the alarm system lands
 
-Then:
-- Doors and keys: color matching, which introduces the object property UI in the
-  editor (the last missing piece of the original milestone 1 scope)
-- Item pickup and inventory: health kit, ammo pack, bulletproof vest, briefcase,
-  infra goggles (hidden platforms)
-- Shooting: pistol first (wire the shoot action), bullets, ammo count
-- Destructible walls
-
-## Milestone 3 - enemies
+## Milestone 3 - enemies (next)
 - Line of sight: row vs all directions
 - Patrol movement and speeds per the enemy table
 - Soldier degradation chain (Ultimate -> Super -> Soldier -> tombstone)
@@ -85,6 +97,7 @@ Then:
   so resizing is a later editor feature, not a format change.
 
 ## Open design decisions
-- Respawn semantics: current plan is respawn at level start but keep level state
-  (opened doors stay open, dead enemies stay dead). Alternative: full level reset
-  per death. README does not specify.
+- Respawn semantics: implemented as respawn at the agent start keeping level
+  state (opened doors stay open, picked items stay picked). The alternative,
+  a full level reset per death, is still easy to switch to if playtesting
+  favors it. README does not specify.

@@ -15,19 +15,118 @@ public partial class Agent : CharacterBody2D
 
     private static readonly float Gravity = 2f * JumpHeight / (TimeToApex * TimeToApex);
     private static readonly float JumpVelocity = -Gravity * TimeToApex;
-    private static readonly float RunSpeed = JumpDistance / (2f * TimeToApex);
+    public static readonly float RunSpeed = JumpDistance / (2f * TimeToApex);
+
+    // README water spec: submerged vertical speed is capped by water
+    // resistance; a jump from the surface line gets the full jump velocity.
+    private const float WaterGravityFactor = 0.4f;
+    private const float SwimSpeed = 120f;
+    private const float SinkSpeed = 80f;
+
+    private const float ElectricInterval = 3f;
+
+    // Hazard overlap is sampled slightly inside the 30x30 collision box so
+    // standing next to a hazard tile does not count as touching it.
+    private const float HazardExtent = 14f;
+
+    public PlaySession Session { get; set; }
+    public int Facing { get; private set; } = 1;
+
+    private float _electricTime;
+
+    public void ResetForRespawn(Vector2 position)
+    {
+        Position = position;
+        Velocity = Vector2.Zero;
+        _electricTime = 0f;
+    }
 
     public override void _PhysicsProcess(double delta)
     {
+        float dt = (float)delta;
         Vector2 velocity = Velocity;
-        velocity.Y += Gravity * (float)delta;
 
-        if (IsOnFloor() && Input.IsActionJustPressed("jump"))
-            velocity.Y = JumpVelocity;
+        bool submerged = TileAt(0, 0) == TileDefs.Water;
+        bool atSurface = submerged && TileAt(0, -Tile) != TileDefs.Water;
 
-        velocity.X = Input.GetAxis("move_left", "move_right") * RunSpeed;
+        velocity.Y += Gravity * dt * (submerged ? WaterGravityFactor : 1f);
+
+        if (Input.IsActionJustPressed("jump"))
+        {
+            if (submerged)
+                velocity.Y = atSurface ? JumpVelocity : -SwimSpeed;
+            else if (IsOnFloor())
+                velocity.Y = JumpVelocity;
+        }
+
+        if (submerged)
+            velocity.Y = atSurface
+                ? Mathf.Min(velocity.Y, SinkSpeed)                // full jumps may leave the water
+                : Mathf.Clamp(velocity.Y, -SwimSpeed, SinkSpeed); // deep water caps both directions
+
+        float axis = Input.GetAxis("move_left", "move_right");
+        if (axis != 0)
+            Facing = axis > 0 ? 1 : -1;
+        velocity.X = axis * RunSpeed * (submerged ? 0.5f : 1f);
 
         Velocity = velocity;
         MoveAndSlide();
+
+        if (Session == null)
+            return;
+
+        if (Input.IsActionJustPressed("shoot"))
+            Session.TryShoot(this);
+        if (Input.IsActionJustPressed("activate"))
+            Session.ActivateHeldItem();
+
+        CheckHazards(dt);
+    }
+
+    private int TileAt(float dx, float dy) =>
+        Session?.TileAtPosition(Position + new Vector2(dx, dy)) ?? TileDefs.Empty;
+
+    private void CheckHazards(float dt)
+    {
+        // Kill plane below the level bounds.
+        if (Position.Y > Session.LevelBottom + 2f * Tile)
+        {
+            Session.AgentHit();
+            return;
+        }
+
+        int minX = (int)Mathf.Floor((Position.X - HazardExtent) / Tile);
+        int maxX = (int)Mathf.Floor((Position.X + HazardExtent) / Tile);
+        int minY = (int)Mathf.Floor((Position.Y - HazardExtent) / Tile);
+        int maxY = (int)Mathf.Floor((Position.Y + HazardExtent) / Tile);
+        for (int y = minY; y <= maxY; y++)
+            for (int x = minX; x <= maxX; x++)
+            {
+                int id = Session.TileAt(x, y);
+                if (id == TileDefs.Lava || id == TileDefs.Spear || (id == TileDefs.Spikes && Session.SpikesUp))
+                {
+                    Session.AgentHit();
+                    return;
+                }
+            }
+
+        bool onElectric = false;
+        if (IsOnFloor())
+        {
+            int below = (int)Mathf.Floor((Position.Y + HazardExtent + 3f) / Tile);
+            for (int x = minX; x <= maxX && !onElectric; x++)
+                onElectric = Session.TileAt(x, below) == TileDefs.ElectricFloor;
+        }
+        if (!onElectric)
+        {
+            _electricTime = 0f;
+            return;
+        }
+        _electricTime += dt;
+        if (_electricTime >= ElectricInterval)
+        {
+            _electricTime = 0f;
+            Session.AgentHit();
+        }
     }
 }

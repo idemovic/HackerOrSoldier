@@ -9,14 +9,19 @@ public partial class Editor : Node2D
     private const int TileSize = TileSetBuilder.TileSize;
     private const float PanSpeed = 400f;
 
+    // Hidden platforms live on their own layer so play mode can hide them
+    // (infra goggles reveal them); in edit mode they show semi-transparent.
+    private static readonly Color HiddenEditTint = new(1, 1, 1, 0.45f);
+
     private LevelData _level = LevelData.NewDefault();
     private PackedScene _agentScene;
 
     private TileMapLayer _grid;
+    private TileMapLayer _hiddenGrid;
     private Node2D _markers;
     private ColorRect _cursor;
     private Camera2D _camera;
-    private Node2D _playRoot;
+    private PlaySession _session;
 
     private Label _status;
     private Button _playButton;
@@ -26,16 +31,20 @@ public partial class Editor : Node2D
     private ConfirmationDialog _loadDialog;
     private ItemList _levelList;
     private Minimap _minimap;
+    private HBoxContainer _colorRow;
+    private OptionButton _colorPicker;
 
     private enum BrushKind { Tile, Object, Eraser }
 
     private BrushKind _brushKind = BrushKind.Tile;
     private int _brushTile = TileDefs.All[0].Id;
     private string _brushObject = "";
+    private string _brushColor = ObjectDefs.KeyColors[0];
 
     public LevelData Level => _level;
-    public bool IsPlaying => _playRoot != null;
-    public Agent PlayerAgent => _playRoot?.GetChildren().OfType<Agent>().FirstOrDefault();
+    public bool IsPlaying => _session != null;
+    public PlaySession Session => _session;
+    public Agent PlayerAgent => _session?.Agent;
 
     public override void _Ready()
     {
@@ -43,6 +52,9 @@ public partial class Editor : Node2D
 
         _grid = new TileMapLayer { TileSet = TileSetBuilder.Build() };
         AddChild(_grid);
+
+        _hiddenGrid = new TileMapLayer { TileSet = _grid.TileSet, Modulate = HiddenEditTint };
+        AddChild(_hiddenGrid);
 
         _markers = new Node2D();
         AddChild(_markers);
@@ -118,15 +130,34 @@ public partial class Editor : Node2D
     {
         _brushKind = BrushKind.Tile;
         _brushTile = tileId;
+        UpdateColorRow();
     }
 
-    public void SetBrushObject(string type)
+    public void SetBrushObject(string type, string color = null)
     {
         _brushKind = BrushKind.Object;
         _brushObject = type;
+        if (color != null)
+        {
+            _brushColor = color;
+            int index = System.Array.IndexOf(ObjectDefs.KeyColors, color);
+            if (_colorPicker != null && index >= 0)
+                _colorPicker.Selected = index;
+        }
+        UpdateColorRow();
     }
 
-    public void SetBrushEraser() => _brushKind = BrushKind.Eraser;
+    public void SetBrushEraser()
+    {
+        _brushKind = BrushKind.Eraser;
+        UpdateColorRow();
+    }
+
+    private void UpdateColorRow()
+    {
+        if (_colorRow != null)
+            _colorRow.Visible = _brushKind == BrushKind.Object && ObjectDefs.HasColorProperty(_brushObject);
+    }
 
     public void PaintCell(Vector2I cell)
     {
@@ -136,7 +167,7 @@ public partial class Editor : Node2D
         {
             case BrushKind.Tile:
                 _level.SetTile(cell.X, cell.Y, _brushTile);
-                _grid.SetCell(cell, TileSetBuilder.SourceId, TileSetBuilder.AtlasCoordsFor(_brushTile));
+                SetGridCell(cell, _brushTile);
                 break;
             case BrushKind.Object:
                 PlaceObject(cell, _brushObject);
@@ -153,8 +184,17 @@ public partial class Editor : Node2D
             return;
         _level.SetTile(cell.X, cell.Y, TileDefs.Empty);
         _grid.EraseCell(cell);
+        _hiddenGrid.EraseCell(cell);
         if (_level.Objects.RemoveAll(o => o.X == cell.X && o.Y == cell.Y) > 0)
             RebuildMarkers();
+    }
+
+    private void SetGridCell(Vector2I cell, int tileId)
+    {
+        var target = tileId == TileDefs.HiddenPlatform ? _hiddenGrid : _grid;
+        var other = tileId == TileDefs.HiddenPlatform ? _grid : _hiddenGrid;
+        other.EraseCell(cell);
+        target.SetCell(cell, TileSetBuilder.SourceId, TileSetBuilder.AtlasCoordsFor(tileId));
     }
 
     public bool StartPlay()
@@ -166,29 +206,11 @@ public partial class Editor : Node2D
             return false;
         }
 
-        _playRoot = new Node2D();
-        AddChild(_playRoot);
-
-        foreach (var obj in _level.Objects)
-        {
-            var pos = new Vector2(obj.X * TileSize + TileSize / 2f, obj.Y * TileSize + TileSize / 2f);
-            if (obj.Type == ObjectDefs.AgentStart)
-            {
-                var agent = _agentScene.Instantiate<Agent>();
-                agent.Position = pos;
-                var camera = new Camera2D();
-                agent.AddChild(camera);
-                _playRoot.AddChild(agent);
-                ApplyCameraLimits(camera);
-                camera.MakeCurrent();
-            }
-            else if (obj.Type == ObjectDefs.ExitDoor)
-            {
-                var door = new ExitDoor { Position = pos };
-                door.Reached += () => Callable.From(OnLevelComplete).CallDeferred();
-                _playRoot.AddChild(door);
-            }
-        }
+        _session = new PlaySession();
+        _session.Setup(_level, _grid, _hiddenGrid, _agentScene);
+        _session.Completed += () => Callable.From(() => EndPlay("Level complete!")).CallDeferred();
+        _session.Failed += () => Callable.From(() => EndPlay("Out of lives.")).CallDeferred();
+        AddChild(_session);
 
         _markers.Visible = false;
         _cursor.Visible = false;
@@ -200,20 +222,22 @@ public partial class Editor : Node2D
 
     public void StopPlay()
     {
-        if (_playRoot == null)
+        if (_session == null)
             return;
-        _playRoot.QueueFree();
-        _playRoot = null;
+        _session.QueueFree();
+        _session = null;
+        _hiddenGrid.Modulate = HiddenEditTint;
+        RedrawLevel();   // restores walls destroyed during play
         _markers.Visible = true;
         _minimap.Visible = true;
         _camera.MakeCurrent();
         _playButton.Text = "Play (P)";
     }
 
-    private void OnLevelComplete()
+    private void EndPlay(string message)
     {
         StopPlay();
-        _status.Text = "Level complete!";
+        _status.Text = message;
     }
 
     private Vector2I MouseCell() => _grid.LocalToMap(_grid.ToLocal(GetGlobalMousePosition()));
@@ -223,19 +247,23 @@ public partial class Editor : Node2D
         _level.Objects.RemoveAll(o => o.X == cell.X && o.Y == cell.Y);
         if (type == ObjectDefs.AgentStart)
             _level.Objects.RemoveAll(o => o.Type == ObjectDefs.AgentStart);
-        _level.Objects.Add(new LevelObject { Type = type, X = cell.X, Y = cell.Y });
+        var obj = new LevelObject { Type = type, X = cell.X, Y = cell.Y };
+        if (ObjectDefs.HasColorProperty(type))
+            obj.Properties["color"] = _brushColor;
+        _level.Objects.Add(obj);
         RebuildMarkers();
     }
 
     private void RedrawLevel()
     {
         _grid.Clear();
+        _hiddenGrid.Clear();
         for (int y = 0; y < _level.Height; y++)
             for (int x = 0; x < _level.Width; x++)
             {
                 int id = _level.GetTile(x, y);
                 if (id != TileDefs.Empty)
-                    _grid.SetCell(new Vector2I(x, y), TileSetBuilder.SourceId, TileSetBuilder.AtlasCoordsFor(id));
+                    SetGridCell(new Vector2I(x, y), id);
             }
         RebuildMarkers();
         ApplyCameraLimits(_camera);
@@ -253,11 +281,14 @@ public partial class Editor : Node2D
             if (def == null)
                 continue;
             var color = def.Color;
+            if (ObjectDefs.HasColorProperty(obj.Type) && obj.Properties.TryGetValue("color", out var name))
+                color = ObjectDefs.KeyColor(name);
             color.A = 0.85f;
+            int inset = ObjectDefs.IsPickup(obj.Type) ? 8 : 0;   // pickups draw smaller than doors
             _markers.AddChild(new ColorRect
             {
-                Position = new Vector2(obj.X * TileSize, obj.Y * TileSize),
-                Size = new Vector2(TileSize, TileSize),
+                Position = new Vector2(obj.X * TileSize + inset, obj.Y * TileSize + inset),
+                Size = new Vector2(TileSize - 2 * inset, TileSize - 2 * inset),
                 Color = color,
                 MouseFilter = Control.MouseFilterEnum.Ignore,
             });
@@ -320,8 +351,14 @@ public partial class Editor : Node2D
 
         var palette = new PanelContainer { Theme = theme, Position = new Vector2(0, 32) };
         ui.AddChild(palette);
+        var scroll = new ScrollContainer
+        {
+            CustomMinimumSize = new Vector2(0, 312),
+            HorizontalScrollMode = ScrollContainer.ScrollMode.Disabled,
+        };
+        palette.AddChild(scroll);
         var paletteBox = new VBoxContainer();
-        palette.AddChild(paletteBox);
+        scroll.AddChild(paletteBox);
 
         var group = new ButtonGroup();
         paletteBox.AddChild(new Label { Text = "Tiles" });
@@ -331,6 +368,15 @@ public partial class Editor : Node2D
             paletteBox.AddChild(MakeBrushButton(def.Name, def.Color, group, () => SetBrushTile(id), pressed: id == _brushTile));
         }
         paletteBox.AddChild(new Label { Text = "Objects" });
+        _colorRow = new HBoxContainer { Visible = false };
+        _colorRow.AddChild(new Label { Text = "Color" });
+        _colorPicker = new OptionButton();
+        foreach (var name in ObjectDefs.KeyColors)
+            _colorPicker.AddItem(name);
+        _colorPicker.Selected = 0;
+        _colorPicker.ItemSelected += index => _brushColor = ObjectDefs.KeyColors[(int)index];
+        _colorRow.AddChild(_colorPicker);
+        paletteBox.AddChild(_colorRow);
         foreach (var def in ObjectDefs.All)
         {
             string type = def.Type;
