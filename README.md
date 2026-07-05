@@ -1,7 +1,17 @@
 # Hacker or Soldier
-2D platformer about an agent who fights through levels full of robots, drones and enemy soldiers, using one of two strategies:
-either hacking through the levels without using violence or fighting through the hordes of enemies to the end.
+2D platformer from 2030, about an agent who fights through levels full of robots, drones and enemy soldiers, using one of two strategies: either hacking through the levels without using violence or fighting through the hordes of enemies to the end.
 The agent is sent by the Agency across the globe to execute impossible missions and accomplish the main objective.
+
+## Graphic aesthetics
+
+### 256-color VGA limitation
+This limited the palette to 256 stark, highly saturated colors. There are no smooth gradients or subtle shading values. Shading is entirely achieved through dithering—checkerboard-like pixel patterns alternating two solid colors (such as dithering cyan and dark blue to create a mid-tone blue).The palette heavily relies on high-contrast primaries: intense reds for dynamite, bright cyans and magentas for high-tech base structures, and deep blacks or dark greys for underground rocks.
+
+### Rigid, Block-Based Level Design
+The game uses a hyper-segmented grid system, meaning the environment is constructed entirely out of square tiles. Floors, ceilings, and walls are completely flat, rectilinear, and snap together like virtual Lego blocks.This gives the industrial fortresses, radar rooms, and underground caves a clean, hyper-ordered, geometric look typical of early DOS puzzle-platformers.
+
+### The "Modern Retro" standard (32×32 tiles on a 640×360 canvas)
+Grants enough pixel real estate for expressive animations, distinct sub-pixel sub-lighting, and atmospheric debris. The downside is that asset production time increases by ~300% per sprite sheet compared to 16×16.
 
 ## Objective of design
 The main objective of this design document is to help to create a level editor with an engine, where the game can be created.
@@ -23,6 +33,9 @@ The main character, the agent, has the following statistics:
 - The agent jumps 2.5 tiles high (or hits his head sooner)
 - The agent jumps up to 5 tiles sideways
 
+##### Jump from water
+The player swims up toward the surface. As long as they are submerged, their vertical velocity is capped by water resistance. When they press the jump button right at the surface boundary, the engine grants a standard jump velocity boost, but it is calculated from the water's surface line.
+
 ## Level
 The main objective of the level is to get to the exit door, which ends the level and transitions to the statistics screen. No level object can't be destroyed, unless it's stated that it's destroyable.
 
@@ -38,8 +51,8 @@ Terrain is used to create the level, the rooms. It consists of:
 - Floors
 
 ### Floors and platforms
-- Alarm floor - triggers alarm on touch
-- Hidden platforms - 
+- Alarm floor - triggers alarm on step
+- Hidden platforms - platforms that are visible only when wearing infra goggles
 
 #### Walls
 Standard or destructible walls of various textures. Walls can also be floors.
@@ -70,7 +83,7 @@ Fulfill strictly decorative / visual aspect of the game.
 - Crates (wooden / steel) - can be jumped on
 
 #### Killing terrain
-- Water floor - instantly kills the agent
+- Water floor - allows slower movement horizontally, contains electric eels
 - Spike trap - cyclically (10s) raises a spike, which takes a life 
 - Electric floor - takes a life every 3 seconds
 - Spear - stationary spear, instantly kills the agent
@@ -87,7 +100,7 @@ The alarm is on for 30 seconds from last trigger time, when on, the room changes
 twice as quickly. 
 
 #### Closet
-The agent can hide in the closet, e.g. in case of an alarm.
+The agent can hide in the closet on activate action, e.g. in case of an alarm.
 
 ### Machines / Devices
 - Computer - can be hacked via USB key with same number, switches off laser beam / floor
@@ -97,7 +110,7 @@ The agent can hide in the closet, e.g. in case of an alarm.
 - Switch - switches off laser beam / floor on hit
 
 ### Movables
-In the rooms the agent may find barrels that can be moved in both directions to make a way to originally inaccessible places.
+In the rooms the agent may find barrels that can be moved (properly emphasized) in both directions to make a way to originally inaccessible places.
 
 ## Enemies
 The agent may encounter the following enemies:
@@ -110,6 +123,7 @@ The agent may encounter the following enemies:
 - Turret - Lives: 1, Weapon: plasma shot, LoS: all directions, Speed: 0
 - Robot - Lives: infinite, Weapon: plasma shot, LoS: row, Speed: 1
 - Landmine - Lives: infinite, Weapon: mine, LoS: none (impact), Speed: 0
+- Electric eel - Lives: 1, Weapon electric shock, LoS: row, Speed 1
 Legend:
 LoS - line of sight, where can the enemy spot the agent
 Soldier, Super soldier, Drone, Robodog and Robot sometimes drop a free ammo pack
@@ -135,7 +149,7 @@ The following items available across levels activate automatically:
 
 These items activate manually:
 - Briefcase (disguise), when used, agent looks like a soldier for 30 seconds, and can't be detected by cameras
-- Infra goggles - changes visual to infra red and reveals hidden platforms
+- Infra goggles - changes visual to infra red and reveals hidden platforms, when activated they are active for 30 seconds
 
 Items can't be destroyed nor shot.
 
