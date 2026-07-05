@@ -268,3 +268,6 @@ edit mode and play mode at any time.
 ### Saving
 - The level is saved with a name and description, which are shown in the level briefing
 - Saved levels can be reopened for editing
+
+### Minimap
+To orient in a bigger level while editing, there should be top right minimap of the whole level.
