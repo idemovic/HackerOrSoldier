@@ -60,15 +60,38 @@ Known simplifications (revisit with milestone 3):
   exist
 - Alarm floor is a plain solid tile until the alarm system lands
 
-## Milestone 3 - enemies (next)
-- Line of sight: row vs all directions
-- Patrol movement and speeds per the enemy table
-- Soldier degradation chain (Ultimate -> Super -> Soldier -> tombstone)
-- Alarm system: triggers (gunshot, explosion, camera, alarm floor), 30s timer,
-  enemies at double speed, room appearance change
-- Enemy drops (ammo packs)
+### Milestone 3 - enemies
+- All ten README enemies as one data-driven class (scripts/EnemyDefs.cs +
+  scripts/Enemy.cs): fighter, soldier, super soldier, ultimate soldier, drone,
+  robodog, turret, robot, landmine, electric eel; placeable from an Enemies
+  palette section
+- Patrol with wall and ledge turning; drones fly, eels stay inside water,
+  turrets and landmines are static; contact damage with a 1s per-enemy cooldown
+- Line of sight: row (facing direction, up to 10 tiles, blocked by solid
+  tiles) or all directions (8 tiles); melee enemies chase, ranged enemies
+  stop and fire (pistol/minigun bullets straight, turret plasma aimed),
+  drones drop dynamite
+- Soldier degradation chain: Ultimate -> Super -> Soldier -> dead with a
+  tombstone (decoration until the milestone 5 score collectible)
+- Robot is invulnerable except during its 1s off-window every 10s
+- Alarm: triggered by gunshots, explosions and alarm floor tiles; 30s from
+  the last trigger, doubles enemy movement speed, tints the level red, shows
+  in the HUD (camera trigger arrives with milestone 4)
+- Explosions (dynamite, landmines): 5-tile radius, destroy destructible
+  walls, kill non-infinite enemies outright, hurt the agent, raise the alarm
+- Soldier/super soldier/drone/robodog/robot drop an ammo pack on death with
+  30% chance (PlaySession.DropChance)
+- Collision layers: tiles on layer 1, agent on layer 2, enemies collide with
+  tiles only, so enemies and the agent pass through each other and damage is
+  proximity-based
 
-## Milestone 4 - hacking path
+Known simplifications (tuning constants, not README rules):
+- Speed unit 40 px/s per table point; sight ranges 10/8 tiles
+- Enemy shot cooldowns: pistol 1.5s, minigun 0.6s, plasma 2s, dynamite 4s
+- Low-difficulty rules (super soldier dies outright, minimum lives) wait for
+  the milestone 5 settings screen
+
+## Milestone 4 - hacking path (next)
 - Computers + USB keys (number matching), switches, laser beams
 - Security cameras
 - Closets (activate action), briefcase disguise

@@ -1,3 +1,4 @@
+using System.Linq;
 using System.Threading.Tasks;
 using Godot;
 
@@ -24,6 +25,15 @@ public partial class SmokeTest : Node
         await SpikeCheck();
         await ElectricFloorCheck();
         await GogglesCheck();
+        await FighterContactCheck();
+        await DegradationCheck();
+        await TurretCheck();
+        await RobotCheck();
+        await DropCheck();
+        await EelCheck();
+        await AlarmFloorCheck();
+        await MineCheck();
+        await ExplosionCheck();
 
         GD.Print(_failures == 0 ? "SMOKE OK" : $"SMOKE FAILED ({_failures})");
         GetTree().Quit(_failures == 0 ? 0 : 1);
@@ -240,6 +250,168 @@ public partial class SmokeTest : Node
         await Frames(2);
         Input.ActionRelease("activate");
         Check(editor.Session.GogglesActive, "activate turns on picked-up infra goggles");
+        editor.StopPlay();
+    }
+
+    // A patrolling fighter spots the agent (row LoS), chases and hits on contact.
+    private async Task FighterContactCheck()
+    {
+        var editor = await FreshEditor();
+        editor.SetBrushObject(EnemyDefs.Fighter);
+        editor.PaintCell(new Vector2I(8, 10));
+        Check(editor.StartPlay(), "fighter level starts");
+        Check(editor.Session.Enemies.Count == 1, "enemy spawns in play mode");
+        await Frames(150);
+        Check(editor.IsPlaying && editor.Session.Lives == 2, "enemy contact costs a life");
+        editor.StopPlay();
+    }
+
+    // Ultimate -> Super -> Soldier -> dead, three hits across a pit that the
+    // melee stages cannot cross. The first gunshot also raises the alarm.
+    private async Task DegradationCheck()
+    {
+        var editor = await FreshEditor();
+        editor.SetBrushEraser();
+        editor.PaintCell(new Vector2I(6, 11));
+        editor.PaintCell(new Vector2I(7, 11));
+        editor.SetBrushObject(EnemyDefs.UltimateSoldier);
+        editor.PaintCell(new Vector2I(11, 10));
+        Check(editor.StartPlay(), "degradation level starts");
+        for (int shot = 0; shot < 3; shot++)
+        {
+            Input.ActionPress("shoot");
+            await Frames(2);
+            Input.ActionRelease("shoot");
+            await Frames(10);
+        }
+        Check(editor.Session.AlarmActive, "gunshot triggers the alarm");
+        await Frames(60);
+        Check(editor.Session.Enemies.Count == 0, "ultimate soldier degrades and dies after three hits");
+        editor.StopPlay();
+    }
+
+    // Turret sees in all directions and hits the agent with aimed plasma.
+    private async Task TurretCheck()
+    {
+        var editor = await FreshEditor();
+        editor.SetBrushObject(EnemyDefs.Turret);
+        editor.PaintCell(new Vector2I(8, 10));
+        Check(editor.StartPlay(), "turret level starts");
+        await Frames(80);
+        Check(editor.IsPlaying && editor.Session.Lives == 2, "turret plasma takes a life");
+        editor.StopPlay();
+    }
+
+    // Robots shrug off bullets except during their 1s off-window every 10s.
+    private async Task RobotCheck()
+    {
+        var editor = await FreshEditor();
+        editor.SetBrushObject(EnemyDefs.Robot);
+        editor.PaintCell(new Vector2I(8, 10));
+        Check(editor.StartPlay(), "robot level starts");
+        Input.ActionPress("shoot");
+        await Frames(2);
+        Input.ActionRelease("shoot");
+        await Frames(40);
+        Check(editor.Session.Enemies.Count == 1, "robot shrugs off bullets while active");
+        editor.Session.Time = 9.0f;   // inside the off-window (9..10)
+        Input.ActionPress("shoot");
+        await Frames(2);
+        Input.ActionRelease("shoot");
+        await Frames(40);
+        Check(editor.Session.Enemies.Count == 0, "robot dies while turned off");
+        editor.StopPlay();
+    }
+
+    // A dead robodog drops an ammo pack (drop chance forced to 100%).
+    private async Task DropCheck()
+    {
+        var editor = await FreshEditor();
+        editor.SetBrushEraser();
+        editor.PaintCell(new Vector2I(6, 11));
+        editor.PaintCell(new Vector2I(7, 11));
+        editor.SetBrushObject(EnemyDefs.Robodog);
+        editor.PaintCell(new Vector2I(11, 10));
+        Check(editor.StartPlay(), "drop level starts");
+        editor.Session.DropChance = 1f;
+        for (int shot = 0; shot < 2; shot++)
+        {
+            Input.ActionPress("shoot");
+            await Frames(2);
+            Input.ActionRelease("shoot");
+            await Frames(10);
+        }
+        await Frames(40);
+        Check(editor.Session.Enemies.Count == 0, "robodog dies after two hits");
+        Check(editor.Session.GetChildren().OfType<Pickup>().Any(p => p.Source.Type == ObjectDefs.AmmoPack),
+            "dead robodog dropped an ammo pack");
+        editor.StopPlay();
+    }
+
+    // The eel patrols inside the water and shocks the agent on contact.
+    private async Task EelCheck()
+    {
+        var editor = await FreshEditor();
+        editor.SetBrushTile(TileDefs.Water);
+        for (int x = 8; x <= 12; x++)
+            for (int y = 8; y <= 10; y++)
+                editor.PaintCell(new Vector2I(x, y));
+        editor.SetBrushObject(EnemyDefs.ElectricEel);
+        editor.PaintCell(new Vector2I(10, 10));
+        Check(editor.StartPlay(), "eel level starts");
+        Input.ActionPress("move_right");
+        await Frames(90);
+        Input.ActionRelease("move_right");
+        await Frames(10);
+        Check(editor.IsPlaying && editor.Session.Lives == 2, "electric eel shock costs a life");
+        editor.StopPlay();
+    }
+
+    // Standing on an alarm floor tile raises the alarm.
+    private async Task AlarmFloorCheck()
+    {
+        var editor = await FreshEditor();
+        editor.SetBrushTile(TileDefs.AlarmFloor);
+        editor.PaintCell(new Vector2I(2, 11));
+        Check(editor.StartPlay(), "alarm floor level starts");
+        await Frames(5);
+        Check(editor.Session.AlarmActive, "alarm floor triggers the alarm");
+        editor.StopPlay();
+    }
+
+    // Landmines explode on impact and are consumed.
+    private async Task MineCheck()
+    {
+        var editor = await FreshEditor();
+        editor.SetBrushObject(EnemyDefs.Landmine);
+        editor.PaintCell(new Vector2I(6, 10));
+        Check(editor.StartPlay(), "landmine level starts");
+        Input.ActionPress("move_right");
+        await Frames(40);
+        Input.ActionRelease("move_right");
+        await Frames(20);
+        Check(editor.IsPlaying && editor.Session.Lives == 2, "landmine explosion costs a life");
+        Check(editor.Session.Enemies.Count == 0, "landmine is consumed by its explosion");
+        editor.StopPlay();
+    }
+
+    // Explosions destroy destructible walls, kill enemies in the radius,
+    // hurt the agent and raise the alarm.
+    private async Task ExplosionCheck()
+    {
+        var editor = await FreshEditor();
+        editor.SetBrushTile(TileDefs.DestructibleWall);
+        editor.PaintCell(new Vector2I(5, 9));
+        editor.SetBrushObject(EnemyDefs.Fighter);
+        editor.PaintCell(new Vector2I(8, 10));
+        Check(editor.StartPlay(), "explosion level starts");
+        await Frames(2);
+        editor.Session.Explode(new Vector2(6 * 32, 10 * 32 + 16));
+        await Frames(2);
+        Check(editor.Session.TileAt(5, 9) == TileDefs.Empty, "explosion destroys destructible walls");
+        Check(editor.Session.Enemies.Count == 0, "explosion kills enemies in the radius");
+        Check(editor.Session.Lives == 2, "explosion hurts the agent");
+        Check(editor.Session.AlarmActive, "explosion triggers the alarm");
         editor.StopPlay();
     }
 

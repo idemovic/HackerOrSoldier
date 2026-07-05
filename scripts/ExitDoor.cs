@@ -9,6 +9,7 @@ public partial class ExitDoor : Area2D
 
     public override void _Ready()
     {
+        CollisionMask = 2;   // the agent's collision layer
         AddChild(new CollisionShape2D
         {
             Shape = new RectangleShape2D { Size = new Vector2(32, 32) },

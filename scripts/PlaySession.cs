@@ -19,6 +19,10 @@ public partial class PlaySession : Node2D
     private const float SpikeCycle = 10f;   // README: spike trap cycles every 10s
     private const float SpikeUpTime = 2f;   // raised during the last 2s of each cycle
     private const float ItemDuration = 30f; // README: briefcase and goggles last 30s
+    private const float RobotCycle = 10f;   // README: robots stop and turn off every 10s
+    private const float RobotOffTime = 1f;
+    private const float AlarmDuration = 30f;         // README: alarm stays on 30s from the last trigger
+    private const float ExplosionRadius = 5 * 32f;   // README: dynamite kills in a 5 square radius
 
     public Agent Agent { get; private set; }
     public int Lives { get; private set; } = 3;   // README: default 3 lives
@@ -27,7 +31,12 @@ public partial class PlaySession : Node2D
     public bool GogglesActive => _gogglesTime > 0;
     public float Time { get; set; }               // settable so tests can skip ahead
     public bool SpikesUp => Time % SpikeCycle >= SpikeCycle - SpikeUpTime;
+    public bool RobotsOff => Time % RobotCycle >= RobotCycle - RobotOffTime;
+    public bool AlarmActive => _alarmTime > 0;
+    public float DropChance { get; set; } = 0.3f;   // README: some enemies "sometimes" drop an ammo pack
+    public System.Collections.Generic.IReadOnlyList<Enemy> Enemies => _enemies;
     public float LevelBottom => _level.Height * TileSetBuilder.TileSize;
+    public float LevelRight => _level.Width * TileSetBuilder.TileSize;
 
     private LevelData _level;
     private TileMapLayer _grid;
@@ -38,6 +47,8 @@ public partial class PlaySession : Node2D
     private readonly HashSet<string> _keys = new();
     private readonly List<string> _heldItems = new();
     private readonly List<LockedDoor> _doors = new();
+    private readonly List<Enemy> _enemies = new();
+    private float _alarmTime;
     private float _gogglesTime;
     private float _disguiseTime;
     private Vector2 _startPosition;
@@ -90,6 +101,14 @@ public partial class PlaySession : Node2D
                     AddChild(door);
                     break;
                 default:
+                    var enemyDef = EnemyDefs.Get(obj.Type);
+                    if (enemyDef != null)
+                    {
+                        var enemy = new Enemy { Position = pos, Def = enemyDef, Session = this };
+                        _enemies.Add(enemy);
+                        AddChild(enemy);
+                        break;
+                    }
                     var pickup = new Pickup { Position = pos, Source = obj };
                     pickup.Collected += OnPickup;
                     AddChild(pickup);
@@ -135,6 +154,14 @@ public partial class PlaySession : Node2D
         if (_disguiseTime > 0)
             _disguiseTime -= dt;
 
+        if (_alarmTime > 0)
+        {
+            _alarmTime -= dt;
+            _grid.Modulate = new Color(1f, 0.72f, 0.72f);   // README: rooms change appearance during an alarm
+            if (_alarmTime <= 0)
+                _grid.Modulate = Colors.White;
+        }
+
         // Doors open on contact when the agent carries the matching key.
         for (int i = _doors.Count - 1; i >= 0; i--)
         {
@@ -172,12 +199,84 @@ public partial class PlaySession : Node2D
         if (Ammo <= 0)
             return;
         Ammo--;
+        TriggerAlarm();   // README: a gun shot triggers the alarm
         AddChild(new Bullet
         {
             Session = this,
             Direction = agent.Facing,
             Position = agent.Position + new Vector2(agent.Facing * 20, -2),
         });
+    }
+
+    public void TriggerAlarm() => _alarmTime = AlarmDuration;
+
+    public void OnEnemyDied(Enemy enemy) => _enemies.Remove(enemy);
+
+    public void SpawnEnemyBullet(Vector2 from, Vector2 direction, Color tint) =>
+        AddChild(new EnemyBullet { Session = this, Position = from, Direction = direction, Tint = tint });
+
+    public void SpawnDynamite(Vector2 from) =>
+        AddChild(new Dynamite { Session = this, Position = from });
+
+    public void SpawnAmmoPack(Vector2 at)
+    {
+        var pickup = new Pickup
+        {
+            Position = at,
+            Source = new LevelObject { Type = ObjectDefs.AmmoPack },
+        };
+        pickup.Collected += OnPickup;
+        AddChild(pickup);
+    }
+
+    public void SpawnTombstone(Vector2 at) =>
+        AddChild(new ColorRect   // decoration for now; the score collectible comes with milestone 5
+        {
+            Position = at + new Vector2(-8, -4),
+            Size = new Vector2(16, 20),
+            Color = new Color(0.6f, 0.6f, 0.65f),
+            MouseFilter = Control.MouseFilterEnum.Ignore,
+        });
+
+    // Explosions kill outright: no degradation, no drops. Enemies with
+    // infinite lives survive (README: does not apply to infinite lives).
+    public void Explode(Vector2 center)
+    {
+        TriggerAlarm();
+        int tile = TileSetBuilder.TileSize;
+        int minX = (int)Mathf.Floor((center.X - ExplosionRadius) / tile);
+        int maxX = (int)Mathf.Floor((center.X + ExplosionRadius) / tile);
+        int minY = (int)Mathf.Floor((center.Y - ExplosionRadius) / tile);
+        int maxY = (int)Mathf.Floor((center.Y + ExplosionRadius) / tile);
+        for (int y = minY; y <= maxY; y++)
+            for (int x = minX; x <= maxX; x++)
+            {
+                var cellCenter = new Vector2(x * tile + tile / 2f, y * tile + tile / 2f);
+                if (TileAt(x, y) == TileDefs.DestructibleWall && center.DistanceTo(cellCenter) <= ExplosionRadius)
+                    DestroyTile(new Vector2I(x, y));
+            }
+        foreach (var enemy in _enemies.ToArray())
+            if (!enemy.Def.InfiniteLives && center.DistanceTo(enemy.Position) <= ExplosionRadius)
+            {
+                _enemies.Remove(enemy);
+                enemy.QueueFree();
+            }
+        if (Agent != null && center.DistanceTo(Agent.Position) <= ExplosionRadius)
+            AgentHit();
+
+        var flash = new ColorRect
+        {
+            Position = center - new Vector2(ExplosionRadius, ExplosionRadius),
+            Size = new Vector2(ExplosionRadius * 2, ExplosionRadius * 2),
+            Color = new Color(1f, 0.8f, 0.4f, 0.5f),
+            MouseFilter = Control.MouseFilterEnum.Ignore,
+        };
+        AddChild(flash);
+        GetTree().CreateTimer(0.25).Timeout += () =>
+        {
+            if (IsInstanceValid(flash))
+                flash.QueueFree();
+        };
     }
 
     public void ActivateHeldItem()
@@ -221,6 +320,8 @@ public partial class PlaySession : Node2D
             return;
         _ended = true;
         Agent?.SetPhysicsProcess(false);
+        foreach (var enemy in _enemies)
+            enemy.SetPhysicsProcess(false);
         EmitSignal(signal);
     }
 
@@ -265,6 +366,8 @@ public partial class PlaySession : Node2D
             text += $"  Infra {Mathf.CeilToInt(_gogglesTime)}s";
         if (_disguiseTime > 0)
             text += $"  Disguise {Mathf.CeilToInt(_disguiseTime)}s";
+        if (AlarmActive)
+            text += $"  ALARM {Mathf.CeilToInt(_alarmTime)}s";
         _hud.Text = text;
     }
 }

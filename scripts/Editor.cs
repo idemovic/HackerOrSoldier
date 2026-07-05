@@ -227,6 +227,7 @@ public partial class Editor : Node2D
         _session.QueueFree();
         _session = null;
         _hiddenGrid.Modulate = HiddenEditTint;
+        _grid.Modulate = Colors.White;   // clears the alarm tint
         RedrawLevel();   // restores walls destroyed during play
         _markers.Visible = true;
         _minimap.Visible = true;
@@ -278,9 +279,10 @@ public partial class Editor : Node2D
         foreach (var obj in _level.Objects)
         {
             var def = ObjectDefs.All.FirstOrDefault(d => d.Type == obj.Type);
-            if (def == null)
+            var enemyDef = def == null ? EnemyDefs.Get(obj.Type) : null;
+            if (def == null && enemyDef == null)
                 continue;
-            var color = def.Color;
+            var color = def?.Color ?? enemyDef.Color;
             if (ObjectDefs.HasColorProperty(obj.Type) && obj.Properties.TryGetValue("color", out var name))
                 color = ObjectDefs.KeyColor(name);
             color.A = 0.85f;
@@ -378,6 +380,12 @@ public partial class Editor : Node2D
         _colorRow.AddChild(_colorPicker);
         paletteBox.AddChild(_colorRow);
         foreach (var def in ObjectDefs.All)
+        {
+            string type = def.Type;
+            paletteBox.AddChild(MakeBrushButton(def.Name, def.Color, group, () => SetBrushObject(type)));
+        }
+        paletteBox.AddChild(new Label { Text = "Enemies" });
+        foreach (var def in EnemyDefs.All)
         {
             string type = def.Type;
             paletteBox.AddChild(MakeBrushButton(def.Name, def.Color, group, () => SetBrushObject(type)));

@@ -23,6 +23,16 @@ public partial class Bullet : Node2D
     public override void _PhysicsProcess(double delta)
     {
         Position += new Vector2(Direction * Speed * (float)delta, 0);
+        foreach (var enemy in Session.Enemies)
+        {
+            var d = (enemy.Position - Position).Abs();
+            if (d.X < 18 && d.Y < 18)
+            {
+                QueueFree();
+                enemy.TakeHit();
+                return;
+            }
+        }
         int tile = TileSetBuilder.TileSize;
         var cell = new Vector2I(
             (int)Mathf.Floor(Position.X / tile),

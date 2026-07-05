@@ -114,8 +114,14 @@ public partial class Agent : CharacterBody2D
         if (IsOnFloor())
         {
             int below = (int)Mathf.Floor((Position.Y + HazardExtent + 3f) / Tile);
-            for (int x = minX; x <= maxX && !onElectric; x++)
-                onElectric = Session.TileAt(x, below) == TileDefs.ElectricFloor;
+            for (int x = minX; x <= maxX; x++)
+            {
+                int id = Session.TileAt(x, below);
+                if (id == TileDefs.ElectricFloor)
+                    onElectric = true;
+                else if (id == TileDefs.AlarmFloor)
+                    Session.TriggerAlarm();   // README: alarm floor triggers on step
+            }
         }
         if (!onElectric)
         {
