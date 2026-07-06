@@ -33,8 +33,11 @@ public partial class PlaySession : Node2D
     public bool SpikesUp => Time % SpikeCycle >= SpikeCycle - SpikeUpTime;
     public bool RobotsOff => Time % RobotCycle >= RobotCycle - RobotOffTime;
     public bool AlarmActive => _alarmTime > 0;
+    public bool DisguiseActive => _disguiseTime > 0;
+    public bool ElectricFloorsOff { get; private set; }
     public float DropChance { get; set; } = 0.3f;   // README: some enemies "sometimes" drop an ammo pack
     public System.Collections.Generic.IReadOnlyList<Enemy> Enemies => _enemies;
+    public System.Collections.Generic.IReadOnlyList<WallSwitch> Switches => _switches;
     public float LevelBottom => _level.Height * TileSetBuilder.TileSize;
     public float LevelRight => _level.Width * TileSetBuilder.TileSize;
 
@@ -48,6 +51,11 @@ public partial class PlaySession : Node2D
     private readonly List<string> _heldItems = new();
     private readonly List<LockedDoor> _doors = new();
     private readonly List<Enemy> _enemies = new();
+    private readonly List<Computer> _computers = new();
+    private readonly List<WallSwitch> _switches = new();
+    private readonly List<Closet> _closets = new();
+    private readonly HashSet<string> _usbKeys = new();
+    private readonly HashSet<string> _circuitsOff = new();
     private float _alarmTime;
     private float _gogglesTime;
     private float _disguiseTime;
@@ -99,6 +107,30 @@ public partial class PlaySession : Node2D
                     var door = new LockedDoor { Position = pos, ColorName = ColorOf(obj) };
                     _doors.Add(door);
                     AddChild(door);
+                    break;
+                case ObjectDefs.Computer:
+                    var computer = new Computer { Position = pos, Number = NumberOf(obj) };
+                    _computers.Add(computer);
+                    AddChild(computer);
+                    break;
+                case ObjectDefs.Switch:
+                    var wallSwitch = new WallSwitch { Position = pos, Number = NumberOf(obj) };
+                    _switches.Add(wallSwitch);
+                    AddChild(wallSwitch);
+                    break;
+                case ObjectDefs.Laser:
+                    AddChild(new LaserBeam { Position = pos, Number = NumberOf(obj), Session = this });
+                    break;
+                case ObjectDefs.Camera:
+                    AddChild(new SecurityCamera { Position = pos, Session = this });
+                    break;
+                case ObjectDefs.Closet:
+                    var closet = new Closet { Position = pos };
+                    _closets.Add(closet);
+                    AddChild(closet);
+                    break;
+                case ObjectDefs.Barrel:
+                    AddChild(new Barrel { Position = pos });
                     break;
                 default:
                     var enemyDef = EnemyDefs.Get(obj.Type);
@@ -174,6 +206,19 @@ public partial class PlaySession : Node2D
             }
         }
 
+        // Computers hack automatically on proximity with the matching USB key.
+        foreach (var computer in _computers)
+        {
+            if (computer.Hacked)
+                continue;
+            var offset = (computer.Position - Agent.Position).Abs();
+            if (offset.X < 36 && offset.Y < 36 && _usbKeys.Contains(computer.Number))
+            {
+                computer.SetHacked();
+                TurnOffCircuit(computer.Number);
+            }
+        }
+
         UpdateHud();
     }
 
@@ -209,6 +254,62 @@ public partial class PlaySession : Node2D
     }
 
     public void TriggerAlarm() => _alarmTime = AlarmDuration;
+
+    public bool IsCircuitOff(string number) => _circuitsOff.Contains(number);
+
+    // README: computers and switches switch off "laser beam / floor". Lasers
+    // are matched per circuit number; electric floors have no per-tile
+    // properties yet, so the first hack disables all of them.
+    public void TurnOffCircuit(string number)
+    {
+        _circuitsOff.Add(number);
+        if (ElectricFloorsOff)
+            return;
+        ElectricFloorsOff = true;
+        int tile = TileSetBuilder.TileSize;
+        for (int y = 0; y < _level.Height; y++)
+            for (int x = 0; x < _level.Width; x++)
+                if (_level.GetTile(x, y) == TileDefs.ElectricFloor)
+                    AddChild(new ColorRect
+                    {
+                        Position = new Vector2(x * tile, y * tile),
+                        Size = new Vector2(tile, tile),
+                        Color = new Color(0.1f, 0.1f, 0.15f, 0.55f),
+                        MouseFilter = Control.MouseFilterEnum.Ignore,
+                    });
+    }
+
+    // The activate action, by priority: leave a closet, hide in a nearby
+    // closet, otherwise use a held manual item.
+    public void ActivateAction()
+    {
+        if (Agent.IsHiding)
+        {
+            Agent.SetHiding(false);
+            return;
+        }
+        foreach (var closet in _closets)
+        {
+            var offset = (closet.Position - Agent.Position).Abs();
+            if (offset.X < 24 && offset.Y < 24)
+            {
+                Agent.SetHiding(true);
+                Agent.Position = closet.Position;
+                return;
+            }
+        }
+        ActivateHeldItem();
+    }
+
+    public bool LineClear(Vector2 from, Vector2 to)
+    {
+        float distance = from.DistanceTo(to);
+        int steps = Mathf.CeilToInt(distance / 16f);
+        for (int i = 1; i < steps; i++)
+            if (TileDefs.Get(TileAtPosition(from.Lerp(to, i / (float)steps)))?.Solid == true)
+                return false;
+        return true;
+    }
 
     public void OnEnemyDied(Enemy enemy) => _enemies.Remove(enemy);
 
@@ -345,6 +446,9 @@ public partial class PlaySession : Node2D
             case ObjectDefs.InfraGoggles:
                 _heldItems.Add(pickup.Source.Type);
                 break;
+            case ObjectDefs.UsbKey:
+                _usbKeys.Add(NumberOf(pickup.Source));
+                break;
         }
         pickup.QueueFree();
         UpdateHud();
@@ -353,11 +457,18 @@ public partial class PlaySession : Node2D
     private static string ColorOf(LevelObject obj) =>
         obj.Properties.TryGetValue("color", out var color) ? color : ObjectDefs.KeyColors[0];
 
+    private static string NumberOf(LevelObject obj) =>
+        obj.Properties.TryGetValue("number", out var number) ? number : ObjectDefs.Numbers[0];
+
     private void UpdateHud()
     {
         var text = $"Lives {Lives}  Ammo {Ammo}";
         if (_keys.Count > 0)
             text += "  Keys: " + string.Join(" ", _keys);
+        if (_usbKeys.Count > 0)
+            text += "  USB: " + string.Join(" ", _usbKeys);
+        if (Agent != null && Agent.IsHiding)
+            text += "  Hidden (C to leave)";
         if (HasVest)
             text += "  Vest";
         foreach (var item in _heldItems)

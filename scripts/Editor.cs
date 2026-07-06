@@ -33,6 +33,8 @@ public partial class Editor : Node2D
     private Minimap _minimap;
     private HBoxContainer _colorRow;
     private OptionButton _colorPicker;
+    private HBoxContainer _numberRow;
+    private OptionButton _numberPicker;
 
     private enum BrushKind { Tile, Object, Eraser }
 
@@ -40,6 +42,7 @@ public partial class Editor : Node2D
     private int _brushTile = TileDefs.All[0].Id;
     private string _brushObject = "";
     private string _brushColor = ObjectDefs.KeyColors[0];
+    private string _brushNumber = ObjectDefs.Numbers[0];
 
     public LevelData Level => _level;
     public bool IsPlaying => _session != null;
@@ -133,7 +136,7 @@ public partial class Editor : Node2D
         UpdateColorRow();
     }
 
-    public void SetBrushObject(string type, string color = null)
+    public void SetBrushObject(string type, string color = null, string number = null)
     {
         _brushKind = BrushKind.Object;
         _brushObject = type;
@@ -143,6 +146,13 @@ public partial class Editor : Node2D
             int index = System.Array.IndexOf(ObjectDefs.KeyColors, color);
             if (_colorPicker != null && index >= 0)
                 _colorPicker.Selected = index;
+        }
+        if (number != null)
+        {
+            _brushNumber = number;
+            int index = System.Array.IndexOf(ObjectDefs.Numbers, number);
+            if (_numberPicker != null && index >= 0)
+                _numberPicker.Selected = index;
         }
         UpdateColorRow();
     }
@@ -157,6 +167,8 @@ public partial class Editor : Node2D
     {
         if (_colorRow != null)
             _colorRow.Visible = _brushKind == BrushKind.Object && ObjectDefs.HasColorProperty(_brushObject);
+        if (_numberRow != null)
+            _numberRow.Visible = _brushKind == BrushKind.Object && ObjectDefs.HasNumberProperty(_brushObject);
     }
 
     public void PaintCell(Vector2I cell)
@@ -251,6 +263,8 @@ public partial class Editor : Node2D
         var obj = new LevelObject { Type = type, X = cell.X, Y = cell.Y };
         if (ObjectDefs.HasColorProperty(type))
             obj.Properties["color"] = _brushColor;
+        if (ObjectDefs.HasNumberProperty(type))
+            obj.Properties["number"] = _brushNumber;
         _level.Objects.Add(obj);
         RebuildMarkers();
     }
@@ -287,13 +301,21 @@ public partial class Editor : Node2D
                 color = ObjectDefs.KeyColor(name);
             color.A = 0.85f;
             int inset = ObjectDefs.IsPickup(obj.Type) ? 8 : 0;   // pickups draw smaller than doors
-            _markers.AddChild(new ColorRect
+            var marker = new ColorRect
             {
                 Position = new Vector2(obj.X * TileSize + inset, obj.Y * TileSize + inset),
                 Size = new Vector2(TileSize - 2 * inset, TileSize - 2 * inset),
                 Color = color,
                 MouseFilter = Control.MouseFilterEnum.Ignore,
-            });
+            };
+            if (ObjectDefs.HasNumberProperty(obj.Type) && obj.Properties.TryGetValue("number", out var number))
+                marker.AddChild(new Label
+                {
+                    Text = number,
+                    Theme = new Theme { DefaultFontSize = 10 },
+                    MouseFilter = Control.MouseFilterEnum.Ignore,
+                });
+            _markers.AddChild(marker);
         }
     }
 
@@ -379,6 +401,15 @@ public partial class Editor : Node2D
         _colorPicker.ItemSelected += index => _brushColor = ObjectDefs.KeyColors[(int)index];
         _colorRow.AddChild(_colorPicker);
         paletteBox.AddChild(_colorRow);
+        _numberRow = new HBoxContainer { Visible = false };
+        _numberRow.AddChild(new Label { Text = "Number" });
+        _numberPicker = new OptionButton();
+        foreach (var number in ObjectDefs.Numbers)
+            _numberPicker.AddItem(number);
+        _numberPicker.Selected = 0;
+        _numberPicker.ItemSelected += index => _brushNumber = ObjectDefs.Numbers[(int)index];
+        _numberRow.AddChild(_numberPicker);
+        paletteBox.AddChild(_numberRow);
         foreach (var def in ObjectDefs.All)
         {
             string type = def.Type;

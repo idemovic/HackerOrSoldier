@@ -31,6 +31,7 @@ public partial class Agent : CharacterBody2D
 
     public PlaySession Session { get; set; }
     public int Facing { get; private set; } = 1;
+    public bool IsHiding { get; private set; }
 
     private float _electricTime;
 
@@ -41,9 +42,24 @@ public partial class Agent : CharacterBody2D
         _electricTime = 0f;
     }
 
+    public void SetHiding(bool hiding)
+    {
+        IsHiding = hiding;
+        Modulate = hiding ? new Color(1, 1, 1, 0.35f) : Colors.White;
+    }
+
     public override void _PhysicsProcess(double delta)
     {
         float dt = (float)delta;
+
+        if (Session != null && Input.IsActionJustPressed("activate"))
+            Session.ActivateAction();
+        if (IsHiding)
+        {
+            Velocity = Vector2.Zero;
+            return;
+        }
+
         Vector2 velocity = Velocity;
 
         bool submerged = TileAt(0, 0) == TileDefs.Water;
@@ -72,13 +88,18 @@ public partial class Agent : CharacterBody2D
         Velocity = velocity;
         MoveAndSlide();
 
+        for (int i = 0; i < GetSlideCollisionCount(); i++)
+        {
+            var collision = GetSlideCollision(i);
+            if (collision.GetCollider() is Barrel barrel && Mathf.Abs(collision.GetNormal().X) > 0.9f)
+                barrel.Push(collision.GetNormal().X < 0 ? 1 : -1);   // the normal points back at the agent
+        }
+
         if (Session == null)
             return;
 
         if (Input.IsActionJustPressed("shoot"))
             Session.TryShoot(this);
-        if (Input.IsActionJustPressed("activate"))
-            Session.ActivateHeldItem();
 
         CheckHazards(dt);
     }
@@ -117,7 +138,7 @@ public partial class Agent : CharacterBody2D
             for (int x = minX; x <= maxX; x++)
             {
                 int id = Session.TileAt(x, below);
-                if (id == TileDefs.ElectricFloor)
+                if (id == TileDefs.ElectricFloor && !Session.ElectricFloorsOff)
                     onElectric = true;
                 else if (id == TileDefs.AlarmFloor)
                     Session.TriggerAlarm();   // README: alarm floor triggers on step

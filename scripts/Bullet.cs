@@ -33,6 +33,19 @@ public partial class Bullet : Node2D
                 return;
             }
         }
+        foreach (var wallSwitch in Session.Switches)
+        {
+            if (wallSwitch.Activated)
+                continue;
+            var d = (wallSwitch.Position - Position).Abs();
+            if (d.X < 18 && d.Y < 18)
+            {
+                QueueFree();
+                wallSwitch.Activate();
+                Session.TurnOffCircuit(wallSwitch.Number);   // README: switch turns off laser beam / floor on hit
+                return;
+            }
+        }
         int tile = TileSetBuilder.TileSize;
         var cell = new Vector2I(
             (int)Mathf.Floor(Position.X / tile),

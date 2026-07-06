@@ -91,13 +91,33 @@ Known simplifications (tuning constants, not README rules):
 - Low-difficulty rules (super soldier dies outright, minimum lives) wait for
   the milestone 5 settings screen
 
-## Milestone 4 - hacking path (next)
-- Computers + USB keys (number matching), switches, laser beams
-- Security cameras
-- Closets (activate action), briefcase disguise
-- Movable barrels
+### Milestone 4 - hacking path
+- Circuits: computers, switches and lasers carry a number property (1-4),
+  chosen from a second property row in the palette; markers and computers
+  show their number
+- USB keys are numbered pickups; walking up to a computer while carrying the
+  matching USB key hacks it automatically (README: items activate on
+  proximity) and turns off its circuit
+- Switches turn off their circuit when shot (README: "on hit"), trading a
+  gunshot alarm for the hack
+- Laser beams run from the emitter up to the first solid tile; contact costs
+  a life after 3 seconds (same rule as the electric floor); turning off the
+  circuit disables the beam
+- Turning off any circuit also disables all electric floor tiles (README says
+  computers/switches switch off "laser beam / floor"; per-tile floor linking
+  would need tile properties, so floor disabling is global for now)
+- Security cameras raise the alarm while they see the agent (8 tiles,
+  blocked by solid tiles); an active briefcase disguise or hiding defeats them
+- Closets: activate (C) next to a closet hides the agent (immobile,
+  invisible to enemies, cameras, bullets and contact damage); C again leaves.
+  Priority for C: leave closet, hide in closet, then use held items
+- Movable barrels: pushed by walking into them (100 px/s), solid to stand
+  on, treated as walls by enemies
+- Smoke test covers hack-by-number, wrong-number stays locked, laser damage
+  and pass-through when off, switch shooting, floor disabling, camera alarm,
+  disguise, closet hiding and leaving, barrel pushing
 
-## Milestone 5 - meta layer
+## Milestone 5 - meta layer (next)
 - Main menu (New game, Continue, Settings, Create level, Exit)
 - Shop and coin economy, collectibles with score
 - Statistics screen (time, score, kills, accuracy, completeness) with the
@@ -118,6 +138,11 @@ Known simplifications (tuning constants, not README rules):
   aesthetic is an asset swap plus one shader, not a structural decision.
 - Level size is fixed at 40x12 tiles for now; the format stores width/height,
   so resizing is a later editor feature, not a format change.
+- README objects not yet scheduled in a milestone: teleports, elevators and
+  moving platforms, electric doors, flame traps, rocket launchers, extra
+  weapons (chainsaw, assault rifle, mini gun, crossbow, dynamite for the
+  agent), decorations (including jumpable tables and crates) and lights.
+  Slot them in around milestone 5 or as editor content updates.
 
 ## Open design decisions
 - Respawn semantics: implemented as respawn at the agent start keeping level

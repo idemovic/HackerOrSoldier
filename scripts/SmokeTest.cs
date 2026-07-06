@@ -34,6 +34,13 @@ public partial class SmokeTest : Node
         await AlarmFloorCheck();
         await MineCheck();
         await ExplosionCheck();
+        await ComputerHackCheck();
+        await LaserDamageCheck();
+        await SwitchCheck();
+        await CameraAlarmCheck();
+        await DisguiseCheck();
+        await ClosetCheck();
+        await BarrelCheck();
 
         GD.Print(_failures == 0 ? "SMOKE OK" : $"SMOKE FAILED ({_failures})");
         GetTree().Quit(_failures == 0 ? 0 : 1);
@@ -412,6 +419,138 @@ public partial class SmokeTest : Node
         Check(editor.Session.Enemies.Count == 0, "explosion kills enemies in the radius");
         Check(editor.Session.Lives == 2, "explosion hurts the agent");
         Check(editor.Session.AlarmActive, "explosion triggers the alarm");
+        editor.StopPlay();
+    }
+
+    // USB key 2 hacks computer 2 on proximity, turning off laser circuit 2.
+    // Computer 3 must stay locked.
+    private async Task ComputerHackCheck()
+    {
+        var editor = await FreshEditor();
+        editor.SetBrushObject(ObjectDefs.UsbKey, number: "2");
+        editor.PaintCell(new Vector2I(5, 10));
+        editor.SetBrushObject(ObjectDefs.Computer, number: "2");
+        editor.PaintCell(new Vector2I(8, 10));
+        editor.SetBrushObject(ObjectDefs.Computer, number: "3");
+        editor.PaintCell(new Vector2I(10, 10));
+        editor.SetBrushObject(ObjectDefs.Laser, number: "2");
+        editor.PaintCell(new Vector2I(12, 10));
+        Check(editor.StartPlay(), "computer level starts");
+        Input.ActionPress("move_right");
+        await Frames(120);
+        Input.ActionRelease("move_right");
+        Check(editor.Session.IsCircuitOff("2"), "usb key with the matching number hacks the computer");
+        Check(!editor.Session.IsCircuitOff("3"), "computer with a different number stays locked");
+        Check(editor.PlayerAgent.Position.X > 13 * 32, "agent passes the switched-off laser");
+        editor.StopPlay();
+    }
+
+    // Standing in an active laser beam costs a life after 3 seconds.
+    private async Task LaserDamageCheck()
+    {
+        var editor = await FreshEditor();
+        editor.SetBrushObject(ObjectDefs.Laser, number: "1");
+        editor.PaintCell(new Vector2I(5, 10));
+        Check(editor.StartPlay(), "laser level starts");
+        Input.ActionPress("move_right");
+        await Frames(25);
+        Input.ActionRelease("move_right");
+        await Frames(200);
+        Check(editor.Session.Lives == 2, "laser beam takes a life after 3 seconds of contact");
+        editor.StopPlay();
+    }
+
+    // Shooting a switch turns off its circuit, which also disables
+    // electric floors before they can hurt the agent.
+    private async Task SwitchCheck()
+    {
+        var editor = await FreshEditor();
+        editor.SetBrushTile(TileDefs.ElectricFloor);
+        editor.PaintCell(new Vector2I(2, 11));
+        editor.SetBrushObject(ObjectDefs.Switch, number: "1");
+        editor.PaintCell(new Vector2I(8, 10));
+        Check(editor.StartPlay(), "switch level starts");
+        Input.ActionPress("shoot");
+        await Frames(2);
+        Input.ActionRelease("shoot");
+        await Frames(240);
+        Check(editor.Session.IsCircuitOff("1"), "shooting the switch turns off its circuit");
+        Check(editor.Session.Lives == 3, "switched-off circuit disables electric floors");
+        editor.StopPlay();
+    }
+
+    // A security camera that sees the agent raises the alarm.
+    private async Task CameraAlarmCheck()
+    {
+        var editor = await FreshEditor();
+        editor.SetBrushObject(ObjectDefs.Camera);
+        editor.PaintCell(new Vector2I(8, 8));
+        Check(editor.StartPlay(), "camera level starts");
+        await Frames(5);
+        Check(editor.Session.AlarmActive, "security camera raises the alarm");
+        editor.StopPlay();
+    }
+
+    // With the briefcase disguise active, the camera does not see the agent.
+    private async Task DisguiseCheck()
+    {
+        var editor = await FreshEditor();
+        editor.SetBrushObject(ObjectDefs.Briefcase);
+        editor.PaintCell(new Vector2I(3, 10));
+        editor.SetBrushObject(ObjectDefs.Camera);
+        editor.PaintCell(new Vector2I(14, 6));
+        Check(editor.StartPlay(), "disguise level starts");
+        Input.ActionPress("move_right");
+        await Frames(20);
+        Input.ActionPress("activate");
+        await Frames(2);
+        Input.ActionRelease("activate");
+        await Frames(38);
+        Input.ActionRelease("move_right");
+        await Frames(10);
+        Check(editor.Session.DisguiseActive, "activate turns on the briefcase disguise");
+        Check(!editor.Session.AlarmActive, "disguised agent is not detected by the camera");
+        editor.StopPlay();
+    }
+
+    // Hiding in a closet protects from patrolling enemies.
+    private async Task ClosetCheck()
+    {
+        var editor = await FreshEditor();
+        editor.SetBrushObject(ObjectDefs.Closet);
+        editor.PaintCell(new Vector2I(6, 10));
+        editor.SetBrushObject(EnemyDefs.Fighter);
+        editor.PaintCell(new Vector2I(12, 10));
+        Check(editor.StartPlay(), "closet level starts");
+        Input.ActionPress("move_right");
+        await Frames(30);
+        Input.ActionRelease("move_right");
+        Input.ActionPress("activate");
+        await Frames(2);
+        Input.ActionRelease("activate");
+        Check(editor.PlayerAgent.IsHiding, "agent hides in the closet");
+        await Frames(150);
+        Check(editor.Session.Lives == 3, "hidden agent is not hurt by patrolling enemies");
+        Input.ActionPress("activate");
+        await Frames(2);
+        Input.ActionRelease("activate");
+        Check(!editor.PlayerAgent.IsHiding, "activate leaves the closet");
+        editor.StopPlay();
+    }
+
+    // The agent pushes a barrel by walking into it.
+    private async Task BarrelCheck()
+    {
+        var editor = await FreshEditor();
+        editor.SetBrushObject(ObjectDefs.Barrel);
+        editor.PaintCell(new Vector2I(6, 10));
+        Check(editor.StartPlay(), "barrel level starts");
+        Input.ActionPress("move_right");
+        await Frames(100);
+        Input.ActionRelease("move_right");
+        var barrel = editor.Session.GetChildren().OfType<Barrel>().FirstOrDefault();
+        Check(barrel != null && barrel.Position.X > 6 * 32 + 60, "agent pushes the barrel");
+        Check(editor.PlayerAgent.Position.X > 6 * 32, "agent advances behind the barrel");
         editor.StopPlay();
     }
 

@@ -141,6 +141,8 @@ public partial class Enemy : CharacterBody2D
 
     private bool SeesAgent()
     {
+        if (Session.Agent.IsHiding)
+            return false;   // README: the agent hides in closets
         var to = Session.Agent.Position - Position;
         switch (Def.LoS)
         {
@@ -157,15 +159,7 @@ public partial class Enemy : CharacterBody2D
         }
     }
 
-    private bool LineClear(Vector2 target)
-    {
-        float distance = Position.DistanceTo(target);
-        int steps = Mathf.CeilToInt(distance / 16f);
-        for (int i = 1; i < steps; i++)
-            if (TileDefs.Get(Session.TileAtPosition(Position.Lerp(target, i / (float)steps)))?.Solid == true)
-                return false;
-        return true;
-    }
+    private bool LineClear(Vector2 target) => Session.LineClear(Position, target);
 
     private void Attack()
     {
@@ -193,6 +187,8 @@ public partial class Enemy : CharacterBody2D
 
     private void CheckContact()
     {
+        if (Session.Agent.IsHiding)
+            return;
         var d = (Session.Agent.Position - Position).Abs();
         if (d.X >= ContactRange || d.Y >= ContactRange)
             return;

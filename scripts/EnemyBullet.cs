@@ -27,7 +27,7 @@ public partial class EnemyBullet : Node2D
         Position += Direction * Speed * (float)delta;
 
         var d = (Session.Agent.Position - Position).Abs();
-        if (d.X < 18 && d.Y < 18)
+        if (!Session.Agent.IsHiding && d.X < 18 && d.Y < 18)
         {
             QueueFree();
             Session.AgentHit();
