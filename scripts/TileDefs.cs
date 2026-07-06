@@ -59,6 +59,18 @@ public static class ObjectDefs
     public const string Camera = "camera";
     public const string Closet = "closet";
     public const string Barrel = "barrel";
+    public const string Teleport = "teleport";
+    public const string Elevator = "elevator";
+    public const string MovingPlatform = "moving_platform";
+    public const string ElectricDoor = "electric_door";
+    public const string FlameTrap = "flame_trap";
+    public const string RocketLauncher = "rocket_launcher";
+    public const string Light = "light";
+    public const string WeaponChainsaw = "weapon_chainsaw";
+    public const string WeaponAssaultRifle = "weapon_assault_rifle";
+    public const string WeaponMinigun = "weapon_minigun";
+    public const string WeaponCrossbow = "weapon_crossbow";
+    public const string WeaponDynamite = "weapon_dynamite";
 
     public static readonly ObjectDef[] All =
     {
@@ -78,6 +90,18 @@ public static class ObjectDefs
         new(Camera, "Security camera", new Color(0.65f, 0.65f, 0.72f)),
         new(Closet, "Closet", new Color(0.50f, 0.33f, 0.18f)),
         new(Barrel, "Barrel", new Color(0.62f, 0.44f, 0.24f)),
+        new(Teleport, "Teleport", new Color(0.45f, 0.30f, 0.90f)),
+        new(Elevator, "Elevator", new Color(0.55f, 0.60f, 0.70f)),
+        new(MovingPlatform, "Moving platform", new Color(0.60f, 0.65f, 0.55f)),
+        new(ElectricDoor, "Electric door", new Color(0.90f, 0.90f, 0.40f)),
+        new(FlameTrap, "Flame trap", new Color(0.95f, 0.50f, 0.15f)),
+        new(RocketLauncher, "Rocket launcher", new Color(0.50f, 0.35f, 0.35f)),
+        new(Light, "Light", new Color(1.00f, 0.95f, 0.70f)),
+        new(WeaponChainsaw, "Chainsaw", new Color(0.80f, 0.45f, 0.20f)),
+        new(WeaponAssaultRifle, "Assault rifle", new Color(0.35f, 0.40f, 0.30f)),
+        new(WeaponMinigun, "Mini gun", new Color(0.30f, 0.35f, 0.40f)),
+        new(WeaponCrossbow, "Crossbow", new Color(0.50f, 0.40f, 0.25f)),
+        new(WeaponDynamite, "Dynamite", new Color(0.90f, 0.15f, 0.10f)),
     };
 
     // Colors available for door / key pairs (README: matching colors).
@@ -97,8 +121,10 @@ public static class ObjectDefs
     // number N; USB keys hack the computer with the matching number.
     public static readonly string[] Numbers = { "1", "2", "3", "4" };
 
-    public static bool HasNumberProperty(string type) => type is Computer or UsbKey or Switch or Laser;
+    public static bool HasNumberProperty(string type) =>
+        type is Computer or UsbKey or Switch or Laser or Teleport;
 
     public static bool IsPickup(string type) =>
-        type is DoorKey or HealthKit or AmmoPack or Vest or Briefcase or InfraGoggles or UsbKey;
+        type is DoorKey or HealthKit or AmmoPack or Vest or Briefcase or InfraGoggles or UsbKey
+            or WeaponChainsaw or WeaponAssaultRifle or WeaponMinigun or WeaponCrossbow or WeaponDynamite;
 }

@@ -35,6 +35,8 @@ public partial class Editor : Node2D
     private OptionButton _colorPicker;
     private HBoxContainer _numberRow;
     private OptionButton _numberPicker;
+    private HBoxContainer _objectRow;
+    private Label _brushLabel;
 
     private enum BrushKind { Tile, Object, Eraser }
 
@@ -282,9 +284,10 @@ public partial class Editor : Node2D
             var def = ObjectDefs.All.FirstOrDefault(d => d.Type == obj.Type);
             var enemyDef = def == null ? EnemyDefs.Get(obj.Type) : null;
             var collectibleDef = def == null && enemyDef == null ? CollectibleDefs.Get(obj.Type) : null;
-            if (def == null && enemyDef == null && collectibleDef == null)
+            var decoDef = def == null && enemyDef == null && collectibleDef == null ? DecorationDefs.Get(obj.Type) : null;
+            if (def == null && enemyDef == null && collectibleDef == null && decoDef == null)
                 continue;
-            var color = def?.Color ?? enemyDef?.Color ?? collectibleDef.Color;
+            var color = def?.Color ?? enemyDef?.Color ?? collectibleDef?.Color ?? decoDef.Color;
             if (ObjectDefs.HasColorProperty(obj.Type) && obj.Properties.TryGetValue("color", out var name))
                 color = ObjectDefs.KeyColor(name);
             color.A = 0.85f;
@@ -366,25 +369,36 @@ public partial class Editor : Node2D
         };
         bar.AddChild(_status);
 
-        var palette = new PanelContainer { Theme = theme, Position = new Vector2(0, 32) };
-        ui.AddChild(palette);
-        var scroll = new ScrollContainer
-        {
-            CustomMinimumSize = new Vector2(0, 312),
-            HorizontalScrollMode = ScrollContainer.ScrollMode.Disabled,
-        };
-        palette.AddChild(scroll);
-        var paletteBox = new VBoxContainer();
-        scroll.AddChild(paletteBox);
+        // Palette: vertical category list on the left, a horizontal row of
+        // swatch buttons for the selected category, and the property row
+        // (brush name, color, number) beneath it.
+        var paletteRoot = new HBoxContainer { Theme = theme, Position = new Vector2(0, 32) };
+        ui.AddChild(paletteRoot);
 
-        var group = new ButtonGroup();
-        paletteBox.AddChild(new Label { Text = "Tiles" });
-        foreach (var def in TileDefs.All)
+        var categoryPanel = new PanelContainer();
+        paletteRoot.AddChild(categoryPanel);
+        var categoryBox = new VBoxContainer();
+        categoryPanel.AddChild(categoryBox);
+
+        var rightBox = new VBoxContainer();
+        paletteRoot.AddChild(rightBox);
+        var objectPanel = new PanelContainer();
+        rightBox.AddChild(objectPanel);
+        var objectScroll = new ScrollContainer
         {
-            int id = def.Id;
-            paletteBox.AddChild(MakeBrushButton(def.Name, def.Color, group, () => SetBrushTile(id), pressed: id == _brushTile));
-        }
-        paletteBox.AddChild(new Label { Text = "Objects" });
+            CustomMinimumSize = new Vector2(380, 36),
+            VerticalScrollMode = ScrollContainer.ScrollMode.Disabled,
+        };
+        objectPanel.AddChild(objectScroll);
+        _objectRow = new HBoxContainer();
+        objectScroll.AddChild(_objectRow);
+
+        var propsPanel = new PanelContainer();
+        rightBox.AddChild(propsPanel);
+        var propsBox = new HBoxContainer();
+        propsPanel.AddChild(propsBox);
+        _brushLabel = new Label { Text = TileDefs.All[0].Name };
+        propsBox.AddChild(_brushLabel);
         _colorRow = new HBoxContainer { Visible = false };
         _colorRow.AddChild(new Label { Text = "Color" });
         _colorPicker = new OptionButton();
@@ -393,7 +407,7 @@ public partial class Editor : Node2D
         _colorPicker.Selected = 0;
         _colorPicker.ItemSelected += index => _brushColor = ObjectDefs.KeyColors[(int)index];
         _colorRow.AddChild(_colorPicker);
-        paletteBox.AddChild(_colorRow);
+        propsBox.AddChild(_colorRow);
         _numberRow = new HBoxContainer { Visible = false };
         _numberRow.AddChild(new Label { Text = "Number" });
         _numberPicker = new OptionButton();
@@ -402,25 +416,39 @@ public partial class Editor : Node2D
         _numberPicker.Selected = 0;
         _numberPicker.ItemSelected += index => _brushNumber = ObjectDefs.Numbers[(int)index];
         _numberRow.AddChild(_numberPicker);
-        paletteBox.AddChild(_numberRow);
-        foreach (var def in ObjectDefs.All)
+        propsBox.AddChild(_numberRow);
+
+        var categories = PaletteCategories();
+        var categoryGroup = new ButtonGroup();
+        foreach (var (name, entries) in categories)
         {
-            string type = def.Type;
-            paletteBox.AddChild(MakeBrushButton(def.Name, def.Color, group, () => SetBrushObject(type)));
+            var captured = entries;
+            var button = new Button
+            {
+                Text = name,
+                ToggleMode = true,
+                ButtonGroup = categoryGroup,
+                Alignment = HorizontalAlignment.Left,
+                ButtonPressed = name == "Terrain",
+            };
+            button.Pressed += () => ShowCategory(captured);
+            categoryBox.AddChild(button);
         }
-        paletteBox.AddChild(new Label { Text = "Enemies" });
-        foreach (var def in EnemyDefs.All)
+        var eraserButton = new Button
         {
-            string type = def.Type;
-            paletteBox.AddChild(MakeBrushButton(def.Name, def.Color, group, () => SetBrushObject(type)));
-        }
-        paletteBox.AddChild(new Label { Text = "Collectibles" });
-        foreach (var def in CollectibleDefs.All)
+            Text = "Eraser",
+            ToggleMode = true,
+            ButtonGroup = categoryGroup,
+            Alignment = HorizontalAlignment.Left,
+        };
+        eraserButton.Pressed += () =>
         {
-            string type = def.Type;
-            paletteBox.AddChild(MakeBrushButton(def.Name, def.Color, group, () => SetBrushObject(type)));
-        }
-        paletteBox.AddChild(MakeBrushButton("Eraser", new Color(0.1f, 0.1f, 0.1f), group, SetBrushEraser));
+            SetBrushEraser();
+            ShowCategory(System.Array.Empty<PaletteEntry>());
+            _brushLabel.Text = "Eraser";
+        };
+        categoryBox.AddChild(eraserButton);
+        ShowCategory(System.Array.Find(categories, c => c.Name == "Terrain").Entries);
 
         _minimap = new Minimap { MouseFilter = Control.MouseFilterEnum.Ignore };
         ui.AddChild(_minimap);
@@ -444,21 +472,91 @@ public partial class Editor : Node2D
         ui.AddChild(_loadDialog);
     }
 
-    private static Button MakeBrushButton(string text, Color color, ButtonGroup group, Action onSelect, bool pressed = false)
+    // One selectable brush in the palette: a tile (TileId >= 0) or an object.
+    private record PaletteEntry(string Name, Color Color, int TileId, string ObjectType);
+
+    // Categories follow the README's palette grouping.
+    private static (string Name, PaletteEntry[] Entries)[] PaletteCategories()
     {
-        var swatch = Image.CreateEmpty(12, 12, false, Image.Format.Rgba8);
-        swatch.Fill(color);
-        var button = new Button
+        PaletteEntry Tile(TileDef def) => new(def.Name, def.Color, def.Id, null);
+        PaletteEntry Obj(string type)
         {
-            Text = text,
-            Icon = ImageTexture.CreateFromImage(swatch),
-            ToggleMode = true,
-            ButtonGroup = group,
-            ButtonPressed = pressed,
-            Alignment = HorizontalAlignment.Left,
+            var def = ObjectDefs.All.First(d => d.Type == type);
+            return new PaletteEntry(def.Name, def.Color, -1, type);
+        }
+
+        var terrain = TileDefs.All.Select(Tile)
+            .Append(Obj(ObjectDefs.Door))
+            .Append(Obj(ObjectDefs.Teleport))
+            .Append(Obj(ObjectDefs.Elevator))
+            .Append(Obj(ObjectDefs.MovingPlatform))
+            .Append(Obj(ObjectDefs.ElectricDoor))
+            .Append(Obj(ObjectDefs.FlameTrap))
+            .Append(Obj(ObjectDefs.Light))
+            .ToArray();
+
+        return new[]
+        {
+            ("Mission", new[] { Obj(ObjectDefs.AgentStart), Obj(ObjectDefs.ExitDoor) }),
+            ("Terrain", terrain),
+            ("Devices", new[]
+            {
+                Obj(ObjectDefs.Computer), Obj(ObjectDefs.Switch), Obj(ObjectDefs.Laser),
+                Obj(ObjectDefs.Camera), Obj(ObjectDefs.RocketLauncher), Obj(ObjectDefs.Closet),
+            }),
+            ("Movables", new[] { Obj(ObjectDefs.Barrel) }),
+            ("Enemies", EnemyDefs.All.Select(d => new PaletteEntry(d.Name, d.Color, -1, d.Type)).ToArray()),
+            ("Items", new[]
+            {
+                Obj(ObjectDefs.DoorKey), Obj(ObjectDefs.UsbKey), Obj(ObjectDefs.HealthKit),
+                Obj(ObjectDefs.AmmoPack), Obj(ObjectDefs.Vest), Obj(ObjectDefs.Briefcase),
+                Obj(ObjectDefs.InfraGoggles),
+            }),
+            ("Weapons", new[]
+            {
+                Obj(ObjectDefs.WeaponChainsaw), Obj(ObjectDefs.WeaponAssaultRifle),
+                Obj(ObjectDefs.WeaponMinigun), Obj(ObjectDefs.WeaponCrossbow),
+                Obj(ObjectDefs.WeaponDynamite),
+            }),
+            ("Collectibles", CollectibleDefs.All.Select(d => new PaletteEntry(d.Name, d.Color, -1, d.Type)).ToArray()),
+            ("Decorations", DecorationDefs.All.Select(d => new PaletteEntry(d.Name, d.Color, -1, d.Type)).ToArray()),
         };
-        button.Pressed += onSelect;
-        return button;
+    }
+
+    private void ShowCategory(PaletteEntry[] entries)
+    {
+        foreach (var child in _objectRow.GetChildren())
+            child.QueueFree();
+        var group = new ButtonGroup();
+        foreach (var entry in entries)
+        {
+            var swatch = Image.CreateEmpty(16, 16, false, Image.Format.Rgba8);
+            swatch.Fill(entry.Color);
+            var captured = entry;
+            var button = new Button
+            {
+                Icon = ImageTexture.CreateFromImage(swatch),
+                ToggleMode = true,
+                ButtonGroup = group,
+                TooltipText = entry.Name,
+                ButtonPressed = IsCurrentBrush(entry),
+            };
+            button.Pressed += () => SelectEntry(captured);
+            _objectRow.AddChild(button);
+        }
+    }
+
+    private bool IsCurrentBrush(PaletteEntry entry) => entry.TileId >= 0
+        ? _brushKind == BrushKind.Tile && _brushTile == entry.TileId
+        : _brushKind == BrushKind.Object && _brushObject == entry.ObjectType;
+
+    private void SelectEntry(PaletteEntry entry)
+    {
+        if (entry.TileId >= 0)
+            SetBrushTile(entry.TileId);
+        else
+            SetBrushObject(entry.ObjectType);
+        _brushLabel.Text = entry.Name;
     }
 
     private void OnNewPressed()

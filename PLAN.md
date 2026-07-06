@@ -146,6 +146,41 @@ Known simplifications (tuning constants, not README rules):
 - Score, kills, shots fired/hit tracked in PlaySession; accuracy and
   completeness computed there so the editor's test mode shows them too
 
+### Content update - remaining README objects
+- Teleports: capsule pairs matched by the number property; entering one
+  moves the agent to the other (a lock prevents ping-ponging until the agent
+  steps away)
+- Elevators (up/down) and moving platforms (left/right): AnimatableBody2D
+  at 60 px/s, travelling up to 4 tiles from the start cell or until blocked
+  by a solid tile; carries whoever stands on them. A movement-range property
+  UI can replace the fixed range later
+- Electric door: passable frame whose field engages during the last 2s of
+  each 10s cycle (same phase as spikes) and takes a life on contact
+- Flame trap: burns its own cell plus the cell above during seconds 4-6 of
+  each cycle (offset from spikes so both can be combined)
+- Rocket launcher: fires a rocket every 3 seconds, alternating left/right;
+  rockets move at 1x agent speed and take a life (README ammo table)
+- Weapons as pickups that equip on collection with README default ammo:
+  chainsaw (melee sweep, no ammo, no alarm), assault rifle (burst of 3),
+  mini gun (burst of 2), crossbow (arrows, does not trigger the alarm),
+  dynamite (placed stick, 5s fuse, reuses the explosion system). Pistol,
+  rifle and mini gun share the bullet pool per the README ammo table; the
+  weapon resets to pistol at the start of each level
+- Decorations: clock, poster, plant, toilet, pipe, sign, machine (visual
+  only) plus table, wooden crate and steel crate (solid, jump-on-able;
+  tables at 18px height)
+- Lights: PointLight2D glow with a runtime radial gradient, strictly visual
+
+### Editor palette rework
+- Palette layout: vertical category list (Mission, Terrain, Devices,
+  Movables, Enemies, Items, Weapons, Collectibles, Decorations, Eraser -
+  following the README's palette grouping) with a horizontal, scrollable row
+  of swatch buttons for the selected category; tooltips carry the names and
+  the selected brush name shows in the property row next to the color and
+  number pickers
+- scenes/screenshot.tscn renders the editor and saves user://editor_ui.png
+  for quick visual checks of UI changes
+
 ## Milestone 6 - Steam prep (next)
 - Export presets for Windows and Linux
 - GodotSteam integration: achievements, cloud saves
@@ -159,11 +194,9 @@ Known simplifications (tuning constants, not README rules):
   aesthetic is an asset swap plus one shader, not a structural decision.
 - Level size is fixed at 40x12 tiles for now; the format stores width/height,
   so resizing is a later editor feature, not a format change.
-- README objects not yet scheduled in a milestone: teleports, elevators and
-  moving platforms, electric doors, flame traps, rocket launchers, extra
-  weapons (chainsaw, assault rifle, mini gun, crossbow, dynamite for the
-  agent), decorations (including jumpable tables and crates) and lights.
-  Slot them in around milestone 5 or as editor content updates.
+- Elevator / moving platform movement-range property (start and end tile per
+  the README editor section): the current fixed 4-tile obstacle-limited range
+  works without new UI; add the range picker when the property row grows up.
 
 ## Open design decisions
 - Respawn semantics: implemented as respawn at the agent start keeping level

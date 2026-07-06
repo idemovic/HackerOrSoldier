@@ -2,21 +2,21 @@ using Godot;
 
 namespace HackerOrSoldier;
 
-// Hostile projectile (pistol bullet, minigun bullet or plasma shot).
+// Hostile projectile (pistol bullet, minigun bullet, plasma shot or rocket).
 public partial class EnemyBullet : Node2D
 {
-    private static readonly float Speed = 2f * Agent.RunSpeed;   // README: bullets and plasma move at 2x agent speed
-
     public PlaySession Session { get; set; }
     public Vector2 Direction { get; set; } = Vector2.Right;
     public Color Tint { get; set; } = new(0.4f, 0.9f, 0.9f);
+    public float Speed { get; set; } = 2f * Agent.RunSpeed;   // README: bullets and plasma move at 2x agent speed
+    public Vector2 VisualSize { get; set; } = new(6, 6);
 
     public override void _Ready()
     {
         AddChild(new ColorRect
         {
-            Position = new Vector2(-3, -3),
-            Size = new Vector2(6, 6),
+            Position = -VisualSize / 2f,
+            Size = VisualSize,
             Color = Tint,
             MouseFilter = Control.MouseFilterEnum.Ignore,
         });

@@ -48,6 +48,16 @@ public partial class SmokeTest : Node
         await DifficultyCheck();
         ProfileShopChecks();
         await HackingToolCheck();
+        await TeleportCheck();
+        await ElevatorCheck();
+        await AssaultRifleCheck();
+        await CrossbowCheck();
+        await ChainsawCheck();
+        await DynamiteWeaponCheck();
+        await ElectricDoorCheck();
+        await FlameTrapCheck();
+        await RocketLauncherCheck();
+        await DecorationCheck();
         await MenuSceneCheck();
 
         GD.Print(_failures == 0 ? "SMOKE OK" : $"SMOKE FAILED ({_failures})");
@@ -732,6 +742,200 @@ public partial class SmokeTest : Node
         Check(editor.Session.IsCircuitOff("1"), "hacking tool hacks computers without a usb key");
         editor.StopPlay();
         Profile.Current.HasHackingTool = false;
+    }
+
+    // Entering a teleport capsule moves the agent to the paired capsule.
+    private async Task TeleportCheck()
+    {
+        var editor = await FreshEditor();
+        editor.SetBrushObject(ObjectDefs.Teleport, number: "1");
+        editor.PaintCell(new Vector2I(5, 10));
+        editor.PaintCell(new Vector2I(15, 10));
+        Check(editor.StartPlay(), "teleport level starts");
+        Input.ActionPress("move_right");
+        await Frames(40);
+        Input.ActionRelease("move_right");
+        Check(editor.PlayerAgent.Position.X > 14 * 32, "teleport moves the agent to the paired capsule");
+        editor.StopPlay();
+    }
+
+    // Elevators move vertically and stay within their 4-tile range.
+    private async Task ElevatorCheck()
+    {
+        var editor = await FreshEditor();
+        editor.SetBrushObject(ObjectDefs.Elevator);
+        editor.PaintCell(new Vector2I(8, 8));
+        Check(editor.StartPlay(), "elevator level starts");
+        var platform = editor.Session.GetChildren().OfType<MovingPlatform>().FirstOrDefault();
+        Check(platform != null, "elevator spawns in play mode");
+        float y0 = platform.Position.Y;
+        float minY = y0, maxY = y0;
+        for (int i = 0; i < 240; i++)
+        {
+            await Frames(1);
+            minY = Mathf.Min(minY, platform.Position.Y);
+            maxY = Mathf.Max(maxY, platform.Position.Y);
+        }
+        Check(minY < y0 - 20, "elevator moves upward");
+        Check(y0 - minY <= 134 && maxY - y0 <= 134, "elevator stays within its range");
+        editor.StopPlay();
+    }
+
+    // The assault rifle fires a burst of three bullets from the shared pool.
+    private async Task AssaultRifleCheck()
+    {
+        var editor = await FreshEditor();
+        editor.SetBrushObject(ObjectDefs.WeaponAssaultRifle);
+        editor.PaintCell(new Vector2I(4, 10));
+        Check(editor.StartPlay(), "assault rifle level starts");
+        Input.ActionPress("move_right");
+        await Frames(20);
+        Input.ActionRelease("move_right");
+        Check(editor.Session.Weapon == "assault_rifle", "weapon pickup equips the assault rifle");
+        Input.ActionPress("shoot");
+        await Frames(2);
+        Input.ActionRelease("shoot");
+        Check(editor.Session.Ammo == 17, "assault rifle fires a burst of three bullets");
+        editor.StopPlay();
+    }
+
+    // README: the crossbow does not trigger the alarm.
+    private async Task CrossbowCheck()
+    {
+        var editor = await FreshEditor();
+        editor.SetBrushObject(ObjectDefs.WeaponCrossbow);
+        editor.PaintCell(new Vector2I(4, 10));
+        Check(editor.StartPlay(), "crossbow level starts");
+        Input.ActionPress("move_right");
+        await Frames(20);
+        Input.ActionRelease("move_right");
+        Input.ActionPress("shoot");
+        await Frames(2);
+        Input.ActionRelease("shoot");
+        Check(editor.Session.Arrows == 19, "crossbow spends an arrow");
+        Check(!editor.Session.AlarmActive, "crossbow does not trigger the alarm");
+        editor.StopPlay();
+    }
+
+    // The chainsaw kills in melee range without ammo.
+    private async Task ChainsawCheck()
+    {
+        var editor = await FreshEditor();
+        editor.SetBrushObject(ObjectDefs.WeaponChainsaw);
+        editor.PaintCell(new Vector2I(3, 10));
+        editor.SetBrushObject(EnemyDefs.Fighter);
+        editor.PaintCell(new Vector2I(12, 10));
+        Check(editor.StartPlay(), "chainsaw level starts");
+        Input.ActionPress("move_right");
+        await Frames(12);
+        Input.ActionRelease("move_right");
+        Check(editor.Session.Weapon == "chainsaw", "weapon pickup equips the chainsaw");
+        for (int i = 0; i < 30 && editor.Session.Enemies.Count > 0; i++)
+        {
+            Input.ActionPress("shoot");
+            await Frames(2);
+            Input.ActionRelease("shoot");
+            await Frames(8);
+        }
+        Check(editor.Session.Enemies.Count == 0, "chainsaw kills the charging fighter in melee range");
+        Check(editor.Session.Ammo == 10, "chainsaw uses no ammo");
+        editor.StopPlay();
+    }
+
+    // Placed dynamite explodes after its fuse and destroys destructible walls.
+    private async Task DynamiteWeaponCheck()
+    {
+        var editor = await FreshEditor();
+        editor.SetBrushObject(ObjectDefs.WeaponDynamite);
+        editor.PaintCell(new Vector2I(4, 10));
+        editor.SetBrushTile(TileDefs.DestructibleWall);
+        editor.PaintCell(new Vector2I(8, 10));
+        Check(editor.StartPlay(), "dynamite level starts");
+        Input.ActionPress("move_right");
+        await Frames(32);
+        Input.ActionRelease("move_right");
+        Input.ActionPress("shoot");
+        await Frames(2);
+        Input.ActionRelease("shoot");
+        Check(editor.Session.DynamiteSticks == 2, "placing dynamite spends a stick");
+        Input.ActionPress("move_left");
+        await Frames(40);
+        Input.ActionRelease("move_left");
+        await Frames(280);
+        Check(editor.Session.TileAt(8, 10) == TileDefs.Empty, "dynamite destroys destructible walls in its radius");
+        editor.StopPlay();
+    }
+
+    // The electric door field follows the 10s cycle.
+    private async Task ElectricDoorCheck()
+    {
+        var editor = await FreshEditor();
+        editor.SetBrushObject(ObjectDefs.ElectricDoor);
+        editor.PaintCell(new Vector2I(5, 10));
+        Check(editor.StartPlay(), "electric door level starts");
+        Input.ActionPress("move_right");
+        await Frames(30);
+        Input.ActionRelease("move_right");
+        Check(editor.Session.Lives == 3, "electric door is safe between cycles");
+        var agent = editor.PlayerAgent;
+        agent.Position = new Vector2(5 * 32 + 16, 10 * 32 + 16);
+        agent.Velocity = Vector2.Zero;
+        editor.Session.Time = 8.5f;
+        await Frames(5);
+        Check(editor.Session.Lives == 2, "engaged electric door field takes a life");
+        editor.StopPlay();
+    }
+
+    // The flame trap burns during seconds 4-6 of each cycle.
+    private async Task FlameTrapCheck()
+    {
+        var editor = await FreshEditor();
+        editor.SetBrushObject(ObjectDefs.FlameTrap);
+        editor.PaintCell(new Vector2I(5, 10));
+        Check(editor.StartPlay(), "flame trap level starts");
+        Input.ActionPress("move_right");
+        await Frames(30);
+        Input.ActionRelease("move_right");
+        Check(editor.Session.Lives == 3, "flame trap is safe between bursts");
+        var agent = editor.PlayerAgent;
+        agent.Position = new Vector2(5 * 32 + 16, 10 * 32 + 16);
+        agent.Velocity = Vector2.Zero;
+        editor.Session.Time = 4.5f;
+        await Frames(5);
+        Check(editor.Session.Lives == 2, "flame burst takes a life");
+        editor.StopPlay();
+    }
+
+    // The rocket launcher fires rockets that take a life.
+    private async Task RocketLauncherCheck()
+    {
+        var editor = await FreshEditor();
+        editor.SetBrushObject(ObjectDefs.RocketLauncher);
+        editor.PaintCell(new Vector2I(10, 10));
+        Check(editor.StartPlay(), "rocket launcher level starts");
+        await Frames(180);
+        Check(editor.Session.Lives == 2, "rocket takes a life");
+        editor.StopPlay();
+    }
+
+    // Plants are walk-through, crates are solid and block the agent.
+    private async Task DecorationCheck()
+    {
+        var editor = await FreshEditor();
+        editor.SetBrushObject("deco_plant");
+        editor.PaintCell(new Vector2I(4, 10));
+        editor.SetBrushObject("deco_crate_wood");
+        editor.PaintCell(new Vector2I(6, 10));
+        editor.SetBrushObject(ObjectDefs.Light);
+        editor.PaintCell(new Vector2I(8, 8));
+        Check(editor.StartPlay(), "decoration level starts");
+        Input.ActionPress("move_right");
+        await Frames(60);
+        Input.ActionRelease("move_right");
+        float x = editor.PlayerAgent.Position.X;
+        Check(x > 150 && x < 185, "plant is walk-through, crate is solid");
+        Check(editor.Session.GetChildren().OfType<LevelLight>().Any(), "light spawns in play mode");
+        editor.StopPlay();
     }
 
     // The menu and campaign scenes build their UI without errors.

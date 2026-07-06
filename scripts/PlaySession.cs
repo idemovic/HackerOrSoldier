@@ -27,6 +27,9 @@ public partial class PlaySession : Node2D
     public Agent Agent { get; private set; }
     public int Lives { get; private set; } = 3;   // README: default 3 lives
     public int Ammo { get; private set; } = 10;   // README: pistol, default 10 ammo
+    public string Weapon { get; private set; } = "pistol";
+    public int Arrows { get; private set; }          // crossbow ammo, separate pool
+    public int DynamiteSticks { get; private set; }
     public bool HasVest { get; private set; }
     public int Score { get; private set; }
     public int CoinsCollected { get; private set; }
@@ -66,6 +69,8 @@ public partial class PlaySession : Node2D
     private readonly List<Computer> _computers = new();
     private readonly List<WallSwitch> _switches = new();
     private readonly List<Closet> _closets = new();
+    private readonly List<Teleporter> _teleports = new();
+    private bool _teleportLock;
     private readonly HashSet<string> _usbKeys = new();
     private readonly HashSet<string> _circuitsOff = new();
     private float _alarmTime;
@@ -150,6 +155,29 @@ public partial class PlaySession : Node2D
                 case ObjectDefs.Barrel:
                     AddChild(new Barrel { Position = pos });
                     break;
+                case ObjectDefs.Teleport:
+                    var capsule = new Teleporter { Position = pos, Number = NumberOf(obj) };
+                    _teleports.Add(capsule);
+                    AddChild(capsule);
+                    break;
+                case ObjectDefs.Elevator:
+                    AddChild(new MovingPlatform { Position = pos, Session = this, Vertical = true });
+                    break;
+                case ObjectDefs.MovingPlatform:
+                    AddChild(new MovingPlatform { Position = pos, Session = this, Vertical = false });
+                    break;
+                case ObjectDefs.ElectricDoor:
+                    AddChild(new ElectricDoorField { Position = pos, Session = this });
+                    break;
+                case ObjectDefs.FlameTrap:
+                    AddChild(new FlameTrap { Position = pos, Session = this });
+                    break;
+                case ObjectDefs.RocketLauncher:
+                    AddChild(new RocketLauncher { Position = pos, Session = this });
+                    break;
+                case ObjectDefs.Light:
+                    AddChild(new LevelLight { Position = pos });
+                    break;
                 default:
                     var enemyDef = EnemyDefs.Get(obj.Type);
                     if (enemyDef != null)
@@ -157,6 +185,12 @@ public partial class PlaySession : Node2D
                         var enemy = new Enemy { Position = pos, Def = enemyDef, Session = this };
                         _enemies.Add(enemy);
                         AddChild(enemy);
+                        break;
+                    }
+                    var decoDef = DecorationDefs.Get(obj.Type);
+                    if (decoDef != null)
+                    {
+                        AddChild(new Decoration { Position = pos, Def = decoDef });
                         break;
                     }
                     var pickup = new Pickup { Position = pos, Source = obj, FromLevel = true };
@@ -226,6 +260,29 @@ public partial class PlaySession : Node2D
             }
         }
 
+        // Entering a teleport capsule moves the agent to its paired capsule;
+        // the lock prevents ping-ponging until the agent steps away.
+        bool nearCapsule = false;
+        foreach (var capsule in _teleports)
+        {
+            var offset = (capsule.Position - Agent.Position).Abs();
+            if (offset.X >= 20 || offset.Y >= 26)
+                continue;
+            nearCapsule = true;
+            if (_teleportLock)
+                break;
+            foreach (var partner in _teleports)
+                if (partner != capsule && partner.Number == capsule.Number)
+                {
+                    Agent.Position = partner.Position;
+                    _teleportLock = true;
+                    break;
+                }
+            break;
+        }
+        if (!nearCapsule)
+            _teleportLock = false;
+
         // Computers hack automatically on proximity with the matching USB key.
         foreach (var computer in _computers)
         {
@@ -262,18 +319,65 @@ public partial class PlaySession : Node2D
 
     public void TryShoot(Agent agent)
     {
-        if (Ammo <= 0)
-            return;
-        Ammo--;
-        ShotsFired++;
-        TriggerAlarm();   // README: a gun shot triggers the alarm
+        switch (Weapon)
+        {
+            case "chainsaw":
+                // Melee sweep in front of the agent; no ammo, no alarm.
+                foreach (var enemy in _enemies.ToArray())
+                {
+                    var to = enemy.Position - agent.Position;
+                    if (Mathf.Abs(to.Y) < 28 && to.X * agent.Facing > 0 && Mathf.Abs(to.X) < 44)
+                        enemy.TakeHit();
+                }
+                return;
+            case "crossbow":
+                if (Arrows <= 0)
+                    return;
+                Arrows--;
+                ShotsFired++;
+                SpawnAgentBullet(agent, 0);   // README: the crossbow does not trigger the alarm
+                return;
+            case "dynamite":
+                if (DynamiteSticks <= 0)
+                    return;
+                DynamiteSticks--;
+                SpawnDynamite(agent.Position);
+                return;
+            default:
+                // README: pistol 1 bullet, mini gun 2, assault rifle 3 per shot,
+                // all feeding on the shared bullet pool.
+                int burst = Weapon == "assault_rifle" ? 3 : Weapon == "minigun" ? 2 : 1;
+                burst = Mathf.Min(burst, Ammo);
+                if (burst <= 0)
+                    return;
+                Ammo -= burst;
+                ShotsFired += burst;
+                TriggerAlarm();   // README: a gun shot triggers the alarm
+                for (int i = 0; i < burst; i++)
+                    SpawnAgentBullet(agent, (i - (burst - 1) / 2f) * 6f);
+                return;
+        }
+    }
+
+    private void SpawnAgentBullet(Agent agent, float offsetY) =>
         AddChild(new Bullet
         {
             Session = this,
             Direction = agent.Facing,
-            Position = agent.Position + new Vector2(agent.Facing * 20, -2),
+            Position = agent.Position + new Vector2(agent.Facing * 20, -2 + offsetY),
         });
-    }
+
+    // README ammo table: rockets take a life and move at 1x agent speed.
+    public void SpawnRocket(Vector2 from, int direction) =>
+        AddChild(new EnemyBullet
+        {
+            Session = this,
+            Position = from,
+            Direction = new Vector2(direction, 0),
+            Speed = Agent.RunSpeed,
+            Tint = new Color(0.85f, 0.30f, 0.20f),
+            VisualSize = new Vector2(14, 6),
+        });
 
     public void TriggerAlarm() => _alarmTime = AlarmDuration;
 
@@ -479,6 +583,26 @@ public partial class PlaySession : Node2D
             case ObjectDefs.UsbKey:
                 _usbKeys.Add(NumberOf(pickup.Source));
                 break;
+            // Weapon pickups equip the weapon and grant its README default ammo.
+            case ObjectDefs.WeaponChainsaw:
+                Weapon = "chainsaw";
+                break;
+            case ObjectDefs.WeaponAssaultRifle:
+                Weapon = "assault_rifle";
+                Ammo += 10;
+                break;
+            case ObjectDefs.WeaponMinigun:
+                Weapon = "minigun";
+                Ammo += 20;
+                break;
+            case ObjectDefs.WeaponCrossbow:
+                Weapon = "crossbow";
+                Arrows += 20;
+                break;
+            case ObjectDefs.WeaponDynamite:
+                Weapon = "dynamite";
+                DynamiteSticks += 3;
+                break;
             default:
                 var collectible = CollectibleDefs.Get(pickup.Source.Type);
                 if (collectible != null)
@@ -511,7 +635,16 @@ public partial class PlaySession : Node2D
 
     private void UpdateHud()
     {
-        var text = $"Lives {Lives}  Ammo {Ammo}";
+        string weaponText = Weapon switch
+        {
+            "chainsaw" => "Chainsaw",
+            "crossbow" => $"Crossbow {Arrows}",
+            "dynamite" => $"Dynamite {DynamiteSticks}",
+            "assault_rifle" => $"Assault rifle {Ammo}",
+            "minigun" => $"Mini gun {Ammo}",
+            _ => $"Pistol {Ammo}",
+        };
+        var text = $"Lives {Lives}  {weaponText}";
         if (_keys.Count > 0)
             text += "  Keys: " + string.Join(" ", _keys);
         if (_usbKeys.Count > 0)
