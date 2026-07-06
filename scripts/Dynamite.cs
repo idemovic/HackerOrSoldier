@@ -13,16 +13,8 @@ public partial class Dynamite : Node2D
     private float _timer = Fuse;
     private float _fallSpeed;
 
-    public override void _Ready()
-    {
-        AddChild(new ColorRect
-        {
-            Position = new Vector2(-4, -8),
-            Size = new Vector2(8, 16),
-            Color = new Color(0.9f, 0.15f, 0.1f),
-            MouseFilter = Control.MouseFilterEnum.Ignore,
-        });
-    }
+    public override void _Ready() =>
+        AddChild(new Sprite2D { Texture = Sprites.Get("dynamite") });
 
     public override void _PhysicsProcess(double delta)
     {

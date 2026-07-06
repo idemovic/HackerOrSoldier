@@ -22,27 +22,8 @@ public partial class Pickup : Area2D
         {
             Shape = new RectangleShape2D { Size = new Vector2(24, 24) },
         });
-        var def = System.Array.Find(ObjectDefs.All, d => d.Type == Source.Type);
-        var collectible = CollectibleDefs.Get(Source.Type);
-        var color = ObjectDefs.HasColorProperty(Source.Type) && Source.Properties.TryGetValue("color", out var name)
-            ? ObjectDefs.KeyColor(name)
-            : def?.Color ?? collectible?.Color ?? Colors.White;
-        AddChild(new ColorRect
-        {
-            Position = new Vector2(-8, -8),
-            Size = new Vector2(16, 16),
-            Color = color,
-            MouseFilter = Control.MouseFilterEnum.Ignore,
-        });
-        if (collectible?.Letter != null)
-            AddChild(new Label
-            {
-                Text = collectible.Letter,
-                Position = new Vector2(-4, -10),
-                Theme = new Theme { DefaultFontSize = 10 },
-                Modulate = new Color(0.2f, 0.2f, 0.2f),
-                MouseFilter = Control.MouseFilterEnum.Ignore,
-            });
+        Source.Properties.TryGetValue("color", out var colorName);
+        AddChild(new Sprite2D { Texture = Sprites.ForObject(Source.Type, colorName) });
         BodyEntered += body =>
         {
             if (body is Agent)

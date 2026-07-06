@@ -14,13 +14,7 @@ public partial class ExitDoor : Area2D
         {
             Shape = new RectangleShape2D { Size = new Vector2(32, 32) },
         });
-        AddChild(new ColorRect
-        {
-            Position = new Vector2(-16, -16),
-            Size = new Vector2(32, 32),
-            Color = new Color(0.2f, 0.9f, 0.4f),
-            MouseFilter = Control.MouseFilterEnum.Ignore,
-        });
+        AddChild(new Sprite2D { Texture = Sprites.Get(ObjectDefs.ExitDoor) });
         BodyEntered += OnBodyEntered;
     }
 

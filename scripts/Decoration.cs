@@ -48,19 +48,6 @@ public partial class Decoration : StaticBody2D
                 Shape = new RectangleShape2D { Size = new Vector2(32, Def.Height) },
             });
         }
-        AddChild(new ColorRect
-        {
-            Position = new Vector2(-14, 16 - Def.Height),
-            Size = new Vector2(28, Def.Height - 2),
-            Color = Def.Color,
-            MouseFilter = Control.MouseFilterEnum.Ignore,
-        });
-        AddChild(new ColorRect   // accent stripe so decorations read differently
-        {
-            Position = new Vector2(-14, 16 - Def.Height + 4),
-            Size = new Vector2(28, 4),
-            Color = Def.Color.Darkened(0.35f),
-            MouseFilter = Control.MouseFilterEnum.Ignore,
-        });
+        AddChild(new Sprite2D { Texture = Sprites.ForObject(Def.Type) });
     }
 }

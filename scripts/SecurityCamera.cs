@@ -10,23 +10,8 @@ public partial class SecurityCamera : Node2D
 
     public PlaySession Session { get; set; }
 
-    public override void _Ready()
-    {
-        AddChild(new ColorRect
-        {
-            Position = new Vector2(-10, -6),
-            Size = new Vector2(20, 12),
-            Color = new Color(0.65f, 0.65f, 0.72f),
-            MouseFilter = Control.MouseFilterEnum.Ignore,
-        });
-        AddChild(new ColorRect
-        {
-            Position = new Vector2(4, -3),
-            Size = new Vector2(6, 6),
-            Color = new Color(0.9f, 0.2f, 0.2f),
-            MouseFilter = Control.MouseFilterEnum.Ignore,
-        });
-    }
+    public override void _Ready() =>
+        AddChild(new Sprite2D { Texture = Sprites.Get(ObjectDefs.Camera) });
 
     public override void _PhysicsProcess(double delta)
     {

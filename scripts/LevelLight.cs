@@ -24,12 +24,6 @@ public partial class LevelLight : Node2D
             },
             Energy = 0.9f,
         });
-        AddChild(new ColorRect   // fixture
-        {
-            Position = new Vector2(-6, -14),
-            Size = new Vector2(12, 6),
-            Color = new Color(1f, 0.95f, 0.7f),
-            MouseFilter = Control.MouseFilterEnum.Ignore,
-        });
+        AddChild(new Sprite2D { Texture = Sprites.Get(ObjectDefs.Light) });
     }
 }

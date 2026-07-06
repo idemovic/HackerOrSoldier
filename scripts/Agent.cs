@@ -34,6 +34,13 @@ public partial class Agent : CharacterBody2D
     public bool IsHiding { get; private set; }
 
     private float _electricTime;
+    private Sprite2D _sprite;
+
+    public override void _Ready()
+    {
+        _sprite = new Sprite2D { Texture = Sprites.Get("agent") };
+        AddChild(_sprite);
+    }
 
     public void ResetForRespawn(Vector2 position)
     {
@@ -83,6 +90,7 @@ public partial class Agent : CharacterBody2D
         float axis = Input.GetAxis("move_left", "move_right");
         if (axis != 0)
             Facing = axis > 0 ? 1 : -1;
+        _sprite.FlipH = Facing < 0;
         velocity.X = axis * RunSpeed * (submerged ? 0.5f : 1f);
 
         Velocity = velocity;

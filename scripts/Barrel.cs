@@ -20,20 +20,7 @@ public partial class Barrel : CharacterBody2D
         {
             Shape = new RectangleShape2D { Size = new Vector2(30, 30) },
         });
-        AddChild(new ColorRect
-        {
-            Position = new Vector2(-15, -15),
-            Size = new Vector2(30, 30),
-            Color = new Color(0.62f, 0.44f, 0.24f),
-            MouseFilter = Control.MouseFilterEnum.Ignore,
-        });
-        AddChild(new ColorRect   // barrel hoop
-        {
-            Position = new Vector2(-15, -3),
-            Size = new Vector2(30, 5),
-            Color = new Color(0.45f, 0.30f, 0.15f),
-            MouseFilter = Control.MouseFilterEnum.Ignore,
-        });
+        AddChild(new Sprite2D { Texture = Sprites.Get(ObjectDefs.Barrel) });
     }
 
     public void Push(int direction) => _pushDir = direction;

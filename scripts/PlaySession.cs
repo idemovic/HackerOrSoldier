@@ -375,8 +375,7 @@ public partial class PlaySession : Node2D
             Position = from,
             Direction = new Vector2(direction, 0),
             Speed = Agent.RunSpeed,
-            Tint = new Color(0.85f, 0.30f, 0.20f),
-            VisualSize = new Vector2(14, 6),
+            SpriteKey = "rocket",
         });
 
     public void TriggerAlarm() => _alarmTime = AlarmDuration;
@@ -443,8 +442,8 @@ public partial class PlaySession : Node2D
 
     public void RegisterHit() => ShotsHit++;
 
-    public void SpawnEnemyBullet(Vector2 from, Vector2 direction, Color tint) =>
-        AddChild(new EnemyBullet { Session = this, Position = from, Direction = direction, Tint = tint });
+    public void SpawnEnemyBullet(Vector2 from, Vector2 direction, string spriteKey) =>
+        AddChild(new EnemyBullet { Session = this, Position = from, Direction = direction, SpriteKey = spriteKey });
 
     public void SpawnDynamite(Vector2 from) =>
         AddChild(new Dynamite { Session = this, Position = from });

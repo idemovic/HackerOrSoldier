@@ -9,16 +9,8 @@ public partial class Bullet : Node2D
     public PlaySession Session { get; set; }
     public int Direction { get; set; } = 1;
 
-    public override void _Ready()
-    {
-        AddChild(new ColorRect
-        {
-            Position = new Vector2(-4, -2),
-            Size = new Vector2(8, 4),
-            Color = new Color(1f, 0.9f, 0.4f),
-            MouseFilter = Control.MouseFilterEnum.Ignore,
-        });
-    }
+    public override void _Ready() =>
+        AddChild(new Sprite2D { Texture = Sprites.Get("bullet") });
 
     public override void _PhysicsProcess(double delta)
     {

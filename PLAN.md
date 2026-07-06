@@ -171,6 +171,21 @@ Known simplifications (tuning constants, not README rules):
   tables at 18px height)
 - Lights: PointLight2D glow with a runtime radial gradient, strictly visual
 
+### Sprite pass
+- Runtime-generated pixel art for everything, still no binary assets:
+  scripts/Sprites.cs holds hand-authored 16x16 pixel maps (upscaled 2x) for
+  the agent, all 10 enemies, items, devices, weapons, collectibles,
+  decorations and projectiles; door/key sprites take the pair color
+- The agent is an original take on the classic pixel spy (black suit, white
+  shirt, red tie, shades) per the design direction
+- Tiles are drawn procedurally in TileSetBuilder with the README aesthetic:
+  checkerboard dithering (water surface, lava glow), brick patterns, hazard
+  stripes, VGA-style saturated palette
+- Sprites are used everywhere: play mode, editor markers (90% opacity) and
+  palette icons; enemy and agent sprites flip with facing
+- The smoke test force-builds every sprite so a malformed pixel map fails
+  the run; scenes/screenshot.tscn renders a showcase level for eyeballing
+
 ### Editor palette rework
 - Palette layout: vertical category list (Mission, Terrain, Devices,
   Movables, Enemies, Items, Weapons, Collectibles, Decorations, Eraser -

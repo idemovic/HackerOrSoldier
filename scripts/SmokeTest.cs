@@ -80,6 +80,28 @@ public partial class SmokeTest : Node
 
         var tileSet = TileSetBuilder.Build();
         Check(tileSet.GetSource(TileSetBuilder.SourceId) is TileSetAtlasSource, "tileset builds with atlas source");
+
+        // Force-build every sprite so a malformed pixel map fails the run.
+        try
+        {
+            foreach (var def in ObjectDefs.All)
+                Sprites.ForObject(def.Type, "red");
+            foreach (var def in EnemyDefs.All)
+                Sprites.ForObject(def.Type);
+            foreach (var def in CollectibleDefs.All)
+                Sprites.ForObject(def.Type);
+            foreach (var def in DecorationDefs.All)
+                Sprites.ForObject(def.Type);
+            foreach (var def in TileDefs.All)
+                TileSetBuilder.TileIcon(def.Id);
+            foreach (var key in new[] { "agent", "platform", "flame", "bullet", "plasma", "rocket", "dynamite" })
+                Check(Sprites.Get(key) != null, $"sprite '{key}' exists");
+            Check(true, "all object sprites build");
+        }
+        catch (System.Exception ex)
+        {
+            Check(false, $"sprite build failed: {ex.Message}");
+        }
     }
 
     private async Task EditorLoopChecks()

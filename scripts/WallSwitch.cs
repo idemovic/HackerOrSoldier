@@ -9,29 +9,16 @@ public partial class WallSwitch : Node2D
     public string Number { get; set; } = "1";
     public bool Activated { get; private set; }
 
-    private ColorRect _lever;
+    private Sprite2D _sprite;
 
     public override void _Ready()
     {
-        AddChild(new ColorRect
-        {
-            Position = new Vector2(-8, -10),
-            Size = new Vector2(16, 20),
-            Color = new Color(0.45f, 0.35f, 0.45f),
-            MouseFilter = Control.MouseFilterEnum.Ignore,
-        });
-        _lever = new ColorRect
-        {
-            Position = new Vector2(-3, -8),
-            Size = new Vector2(6, 10),
-            Color = new Color(0.95f, 0.85f, 0.30f),
-            MouseFilter = Control.MouseFilterEnum.Ignore,
-        };
-        AddChild(_lever);
+        _sprite = new Sprite2D { Texture = Sprites.Get(ObjectDefs.Switch) };
+        AddChild(_sprite);
         AddChild(new Label
         {
             Text = Number,
-            Position = new Vector2(-4, -22),
+            Position = new Vector2(-4, -28),
             Theme = new Theme { DefaultFontSize = 10 },
         });
     }
@@ -39,7 +26,6 @@ public partial class WallSwitch : Node2D
     public void Activate()
     {
         Activated = true;
-        _lever.Position = new Vector2(-3, -2);
-        _lever.Color = new Color(0.35f, 0.35f, 0.30f);
+        _sprite.Modulate = new Color(0.5f, 0.5f, 0.5f);
     }
 }

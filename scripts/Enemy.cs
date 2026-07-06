@@ -21,7 +21,7 @@ public partial class Enemy : CharacterBody2D
     private int _facing = -1;
     private float _shootCooldown = 0.5f;   // small delay before the first attack
     private float _contactCooldown;
-    private ColorRect _visual;
+    private Sprite2D _sprite;
 
     public bool IsTurnedOff => Def.Type == EnemyDefs.Robot && Session.RobotsOff;
 
@@ -34,14 +34,8 @@ public partial class Enemy : CharacterBody2D
         {
             Shape = new RectangleShape2D { Size = new Vector2(28, 28) },
         });
-        _visual = new ColorRect
-        {
-            Position = new Vector2(-14, -14),
-            Size = new Vector2(28, 28),
-            Color = Def.Color,
-            MouseFilter = Control.MouseFilterEnum.Ignore,
-        };
-        AddChild(_visual);
+        _sprite = new Sprite2D { Texture = Sprites.ForObject(Def.Type) };
+        AddChild(_sprite);
     }
 
     public override void _PhysicsProcess(double delta)
@@ -54,11 +48,12 @@ public partial class Enemy : CharacterBody2D
         {
             // README: the robot stops and turns off every 10 seconds; only
             // then can it be killed.
-            _visual.Color = Def.Color.Darkened(0.6f);
+            _sprite.Modulate = new Color(0.4f, 0.4f, 0.5f);
             Velocity = Vector2.Zero;
             return;
         }
-        _visual.Color = Def.Color;
+        _sprite.Modulate = Colors.White;
+        _sprite.FlipH = _facing > 0;
 
         bool spotted = SeesAgent();
         bool ranged = Def.Attack is EnemyAttack.Pistol or EnemyAttack.MiniGun or EnemyAttack.Plasma;
@@ -129,7 +124,7 @@ public partial class Enemy : CharacterBody2D
             // README: Ultimate -> Super -> Soldier, one stage per hit.
             Def = EnemyDefs.Get(Def.DegradesTo);
             _lives = StageLives(Def);
-            _visual.Color = Def.Color;
+            _sprite.Texture = Sprites.ForObject(Def.Type);
             return;
         }
         _lives--;
@@ -181,16 +176,16 @@ public partial class Enemy : CharacterBody2D
         {
             case EnemyAttack.Pistol:
                 _shootCooldown = 1.5f;
-                Session.SpawnEnemyBullet(Position, new Vector2(_facing, 0), new Color(0.9f, 0.8f, 0.5f));
+                Session.SpawnEnemyBullet(Position, new Vector2(_facing, 0), "bullet");
                 break;
             case EnemyAttack.MiniGun:
                 _shootCooldown = 0.6f;
-                Session.SpawnEnemyBullet(Position, new Vector2(_facing, 0), new Color(0.9f, 0.8f, 0.5f));
+                Session.SpawnEnemyBullet(Position, new Vector2(_facing, 0), "bullet");
                 break;
             case EnemyAttack.Plasma:
                 _shootCooldown = 2f;
                 Session.SpawnEnemyBullet(Position,
-                    (Session.Agent.Position - Position).Normalized(), new Color(0.4f, 0.9f, 0.9f));
+                    (Session.Agent.Position - Position).Normalized(), "plasma");
                 break;
             case EnemyAttack.Dynamite:
                 _shootCooldown = 4f;

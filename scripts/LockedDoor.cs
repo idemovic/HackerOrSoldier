@@ -16,20 +16,6 @@ public partial class LockedDoor : StaticBody2D
         {
             Shape = new RectangleShape2D { Size = new Vector2(tile, tile) },
         });
-        var color = ObjectDefs.KeyColor(ColorName);
-        AddChild(new ColorRect
-        {
-            Position = new Vector2(-tile / 2f, -tile / 2f),
-            Size = new Vector2(tile, tile),
-            Color = color.Darkened(0.25f),
-            MouseFilter = Control.MouseFilterEnum.Ignore,
-        });
-        AddChild(new ColorRect   // keyhole accent so doors read differently from keys
-        {
-            Position = new Vector2(-3, -6),
-            Size = new Vector2(6, 12),
-            Color = color.Lightened(0.4f),
-            MouseFilter = Control.MouseFilterEnum.Ignore,
-        });
+        AddChild(new Sprite2D { Texture = Sprites.Get(ObjectDefs.Door, ColorName) });
     }
 }

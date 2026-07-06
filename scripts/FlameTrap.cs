@@ -9,26 +9,18 @@ public partial class FlameTrap : Node2D
 {
     public PlaySession Session { get; set; }
 
-    private ColorRect _flame;
+    private Sprite2D _flame;
 
     public bool Flaming => Session.Time % 10f is >= 4f and < 6f;
 
     public override void _Ready()
     {
-        AddChild(new ColorRect   // nozzle
+        AddChild(new Sprite2D { Texture = Sprites.Get(ObjectDefs.FlameTrap) });
+        _flame = new Sprite2D
         {
-            Position = new Vector2(-10, 8),
-            Size = new Vector2(20, 8),
-            Color = new Color(0.45f, 0.35f, 0.30f),
-            MouseFilter = Control.MouseFilterEnum.Ignore,
-        });
-        _flame = new ColorRect
-        {
-            Position = new Vector2(-9, -48),
-            Size = new Vector2(18, 56),
-            Color = new Color(0.98f, 0.55f, 0.10f, 0.9f),
+            Texture = Sprites.Get("flame"),
+            Offset = new Vector2(0, -20),   // the flame column rises from the nozzle
             Visible = false,
-            MouseFilter = Control.MouseFilterEnum.Ignore,
         };
         AddChild(_flame);
     }

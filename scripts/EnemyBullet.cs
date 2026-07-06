@@ -7,20 +7,11 @@ public partial class EnemyBullet : Node2D
 {
     public PlaySession Session { get; set; }
     public Vector2 Direction { get; set; } = Vector2.Right;
-    public Color Tint { get; set; } = new(0.4f, 0.9f, 0.9f);
+    public string SpriteKey { get; set; } = "plasma";
     public float Speed { get; set; } = 2f * Agent.RunSpeed;   // README: bullets and plasma move at 2x agent speed
-    public Vector2 VisualSize { get; set; } = new(6, 6);
 
-    public override void _Ready()
-    {
-        AddChild(new ColorRect
-        {
-            Position = -VisualSize / 2f,
-            Size = VisualSize,
-            Color = Tint,
-            MouseFilter = Control.MouseFilterEnum.Ignore,
-        });
-    }
+    public override void _Ready() =>
+        AddChild(new Sprite2D { Texture = Sprites.Get(SpriteKey), FlipH = Direction.X < 0 });
 
     public override void _PhysicsProcess(double delta)
     {

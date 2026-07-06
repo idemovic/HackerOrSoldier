@@ -28,12 +28,11 @@ public partial class MovingPlatform : AnimatableBody2D
             Position = new Vector2(0, -4),
             Shape = new RectangleShape2D { Size = new Vector2(32, 12) },
         });
-        AddChild(new ColorRect
+        AddChild(new Sprite2D
         {
-            Position = new Vector2(-16, -10),
-            Size = new Vector2(32, 12),
-            Color = Vertical ? new Color(0.55f, 0.60f, 0.70f) : new Color(0.60f, 0.65f, 0.55f),
-            MouseFilter = Control.MouseFilterEnum.Ignore,
+            Texture = Sprites.Get("platform"),
+            Offset = new Vector2(0, -4),
+            Modulate = Vertical ? new Color(0.85f, 0.9f, 1f) : Colors.White,
         });
     }
 

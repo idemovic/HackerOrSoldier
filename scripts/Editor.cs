@@ -281,29 +281,18 @@ public partial class Editor : Node2D
             child.QueueFree();
         foreach (var obj in _level.Objects)
         {
-            var def = ObjectDefs.All.FirstOrDefault(d => d.Type == obj.Type);
-            var enemyDef = def == null ? EnemyDefs.Get(obj.Type) : null;
-            var collectibleDef = def == null && enemyDef == null ? CollectibleDefs.Get(obj.Type) : null;
-            var decoDef = def == null && enemyDef == null && collectibleDef == null ? DecorationDefs.Get(obj.Type) : null;
-            if (def == null && enemyDef == null && collectibleDef == null && decoDef == null)
-                continue;
-            var color = def?.Color ?? enemyDef?.Color ?? collectibleDef?.Color ?? decoDef.Color;
-            if (ObjectDefs.HasColorProperty(obj.Type) && obj.Properties.TryGetValue("color", out var name))
-                color = ObjectDefs.KeyColor(name);
-            color.A = 0.85f;
-            // pickups and collectibles draw smaller than doors and enemies
-            int inset = ObjectDefs.IsPickup(obj.Type) || collectibleDef != null ? 8 : 0;
-            var marker = new ColorRect
+            obj.Properties.TryGetValue("color", out var colorName);
+            var marker = new Sprite2D
             {
-                Position = new Vector2(obj.X * TileSize + inset, obj.Y * TileSize + inset),
-                Size = new Vector2(TileSize - 2 * inset, TileSize - 2 * inset),
-                Color = color,
-                MouseFilter = Control.MouseFilterEnum.Ignore,
+                Texture = Sprites.ForObject(obj.Type, colorName),
+                Position = new Vector2(obj.X * TileSize + TileSize / 2f, obj.Y * TileSize + TileSize / 2f),
+                Modulate = new Color(1, 1, 1, 0.9f),
             };
             if (ObjectDefs.HasNumberProperty(obj.Type) && obj.Properties.TryGetValue("number", out var number))
                 marker.AddChild(new Label
                 {
                     Text = number,
+                    Position = new Vector2(-14, -16),
                     Theme = new Theme { DefaultFontSize = 10 },
                     MouseFilter = Control.MouseFilterEnum.Ignore,
                 });
@@ -530,12 +519,12 @@ public partial class Editor : Node2D
         var group = new ButtonGroup();
         foreach (var entry in entries)
         {
-            var swatch = Image.CreateEmpty(16, 16, false, Image.Format.Rgba8);
-            swatch.Fill(entry.Color);
             var captured = entry;
             var button = new Button
             {
-                Icon = ImageTexture.CreateFromImage(swatch),
+                Icon = entry.TileId >= 0
+                    ? TileSetBuilder.TileIcon(entry.TileId)
+                    : Sprites.Icon(entry.ObjectType),
                 ToggleMode = true,
                 ButtonGroup = group,
                 TooltipText = entry.Name,
