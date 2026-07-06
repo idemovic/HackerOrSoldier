@@ -28,6 +28,14 @@ public partial class PlaySession : Node2D
     public int Lives { get; private set; } = 3;   // README: default 3 lives
     public int Ammo { get; private set; } = 10;   // README: pistol, default 10 ammo
     public bool HasVest { get; private set; }
+    public int Score { get; private set; }
+    public int CoinsCollected { get; private set; }
+    public int Kills { get; private set; }
+    public int ShotsFired { get; private set; }
+    public int ShotsHit { get; private set; }
+    public bool IsHackerRun => Kills == 0;   // README: non-violent runs earn the Hacker tag
+    public int AccuracyPercent => ShotsFired == 0 ? 100 : Mathf.RoundToInt(100f * ShotsHit / ShotsFired);
+    public int CompletenessPercent => _collectibleTotal == 0 ? 100 : Mathf.RoundToInt(100f * _collectibleGot / _collectibleTotal);
     public bool GogglesActive => _gogglesTime > 0;
     public float Time { get; set; }               // settable so tests can skip ahead
     public bool SpikesUp => Time % SpikeCycle >= SpikeCycle - SpikeUpTime;
@@ -45,6 +53,10 @@ public partial class PlaySession : Node2D
     private TileMapLayer _grid;
     private TileMapLayer _hiddenGrid;
     private PackedScene _agentScene;
+    private RunState _run;
+    private readonly HashSet<string> _letters = new();
+    private int _collectibleTotal;
+    private int _collectibleGot;
 
     private readonly HashSet<Vector2I> _destroyed = new();
     private readonly HashSet<string> _keys = new();
@@ -64,18 +76,24 @@ public partial class PlaySession : Node2D
     private Label _hud;
     private bool _ended;
 
-    public void Setup(LevelData level, TileMapLayer grid, TileMapLayer hiddenGrid, PackedScene agentScene)
+    public void Setup(LevelData level, TileMapLayer grid, TileMapLayer hiddenGrid, PackedScene agentScene, RunState run = null)
     {
         _level = level;
         _grid = grid;
         _hiddenGrid = hiddenGrid;
         _agentScene = agentScene;
+        _run = run;
     }
 
     public override void _Ready()
     {
         int tile = TileSetBuilder.TileSize;
         _hiddenGrid.Modulate = new Color(1, 1, 1, 0);
+
+        Lives = _run?.Lives ?? 3 + Profile.Current.AgentLivesBonus;
+        Ammo = _run?.Ammo ?? 10;
+        for (int i = 0; i < (_run?.Briefcases ?? 0); i++)
+            _heldItems.Add(ObjectDefs.Briefcase);
 
         foreach (var obj in _level.Objects)
         {
@@ -141,9 +159,11 @@ public partial class PlaySession : Node2D
                         AddChild(enemy);
                         break;
                     }
-                    var pickup = new Pickup { Position = pos, Source = obj };
+                    var pickup = new Pickup { Position = pos, Source = obj, FromLevel = true };
                     pickup.Collected += OnPickup;
                     AddChild(pickup);
+                    if (CollectibleDefs.Get(obj.Type) != null)
+                        _collectibleTotal++;
                     break;
             }
         }
@@ -212,7 +232,8 @@ public partial class PlaySession : Node2D
             if (computer.Hacked)
                 continue;
             var offset = (computer.Position - Agent.Position).Abs();
-            if (offset.X < 36 && offset.Y < 36 && _usbKeys.Contains(computer.Number))
+            if (offset.X < 36 && offset.Y < 36
+                && (_usbKeys.Contains(computer.Number) || Profile.Current.HasHackingTool))
             {
                 computer.SetHacked();
                 TurnOffCircuit(computer.Number);
@@ -244,6 +265,7 @@ public partial class PlaySession : Node2D
         if (Ammo <= 0)
             return;
         Ammo--;
+        ShotsFired++;
         TriggerAlarm();   // README: a gun shot triggers the alarm
         AddChild(new Bullet
         {
@@ -313,6 +335,10 @@ public partial class PlaySession : Node2D
 
     public void OnEnemyDied(Enemy enemy) => _enemies.Remove(enemy);
 
+    public void RegisterKill() => Kills++;
+
+    public void RegisterHit() => ShotsHit++;
+
     public void SpawnEnemyBullet(Vector2 from, Vector2 direction, Color tint) =>
         AddChild(new EnemyBullet { Session = this, Position = from, Direction = direction, Tint = tint });
 
@@ -330,14 +356,17 @@ public partial class PlaySession : Node2D
         AddChild(pickup);
     }
 
-    public void SpawnTombstone(Vector2 at) =>
-        AddChild(new ColorRect   // decoration for now; the score collectible comes with milestone 5
+    // README: tombstones are collectibles worth 1k score.
+    public void SpawnTombstone(Vector2 at)
+    {
+        var pickup = new Pickup
         {
-            Position = at + new Vector2(-8, -4),
-            Size = new Vector2(16, 20),
-            Color = new Color(0.6f, 0.6f, 0.65f),
-            MouseFilter = Control.MouseFilterEnum.Ignore,
-        });
+            Position = at,
+            Source = new LevelObject { Type = CollectibleDefs.Tombstone },
+        };
+        pickup.Collected += OnPickup;
+        AddChild(pickup);
+    }
 
     // Explosions kill outright: no degradation, no drops. Enemies with
     // infinite lives survive (README: does not apply to infinite lives).
@@ -361,6 +390,7 @@ public partial class PlaySession : Node2D
             {
                 _enemies.Remove(enemy);
                 enemy.QueueFree();
+                Kills++;
             }
         if (Agent != null && center.DistanceTo(Agent.Position) <= ExplosionRadius)
             AgentHit();
@@ -449,6 +479,25 @@ public partial class PlaySession : Node2D
             case ObjectDefs.UsbKey:
                 _usbKeys.Add(NumberOf(pickup.Source));
                 break;
+            default:
+                var collectible = CollectibleDefs.Get(pickup.Source.Type);
+                if (collectible != null)
+                {
+                    Score += collectible.Score;
+                    CoinsCollected += collectible.Coins;
+                    if (pickup.FromLevel)
+                        _collectibleGot++;
+                    if (CollectibleDefs.IsLetter(pickup.Source.Type))
+                    {
+                        _letters.Add(pickup.Source.Type);
+                        if (_letters.Count == CollectibleDefs.LetterTypes.Length)
+                        {
+                            Score += CollectibleDefs.LetterSetBonusScore;
+                            CoinsCollected += CollectibleDefs.LetterSetBonusCoins;
+                        }
+                    }
+                }
+                break;
         }
         pickup.QueueFree();
         UpdateHud();
@@ -469,6 +518,10 @@ public partial class PlaySession : Node2D
             text += "  USB: " + string.Join(" ", _usbKeys);
         if (Agent != null && Agent.IsHiding)
             text += "  Hidden (C to leave)";
+        if (Score > 0)
+            text += $"  Score {Score}";
+        if (CoinsCollected > 0)
+            text += $"  Coins +{CoinsCollected}";
         if (HasVest)
             text += "  Vest";
         foreach (var item in _heldItems)

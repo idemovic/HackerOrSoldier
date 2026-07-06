@@ -27,7 +27,7 @@ public partial class Enemy : CharacterBody2D
 
     public override void _Ready()
     {
-        _lives = Def.Lives;
+        _lives = StageLives(Def);
         CollisionLayer = 0;
         CollisionMask = 1;
         AddChild(new CollisionShape2D
@@ -119,8 +119,16 @@ public partial class Enemy : CharacterBody2D
             return;   // landmines cannot be shot
         if (Def.DegradesTo != null)
         {
+            // README low difficulty: the super soldier does not change to a
+            // soldier, it dies with a tombstone.
+            if (Profile.Current.IsLowDifficulty && Def.Type == EnemyDefs.SuperSoldier)
+            {
+                Die();
+                return;
+            }
             // README: Ultimate -> Super -> Soldier, one stage per hit.
             Def = EnemyDefs.Get(Def.DegradesTo);
+            _lives = StageLives(Def);
             _visual.Color = Def.Color;
             return;
         }
@@ -129,12 +137,18 @@ public partial class Enemy : CharacterBody2D
             Die();
     }
 
+    // README difficulty: enemies get -1/+1 life on low/hard, minimum 1.
+    // Degrading stages always take one hit; the delta lands on the final stage.
+    private static int StageLives(EnemyDef def) =>
+        def.DegradesTo != null ? 1 : Mathf.Max(1, def.Lives + Profile.Current.EnemyLivesDelta);
+
     private void Die()
     {
         if (Def.DropsAmmo && GD.Randf() < Session.DropChance)
             Session.SpawnAmmoPack(Position);
-        if (Def.Type == EnemyDefs.Soldier)
+        if (Def.Type is EnemyDefs.Soldier or EnemyDefs.SuperSoldier)
             Session.SpawnTombstone(Position);   // README: the soldier chain ends with a RIP tombstone
+        Session.RegisterKill();
         Session.OnEnemyDied(this);
         QueueFree();
     }

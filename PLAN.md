@@ -117,15 +117,36 @@ Known simplifications (tuning constants, not README rules):
   and pass-through when off, switch shooting, floor disabling, camera alarm,
   disguise, closet hiding and leaving, barrel pushing
 
-## Milestone 5 - meta layer (next)
-- Main menu (New game, Continue, Settings, Create level, Exit)
-- Shop and coin economy, collectibles with score
-- Statistics screen (time, score, kills, accuracy, completeness) with the
-  Hacker tag for non-violent runs
-- Settings: difficulty, key rebinding, music/sound volume
-- Level briefing screen showing level name and description
+### Milestone 5 - meta layer
+- Main menu (scenes/main_menu.tscn, now the main scene): New game (with the
+  "start from the beginning?" confirmation), Continue level, Settings,
+  Create level, Exit game
+- Campaign mode (scenes/game.tscn, scripts/GameFlow.cs): plays the levels
+  saved in user://levels in file name order - the editor's levels are the
+  campaign. Briefing screen with level name and description before each
+  level, pause menu (Esc) with Resume / Restart level / Main menu / Exit,
+  fail screen with retry
+- Statistics screen after each level: time, score, kills, accuracy,
+  completeness, the HACKER tag for runs with zero kills, and buttons for
+  Shop / Next level / Exit game
+- Persistent profile (user://profile.json): coins (default 100), campaign
+  progress, difficulty, volumes, key binds, hacking tool ownership
+- Run state across levels: lives and ammo carry over (README: ammo
+  transfers), coins bank into the profile after each level
+- Collectibles (scripts/CollectibleDefs.cs): all README entries incl. the
+  AGENT letter set (40k + 5 coins when complete); tombstones dropped by dead
+  soldiers are 1k collectibles; completeness = placed collectibles collected
+- Shop: briefcase 20, hacking tool 30 (permanent: hacks computers without a
+  USB key), extra life 50, 10 ammo 5; weapon entries wait for weapon switching
+- Difficulty (Low/Medium/Hard): agent 4/3/2 lives, enemies -1/+1 life
+  (min 1, applied to the final stage of the soldier chain), low-difficulty
+  super soldiers die outright with a tombstone
+- Settings: difficulty picker, music/sound volume 0-10 (stored; applied when
+  audio lands), keyboard rebinding per action (gamepad binds preserved)
+- Score, kills, shots fired/hit tracked in PlaySession; accuracy and
+  completeness computed there so the editor's test mode shows them too
 
-## Milestone 6 - Steam prep
+## Milestone 6 - Steam prep (next)
 - Export presets for Windows and Linux
 - GodotSteam integration: achievements, cloud saves
 - Steam Workshop publishing for user levels (the JSON level format is already

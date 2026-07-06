@@ -29,6 +29,7 @@ public partial class Bullet : Node2D
             if (d.X < 18 && d.Y < 18)
             {
                 QueueFree();
+                Session.RegisterHit();
                 enemy.TakeHit();
                 return;
             }

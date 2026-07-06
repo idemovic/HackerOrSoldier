@@ -201,13 +201,8 @@ public partial class Editor : Node2D
             RebuildMarkers();
     }
 
-    private void SetGridCell(Vector2I cell, int tileId)
-    {
-        var target = tileId == TileDefs.HiddenPlatform ? _hiddenGrid : _grid;
-        var other = tileId == TileDefs.HiddenPlatform ? _grid : _hiddenGrid;
-        other.EraseCell(cell);
-        target.SetCell(cell, TileSetBuilder.SourceId, TileSetBuilder.AtlasCoordsFor(tileId));
-    }
+    private void SetGridCell(Vector2I cell, int tileId) =>
+        LevelGrids.SetCell(_grid, _hiddenGrid, cell, tileId);
 
     public bool StartPlay()
     {
@@ -271,15 +266,7 @@ public partial class Editor : Node2D
 
     private void RedrawLevel()
     {
-        _grid.Clear();
-        _hiddenGrid.Clear();
-        for (int y = 0; y < _level.Height; y++)
-            for (int x = 0; x < _level.Width; x++)
-            {
-                int id = _level.GetTile(x, y);
-                if (id != TileDefs.Empty)
-                    SetGridCell(new Vector2I(x, y), id);
-            }
+        LevelGrids.Fill(_grid, _hiddenGrid, _level);
         RebuildMarkers();
         ApplyCameraLimits(_camera);
         _minimap.Setup(_level, _camera);
@@ -294,13 +281,15 @@ public partial class Editor : Node2D
         {
             var def = ObjectDefs.All.FirstOrDefault(d => d.Type == obj.Type);
             var enemyDef = def == null ? EnemyDefs.Get(obj.Type) : null;
-            if (def == null && enemyDef == null)
+            var collectibleDef = def == null && enemyDef == null ? CollectibleDefs.Get(obj.Type) : null;
+            if (def == null && enemyDef == null && collectibleDef == null)
                 continue;
-            var color = def?.Color ?? enemyDef.Color;
+            var color = def?.Color ?? enemyDef?.Color ?? collectibleDef.Color;
             if (ObjectDefs.HasColorProperty(obj.Type) && obj.Properties.TryGetValue("color", out var name))
                 color = ObjectDefs.KeyColor(name);
             color.A = 0.85f;
-            int inset = ObjectDefs.IsPickup(obj.Type) ? 8 : 0;   // pickups draw smaller than doors
+            // pickups and collectibles draw smaller than doors and enemies
+            int inset = ObjectDefs.IsPickup(obj.Type) || collectibleDef != null ? 8 : 0;
             var marker = new ColorRect
             {
                 Position = new Vector2(obj.X * TileSize + inset, obj.Y * TileSize + inset),
@@ -365,6 +354,10 @@ public partial class Editor : Node2D
         };
         bar.AddChild(_playButton);
 
+        var menuButton = new Button { Text = "Menu" };
+        menuButton.Pressed += () => GetTree().ChangeSceneToFile("res://scenes/main_menu.tscn");
+        bar.AddChild(menuButton);
+
         _status = new Label
         {
             Text = "Left click: paint, right click: erase, arrows: pan, P: play.",
@@ -417,6 +410,12 @@ public partial class Editor : Node2D
         }
         paletteBox.AddChild(new Label { Text = "Enemies" });
         foreach (var def in EnemyDefs.All)
+        {
+            string type = def.Type;
+            paletteBox.AddChild(MakeBrushButton(def.Name, def.Color, group, () => SetBrushObject(type)));
+        }
+        paletteBox.AddChild(new Label { Text = "Collectibles" });
+        foreach (var def in CollectibleDefs.All)
         {
             string type = def.Type;
             paletteBox.AddChild(MakeBrushButton(def.Name, def.Color, group, () => SetBrushObject(type)));

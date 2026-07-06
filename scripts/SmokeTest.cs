@@ -41,6 +41,14 @@ public partial class SmokeTest : Node
         await DisguiseCheck();
         await ClosetCheck();
         await BarrelCheck();
+        await CollectibleCheck();
+        await LettersBonusCheck();
+        await StatsCheck();
+        await TombstoneScoreCheck();
+        await DifficultyCheck();
+        ProfileShopChecks();
+        await HackingToolCheck();
+        await MenuSceneCheck();
 
         GD.Print(_failures == 0 ? "SMOKE OK" : $"SMOKE FAILED ({_failures})");
         GetTree().Quit(_failures == 0 ? 0 : 1);
@@ -552,6 +560,196 @@ public partial class SmokeTest : Node
         Check(barrel != null && barrel.Position.X > 6 * 32 + 60, "agent pushes the barrel");
         Check(editor.PlayerAgent.Position.X > 6 * 32, "agent advances behind the barrel");
         editor.StopPlay();
+    }
+
+    // Collectibles convert to score and coins instantly; completeness
+    // counts placed collectibles.
+    private async Task CollectibleCheck()
+    {
+        var editor = await FreshEditor();
+        editor.SetBrushObject(CollectibleDefs.Diamond);
+        editor.PaintCell(new Vector2I(4, 10));
+        editor.SetBrushObject(CollectibleDefs.BusinessCard);
+        editor.PaintCell(new Vector2I(12, 10));
+        Check(editor.StartPlay(), "collectible level starts");
+        Input.ActionPress("move_right");
+        await Frames(40);
+        Input.ActionRelease("move_right");
+        Check(editor.Session.Score == 25000, "diamond is worth 25k score");
+        Check(editor.Session.CoinsCollected == 7, "diamond is worth 7 coins");
+        Check(editor.Session.CompletenessPercent == 50, "completeness counts collected collectibles");
+        editor.StopPlay();
+    }
+
+    // Collecting all five AGENT letters is worth 40k score and 5 coins.
+    private async Task LettersBonusCheck()
+    {
+        var editor = await FreshEditor();
+        for (int i = 0; i < CollectibleDefs.LetterTypes.Length; i++)
+        {
+            editor.SetBrushObject(CollectibleDefs.LetterTypes[i]);
+            editor.PaintCell(new Vector2I(4 + i, 10));
+        }
+        Check(editor.StartPlay(), "letters level starts");
+        Input.ActionPress("move_right");
+        await Frames(70);
+        Input.ActionRelease("move_right");
+        Check(editor.Session.Score == 40000, "full AGENT set is worth 40k score");
+        Check(editor.Session.CoinsCollected == 5, "full AGENT set is worth 5 coins");
+        editor.StopPlay();
+    }
+
+    // Kills, accuracy and the Hacker tag.
+    private async Task StatsCheck()
+    {
+        var editor = await FreshEditor();
+        editor.SetBrushEraser();
+        editor.PaintCell(new Vector2I(6, 11));
+        editor.PaintCell(new Vector2I(7, 11));
+        editor.SetBrushObject(EnemyDefs.Fighter);
+        editor.PaintCell(new Vector2I(11, 10));
+        Check(editor.StartPlay(), "stats level starts");
+        Check(editor.Session.IsHackerRun, "run starts as a hacker run");
+        for (int shot = 0; shot < 2; shot++)
+        {
+            Input.ActionPress("shoot");
+            await Frames(2);
+            Input.ActionRelease("shoot");
+            await Frames(10);
+        }
+        await Frames(40);
+        Check(editor.Session.Kills == 1, "killing the fighter counts one kill");
+        Check(editor.Session.AccuracyPercent == 100, "two shots, two hits: accuracy 100");
+        Input.ActionPress("shoot");
+        await Frames(2);
+        Input.ActionRelease("shoot");
+        await Frames(5);
+        Check(editor.Session.AccuracyPercent == 67, "a missed shot drops accuracy to 67");
+        Check(!editor.Session.IsHackerRun, "a kill removes the hacker tag");
+        editor.StopPlay();
+    }
+
+    // The tombstone left by a dead soldier is a 1k collectible, but does
+    // not count toward completeness.
+    private async Task TombstoneScoreCheck()
+    {
+        var editor = await FreshEditor();
+        editor.SetBrushObject(EnemyDefs.Soldier);
+        editor.PaintCell(new Vector2I(6, 10));
+        Check(editor.StartPlay(), "tombstone level starts");
+        Input.ActionPress("shoot");
+        await Frames(2);
+        Input.ActionRelease("shoot");
+        await Frames(20);
+        Input.ActionPress("move_right");
+        await Frames(45);
+        Input.ActionRelease("move_right");
+        Check(editor.Session.Score == 1000, "picked-up tombstone is worth 1k score");
+        Check(editor.Session.CompletenessPercent == 100, "tombstones do not count toward completeness");
+        editor.StopPlay();
+    }
+
+    // Difficulty: agent lives 4/3/2, enemies -1/+1 life, and on low the
+    // super soldier dies outright instead of degrading.
+    private async Task DifficultyCheck()
+    {
+        Profile.Current.Difficulty = "low";
+        var editor = await FreshEditor();
+        editor.SetBrushEraser();
+        editor.PaintCell(new Vector2I(6, 11));
+        editor.PaintCell(new Vector2I(7, 11));
+        editor.SetBrushObject(EnemyDefs.Fighter);
+        editor.PaintCell(new Vector2I(11, 10));
+        editor.SetBrushObject(EnemyDefs.SuperSoldier);
+        editor.PaintCell(new Vector2I(13, 10));
+        Check(editor.StartPlay(), "low difficulty level starts");
+        Check(editor.Session.Lives == 4, "low difficulty grants an extra life");
+        Input.ActionPress("shoot");
+        await Frames(2);
+        Input.ActionRelease("shoot");
+        await Frames(40);
+        Check(editor.Session.Enemies.Count == 1, "fighter dies in one hit on low difficulty");
+        Input.ActionPress("shoot");
+        await Frames(2);
+        Input.ActionRelease("shoot");
+        await Frames(100);
+        Check(editor.Session.Enemies.Count == 0, "super soldier dies outright on low difficulty");
+        editor.StopPlay();
+
+        Profile.Current.Difficulty = "hard";
+        editor = await FreshEditor();
+        Check(editor.StartPlay(), "hard difficulty level starts");
+        Check(editor.Session.Lives == 2, "hard difficulty removes a life");
+        editor.StopPlay();
+        Profile.Current.Difficulty = "medium";
+    }
+
+    // Profile persistence and the shop economy (pure logic, no UI).
+    private void ProfileShopChecks()
+    {
+        var profile = new Profile
+        {
+            Coins = 42,
+            LevelIndex = 3,
+            Difficulty = "hard",
+            MusicVolume = 7,
+            HasHackingTool = true,
+        };
+        profile.Save("profile_test.json");
+        var loaded = Profile.Load("profile_test.json");
+        Check(loaded.Coins == 42 && loaded.LevelIndex == 3 && loaded.Difficulty == "hard"
+            && loaded.MusicVolume == 7 && loaded.HasHackingTool, "profile round trip preserves values");
+
+        var saved = Profile.Current;
+        Profile.Current = new Profile();   // 100 coins, medium
+        var run = RunState.NewRun();
+        Check(run.Lives == 3 && run.Ammo == 10, "new run starts with default lives and ammo");
+        Check(Shop.TryBuy(Shop.ExtraLife, run) && run.Lives == 4 && Profile.Current.Coins == 50,
+            "shop sells an extra life for 50 coins");
+        Check(Shop.TryBuy(Shop.HackingTool, run) && Profile.Current.HasHackingTool && Profile.Current.Coins == 20,
+            "shop sells the hacking tool for 30 coins");
+        Check(!Shop.TryBuy(Shop.ExtraLife, run) && Profile.Current.Coins == 20,
+            "shop rejects purchases the player cannot afford");
+        Check(Shop.TryBuy(Shop.AmmoPack, run) && run.Ammo == 20 && Profile.Current.Coins == 15,
+            "shop sells 10 ammo for 5 coins");
+        Profile.Current.Coins = 20;   // top up: the briefcase costs 20
+        Check(Shop.TryBuy(Shop.BriefcaseItem, run) && run.Briefcases == 1 && Profile.Current.Coins == 0,
+            "shop sells briefcases");
+        Profile.Current = saved;
+    }
+
+    // The purchased hacking tool hacks computers without a USB key.
+    private async Task HackingToolCheck()
+    {
+        Profile.Current.HasHackingTool = true;
+        var editor = await FreshEditor();
+        editor.SetBrushObject(ObjectDefs.Computer, number: "1");
+        editor.PaintCell(new Vector2I(8, 10));
+        Check(editor.StartPlay(), "hacking tool level starts");
+        Input.ActionPress("move_right");
+        await Frames(60);
+        Input.ActionRelease("move_right");
+        Check(editor.Session.IsCircuitOff("1"), "hacking tool hacks computers without a usb key");
+        editor.StopPlay();
+        Profile.Current.HasHackingTool = false;
+    }
+
+    // The menu and campaign scenes build their UI without errors.
+    private async Task MenuSceneCheck()
+    {
+        var menu = GD.Load<PackedScene>("res://scenes/main_menu.tscn").Instantiate();
+        AddChild(menu);
+        await ToSignal(GetTree(), SceneTree.SignalName.ProcessFrame);
+        Check(IsInstanceValid(menu), "main menu scene builds");
+        menu.QueueFree();
+        await ToSignal(GetTree(), SceneTree.SignalName.ProcessFrame);
+
+        var game = GD.Load<PackedScene>("res://scenes/game.tscn").Instantiate();
+        AddChild(game);
+        await ToSignal(GetTree(), SceneTree.SignalName.ProcessFrame);
+        Check(IsInstanceValid(game), "game scene builds");
+        game.QueueFree();
+        await ToSignal(GetTree(), SceneTree.SignalName.ProcessFrame);
     }
 
     private async Task<Editor> FreshEditor()
