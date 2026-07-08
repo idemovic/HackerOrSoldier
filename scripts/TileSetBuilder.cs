@@ -160,11 +160,113 @@ public static class TileSetBuilder
                         if (x % 4 == 1 && y % 4 == 1)
                             img.SetPixel(x, y, new Color("1f8f8f"));
                 break;
+            case TileDefs.StoneBlocks:
+                DrawStoneBlocks(img);
+                break;
+            case TileDefs.RedBrick:
+                DrawBricks(img, new Color("8f1f1a"), new Color("b03a28"), new Color("2a1010"));
+                break;
+            case TileDefs.SteelPlate:
+                for (int y = 0; y < TileSize; y++)
+                    for (int x = 0; x < TileSize; x++)
+                    {
+                        int lx = x % 16, ly = y % 16;
+                        Color c = new Color("7a8aa5");
+                        if (lx == 15 || ly == 15)
+                            c = new Color("4a5570");                     // plate seams
+                        else if (lx == 0 || ly == 0)
+                            c = new Color("9a9aa5");                     // lit edge
+                        else if (lx is 3 or 4 && ly is 3 or 4 || lx is 11 or 12 && ly is 11 or 12
+                            || lx is 3 or 4 && ly is 11 or 12 || lx is 11 or 12 && ly is 3 or 4)
+                            c = new Color("2a2a33");                     // corner rivets
+                        else if (ly > 8 && (x + y) % 2 == 0)
+                            c = new Color("6f7e99");                     // dithered lower half
+                        img.SetPixel(x, y, c);
+                    }
+                break;
+            case TileDefs.Girder:
+                img.Fill(bg);
+                for (int y = 0; y < TileSize; y++)
+                    for (int x = 0; x < TileSize; x++)
+                    {
+                        if (y < 6 || y > 25)
+                        {
+                            Color c = new Color("7a8aa5");               // flanges
+                            if (y is 0 or 26)
+                                c = new Color("9a9aa5");
+                            else if (y is 5 or 31)
+                                c = new Color("4a5570");
+                            else if (x % 8 is 3 or 4 && y is 2 or 3 or 28 or 29)
+                                c = new Color("2a2a33");                 // bolts
+                            img.SetPixel(x, y, c);
+                        }
+                        else if ((x + y) % 12 < 2 || (x - y + 96) % 12 < 2)
+                            img.SetPixel(x, y, new Color("55555f"));     // lattice web
+                    }
+                break;
+            case TileDefs.BackgroundMesh:
+                for (int y = 0; y < TileSize; y++)
+                    for (int x = 0; x < TileSize; x++)
+                    {
+                        Color c = new Color("16181f");
+                        if (x % 8 == 7 || y % 8 == 7)
+                            c = new Color("0e0f14");                     // mesh seams
+                        else if ((x + y) % 4 == 0)
+                            c = new Color("1e2129");                     // faint dither
+                        img.SetPixel(x, y, c);
+                    }
+                break;
+            case TileDefs.BackgroundRock:
+                for (int y = 0; y < TileSize; y++)
+                    for (int x = 0; x < TileSize; x++)
+                    {
+                        Color c = new Color("3a3d47");
+                        if ((x / 2 + y / 2) % 2 == 0)
+                            c = new Color("424653");                     // coarse dither
+                        if ((x * 3 + y * 7) % 31 == 0 || y == Wrap(x + 13))
+                            c = new Color("2e313a");                     // pits and cracks
+                        img.SetPixel(x, y, c);
+                    }
+                break;
+            case TileDefs.BackgroundPanel:
+                for (int y = 0; y < TileSize; y++)
+                    for (int x = 0; x < TileSize; x++)
+                    {
+                        Color c = new Color("1e2230");
+                        if (x % 16 == 15 || y % 16 == 15)
+                            c = new Color("141824");                     // panel seams
+                        else if ((x + y) % 32 < 8 && (x + y) % 2 == 0)
+                            c = new Color("323a52");                     // diagonal light streak
+                        img.SetPixel(x, y, c);
+                    }
+                break;
             default:
                 img.Fill(TileDefs.Get(tileId)?.Color ?? bg);
                 break;
         }
         return img;
+    }
+
+    // Four rounded stone blocks per tile, lit from the top left.
+    private static void DrawStoneBlocks(Image img)
+    {
+        img.Fill(new Color("10101a"));
+        for (int by = 0; by < 2; by++)
+            for (int bx = 0; bx < 2; bx++)
+                for (int y = 1; y < 15; y++)
+                    for (int x = 1; x < 15; x++)
+                    {
+                        if (x is 1 or 14 && y is 1 or 14)
+                            continue;   // rounded corners keep the seam color
+                        Color c = new Color("55555f");
+                        if (x == 1 || y == 1)
+                            c = new Color("7d7d8a");
+                        else if (x == 14 || y == 14)
+                            c = new Color("2a2a33");
+                        else if (y > 8 && (x + y) % 2 == 0)
+                            c = new Color("4a4a55");
+                        img.SetPixel(bx * 16 + x, by * 16 + y, c);
+                    }
     }
 
     private static void DrawBricks(Image img, Color brick, Color highlight, Color mortar)

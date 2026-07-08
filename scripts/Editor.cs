@@ -72,7 +72,9 @@ public partial class Editor : Node2D
         };
         AddChild(_cursor);
 
-        _camera = new Camera2D { Position = new Vector2(320, 180) };
+        // Start looking at the bottom-left corner, where the default floor
+        // and agent start are.
+        _camera = new Camera2D { Position = new Vector2(320, _level.Height * TileSize - 180) };
         AddChild(_camera);
         _camera.MakeCurrent();
 
@@ -474,19 +476,27 @@ public partial class Editor : Node2D
             return new PaletteEntry(def.Name, def.Color, -1, type);
         }
 
-        var terrain = TileDefs.All.Select(Tile)
+        var wallIds = new[]
+        {
+            TileDefs.Wall, TileDefs.DestructibleWall, TileDefs.StoneBlocks, TileDefs.RedBrick,
+            TileDefs.SteelPlate, TileDefs.Girder,
+            TileDefs.BackgroundMesh, TileDefs.BackgroundRock, TileDefs.BackgroundPanel,
+        };
+        var walls = wallIds.Select(id => Tile(TileDefs.Get(id))).ToArray();
+
+        var terrain = TileDefs.All.Where(d => !wallIds.Contains(d.Id)).Select(Tile)
             .Append(Obj(ObjectDefs.Door))
             .Append(Obj(ObjectDefs.Teleport))
             .Append(Obj(ObjectDefs.Elevator))
             .Append(Obj(ObjectDefs.MovingPlatform))
             .Append(Obj(ObjectDefs.ElectricDoor))
             .Append(Obj(ObjectDefs.FlameTrap))
-            .Append(Obj(ObjectDefs.Light))
             .ToArray();
 
         return new[]
         {
             ("Mission", new[] { Obj(ObjectDefs.AgentStart), Obj(ObjectDefs.ExitDoor) }),
+            ("Walls", walls),
             ("Terrain", terrain),
             ("Devices", new[]
             {
@@ -508,7 +518,8 @@ public partial class Editor : Node2D
                 Obj(ObjectDefs.WeaponDynamite),
             }),
             ("Collectibles", CollectibleDefs.All.Select(d => new PaletteEntry(d.Name, d.Color, -1, d.Type)).ToArray()),
-            ("Decorations", DecorationDefs.All.Select(d => new PaletteEntry(d.Name, d.Color, -1, d.Type)).ToArray()),
+            ("Decorations", DecorationDefs.All.Select(d => new PaletteEntry(d.Name, d.Color, -1, d.Type))
+                .Append(Obj(ObjectDefs.Light)).ToArray()),
         };
     }
 
@@ -592,8 +603,14 @@ public partial class Editor : Node2D
         }
         if (IsPlaying)
             StopPlay();
-        _level = loaded;
-        RedrawLevel();
+        SetLevel(loaded);
         _status.Text = $"Loaded '{_level.Name}'";
+    }
+
+    // Replaces the edited level (load dialog, tools, tests).
+    public void SetLevel(LevelData level)
+    {
+        _level = level;
+        RedrawLevel();
     }
 }

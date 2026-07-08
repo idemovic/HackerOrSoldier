@@ -186,6 +186,34 @@ Known simplifications (tuning constants, not README rules):
 - The smoke test force-builds every sprite so a malformed pixel map fails
   the run; scenes/screenshot.tscn renders a showcase level for eyeballing
 
+### Wall variants and Walls palette category
+- New "Walls" palette category between Mission and Terrain holding Wall,
+  Destructible wall and the new variants; the Light object moved from
+  Terrain to Decorations
+- Four new solid (walkable) wall tiles drawn procedurally in the house
+  style, taking their material vocabulary from the Secret Agent reference
+  screenshots in references/ (original art, nothing copied): stone blocks
+  (rounded, lit from the top left), red brick, riveted steel plate, girder
+  (flanges, bolts, lattice web)
+- Three background wall tiles (mesh, rock, lit panel): no collision, so
+  they are pure scenery behind the agent; deliberately darker and flatter
+  than the solid walls so gameplay reads on top of them. Non-solid also
+  means they do not block enemy line of sight
+- Smoke test: agent walks through a background wall and is stopped by a
+  stone block wall (both negative-verified by flipping the Solid flags)
+
+### Level size 40x40
+- Default level size raised from 40x12 to 40x40 tiles; the editor camera
+  starts at the bottom-left corner where the default floor and agent start
+  are, and pans in both axes within the level bounds
+- Camera limits, kill plane, minimap and play camera all derive from the
+  level dimensions, so they adapted without changes; saved 40x12 levels
+  keep their own size and still load and play
+- Editor gained SetLevel (used by the load dialog and the smoke test); the
+  smoke test runs its scenarios on an injected 40x12 level so their
+  hand-tuned coordinates stay valid, and a new check covers the 40x40
+  default (dimensions, spawn at the bottom, standing on the floor)
+
 ### Editor palette rework
 - Palette layout: vertical category list (Mission, Terrain, Devices,
   Movables, Enemies, Items, Weapons, Collectibles, Decorations, Eraser -
@@ -207,8 +235,9 @@ Known simplifications (tuning constants, not README rules):
 - Visual layer (VGA palette + dithering shader, real sprites, 32x32 tile art):
   after milestone 2 or 3. Placeholder rects iterate faster, and the retro
   aesthetic is an asset swap plus one shader, not a structural decision.
-- Level size is fixed at 40x12 tiles for now; the format stores width/height,
-  so resizing is a later editor feature, not a format change.
+- Level size is fixed at 40x40 tiles (raised from 40x12); the format stores
+  width/height, so per-level resizing is a later editor feature, not a
+  format change. Old 40x12 levels still load and play.
 - Elevator / moving platform movement-range property (start and end tile per
   the README editor section): the current fixed 4-tile obstacle-limited range
   works without new UI; add the range picker when the property row grows up.

@@ -17,6 +17,8 @@ public partial class SmokeTest : Node
         DataModelChecks();
         await EditorLoopChecks();
         await CorridorCheck();
+        await DefaultLevelCheck();
+        await WallTilesCheck();
         await LivesAndFailCheck();
         await VestCheck();
         await KillPlaneCheck();
@@ -139,6 +141,46 @@ public partial class SmokeTest : Node
         Input.ActionRelease("move_right");
         Check(runner != null && runner.Position.X > 13 * 32,
             "agent fits through a 1-tile corridor");
+        editor.StopPlay();
+    }
+
+    // The default level is 40x40 with the floor and agent start at the
+    // bottom; the agent spawns and stands there.
+    private async Task DefaultLevelCheck()
+    {
+        var editor = await FreshEditor(legacySize: false);
+        Check(editor.Level.Width == 40 && editor.Level.Height == 40, "default level is 40x40");
+        Check(editor.StartPlay(), "default 40x40 level starts");
+        var agent = editor.PlayerAgent;
+        Check(agent != null && agent.Position.Y > 37 * 32,
+            "agent starts near the bottom of the tall level");
+        float startY = agent?.Position.Y ?? 0;
+        await Frames(20);
+        Check(agent != null && Mathf.Abs(agent.Position.Y - startY) < 8,
+            "agent stands on the floor of the tall level");
+        editor.StopPlay();
+    }
+
+    // Background walls are pure scenery (the agent walks through them);
+    // the new solid wall variants block like any wall.
+    private async Task WallTilesCheck()
+    {
+        var editor = await FreshEditor();
+        editor.SetBrushTile(TileDefs.BackgroundMesh);
+        editor.PaintCell(new Vector2I(5, 9));
+        editor.PaintCell(new Vector2I(5, 10));
+        editor.SetBrushTile(TileDefs.StoneBlocks);
+        editor.PaintCell(new Vector2I(9, 9));
+        editor.PaintCell(new Vector2I(9, 10));
+        Check(editor.StartPlay(), "wall variants level starts");
+        var agent = editor.PlayerAgent;
+        Input.ActionPress("move_right");
+        await Frames(90);
+        Input.ActionRelease("move_right");
+        Check(agent != null && agent.Position.X > 6 * 32,
+            "background wall is not solid (agent walks through)");
+        Check(agent != null && agent.Position.X < 9 * 32 - 8,
+            "stone block wall stops the agent");
         editor.StopPlay();
     }
 
@@ -978,12 +1020,17 @@ public partial class SmokeTest : Node
         await ToSignal(GetTree(), SceneTree.SignalName.ProcessFrame);
     }
 
-    private async Task<Editor> FreshEditor()
+    // Scenarios are written against the legacy 12-row layout (floor at
+    // row 11, agent start at (2, 10)); pass legacySize: false to keep the
+    // 40x40 default level.
+    private async Task<Editor> FreshEditor(bool legacySize = true)
     {
         _editor?.QueueFree();
         _editor = GD.Load<PackedScene>("res://scenes/editor.tscn").Instantiate<Editor>();
         AddChild(_editor);
         await ToSignal(GetTree(), SceneTree.SignalName.ProcessFrame);
+        if (legacySize)
+            _editor.SetLevel(LevelData.NewDefault(40, 12));
         return _editor;
     }
 

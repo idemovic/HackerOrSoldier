@@ -18,6 +18,13 @@ public static class TileDefs
     public const int Spikes = 7;
     public const int Spear = 8;
     public const int HiddenPlatform = 9;
+    public const int StoneBlocks = 10;
+    public const int RedBrick = 11;
+    public const int SteelPlate = 12;
+    public const int Girder = 13;
+    public const int BackgroundMesh = 14;
+    public const int BackgroundRock = 15;
+    public const int BackgroundPanel = 16;
 
     public static readonly TileDef[] All =
     {
@@ -30,6 +37,14 @@ public static class TileDefs
         new(Spikes, "Spikes", new Color(0.75f, 0.75f, 0.80f), Solid: false),
         new(Spear, "Spear", new Color(0.60f, 0.20f, 0.25f), Solid: false),
         new(HiddenPlatform, "Hidden platform", new Color(0.45f, 0.75f, 0.85f), Solid: true),
+        new(StoneBlocks, "Stone blocks", new Color(0.42f, 0.42f, 0.48f), Solid: true),
+        new(RedBrick, "Red brick", new Color(0.56f, 0.16f, 0.13f), Solid: true),
+        new(SteelPlate, "Steel plate", new Color(0.55f, 0.60f, 0.72f), Solid: true),
+        new(Girder, "Girder", new Color(0.45f, 0.48f, 0.55f), Solid: true),
+        // Background walls: scenery behind the agent, no collision.
+        new(BackgroundMesh, "Background mesh", new Color(0.10f, 0.11f, 0.14f), Solid: false),
+        new(BackgroundRock, "Background rock", new Color(0.24f, 0.25f, 0.29f), Solid: false),
+        new(BackgroundPanel, "Background panel", new Color(0.13f, 0.15f, 0.21f), Solid: false),
     };
 
     public static TileDef Get(int id)

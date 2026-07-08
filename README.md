@@ -3,6 +3,9 @@
 The agent is sent by the Agency across the globe to execute impossible missions and accomplish the main objective.
 
 ## Graphic aesthetics
+Original maps can be found as png images here:
+http://www.vgmaps.com/Atlas/PC/index.htm#SecretAgent
+e.g. http://www.vgmaps.com/Atlas/PC/SecretAgent-MissionOne-HuntForRedRockRover-Area01.png
 
 ### 256-color VGA limitation
 This limited the palette to 256 stark, highly saturated colors. There are no smooth gradients or subtle shading values. Shading is entirely achieved through dithering—checkerboard-like pixel patterns alternating two solid colors (such as dithering cyan and dark blue to create a mid-tone blue).The palette heavily relies on high-contrast primaries: intense reds for dynamite, bright cyans and magentas for high-tech base structures, and deep blacks or dark greys for underground rocks.
@@ -271,3 +274,4 @@ edit mode and play mode at any time.
 
 ### Minimap
 To orient in a bigger level while editing, there should be top right minimap of the whole level.
+

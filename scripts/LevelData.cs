@@ -16,7 +16,7 @@ public class LevelObject
 public class LevelData
 {
     public const int DefaultWidth = 40;
-    public const int DefaultHeight = 12;
+    public const int DefaultHeight = 40;
 
     public string Name { get; set; } = "";
     public string Description { get; set; } = "";
@@ -46,9 +46,9 @@ public class LevelData
         return null;
     }
 
-    public static LevelData NewDefault()
+    public static LevelData NewDefault(int width = DefaultWidth, int height = DefaultHeight)
     {
-        var level = new LevelData();
+        var level = new LevelData { Width = width, Height = height, Tiles = new int[width * height] };
         int wall = TileDefs.All[0].Id;
         for (int x = 0; x < level.Width; x++)
             level.SetTile(x, level.Height - 1, wall);
