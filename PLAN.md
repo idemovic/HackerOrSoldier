@@ -195,12 +195,30 @@ Known simplifications (tuning constants, not README rules):
   screenshots in references/ (original art, nothing copied): stone blocks
   (rounded, lit from the top left), red brick, riveted steel plate, girder
   (flanges, bolts, lattice web)
-- Three background wall tiles (mesh, rock, lit panel): no collision, so
-  they are pure scenery behind the agent; deliberately darker and flatter
-  than the solid walls so gameplay reads on top of them. Non-solid also
-  means they do not block enemy line of sight
+- Second batch of solid walls: concrete slabs (form-tie holes, stains),
+  sandbags (staggered courses, lit tops), container (corrugated green with
+  riveted frame rails), pipe wall (stacked teal pipes with couplings)
+- Background wall tiles: no collision, so they are pure scenery behind the
+  agent; deliberately darker and flatter than the solid walls so gameplay
+  reads on top of them. Non-solid also means they do not block enemy line
+  of sight. Variants: mesh, rock, lit panel, shadowed brick, circuit board
+  (dim traces and LEDs, fits the hacking theme), corrugated hangar, night
+  sky with stars for the outdoor top of tall levels
 - Smoke test: agent walks through a background wall and is stopped by a
   stone block wall (both negative-verified by flipping the Solid flags)
+
+### Outdoor sky
+- Cells with no tile are the outdoors: a per-level sky fills the whole
+  level rect behind the tile layers (repeating Sprite2D under the grids in
+  both the editor and the campaign scene). Painted background tiles cover
+  the sky per cell, so they read as indoor walls in front of it
+- The sky is a level property ("night" or "day", default night), toggled
+  with a toolbar button in the editor and saved in the level JSON; old
+  levels without the field load as night
+- New "Day sky" paintable tile (blue with dithered cloud dashes and haze)
+  next to the night one; the sky itself reuses these tile textures
+- Smoke test: default is night, the toggle flips to day, and the choice
+  round-trips through save/load (negative-verified with a no-op toggle)
 
 ### Level size 40x40
 - Default level size raised from 40x12 to 40x40 tiles; the editor camera

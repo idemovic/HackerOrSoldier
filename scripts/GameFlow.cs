@@ -9,6 +9,7 @@ namespace HackerOrSoldier;
 // profile; lives and ammo carry across levels within a run.
 public partial class GameFlow : Node2D
 {
+    private Sprite2D _sky;
     private TileMapLayer _grid;
     private TileMapLayer _hiddenGrid;
     private PackedScene _agentScene;
@@ -30,6 +31,8 @@ public partial class GameFlow : Node2D
         ProcessMode = ProcessModeEnum.Always;
 
         _agentScene = GD.Load<PackedScene>("res://scenes/agent.tscn");
+        _sky = new Sprite2D();
+        AddChild(_sky);   // behind the grids: empty cells show the sky
         _grid = new TileMapLayer { TileSet = TileSetBuilder.Build() };
         AddChild(_grid);
         _hiddenGrid = new TileMapLayer { TileSet = _grid.TileSet, Modulate = new Color(1, 1, 1, 0) };
@@ -100,6 +103,7 @@ public partial class GameFlow : Node2D
     {
         ClearPanel();
         _panel.Visible = false;
+        LevelGrids.UpdateSky(_sky, _level);
         LevelGrids.Fill(_grid, _hiddenGrid, _level);
 
         _session = new PlaySession { ProcessMode = ProcessModeEnum.Pausable };

@@ -68,6 +68,31 @@ public partial class Screenshot : Node
         editor.SetBrushTile(TileDefs.Girder);
         editor.PaintCell(new Vector2I(15, 35));
         editor.PaintCell(new Vector2I(16, 35));
+        editor.SetBrushTile(TileDefs.Concrete);
+        editor.PaintCell(new Vector2I(1, 33));
+        editor.PaintCell(new Vector2I(2, 33));
+        editor.SetBrushTile(TileDefs.Sandbags);
+        editor.PaintCell(new Vector2I(4, 33));
+        editor.PaintCell(new Vector2I(5, 33));
+        editor.SetBrushTile(TileDefs.Container);
+        editor.PaintCell(new Vector2I(7, 33));
+        editor.PaintCell(new Vector2I(8, 33));
+        editor.SetBrushTile(TileDefs.PipeWall);
+        editor.PaintCell(new Vector2I(10, 33));
+        editor.PaintCell(new Vector2I(11, 33));
+        editor.SetBrushTile(TileDefs.BackgroundBrick);
+        editor.PaintCell(new Vector2I(15, 31));
+        editor.PaintCell(new Vector2I(16, 31));
+        editor.SetBrushTile(TileDefs.BackgroundHangar);
+        editor.PaintCell(new Vector2I(18, 31));
+        editor.PaintCell(new Vector2I(19, 31));
+        editor.SetBrushTile(TileDefs.BackgroundCircuit);
+        editor.PaintCell(new Vector2I(15, 33));
+        editor.PaintCell(new Vector2I(16, 33));
+        editor.SetBrushTile(TileDefs.BackgroundSky);
+        editor.PaintCell(new Vector2I(18, 33));
+        editor.PaintCell(new Vector2I(19, 33));
+        editor.ToggleSky();   // show the day sky behind the showcase
     }
 
     public override void _Process(double delta)

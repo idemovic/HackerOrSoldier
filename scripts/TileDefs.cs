@@ -25,6 +25,15 @@ public static class TileDefs
     public const int BackgroundMesh = 14;
     public const int BackgroundRock = 15;
     public const int BackgroundPanel = 16;
+    public const int Concrete = 17;
+    public const int Sandbags = 18;
+    public const int Container = 19;
+    public const int PipeWall = 20;
+    public const int BackgroundBrick = 21;
+    public const int BackgroundCircuit = 22;
+    public const int BackgroundHangar = 23;
+    public const int BackgroundSky = 24;
+    public const int BackgroundSkyDay = 25;
 
     public static readonly TileDef[] All =
     {
@@ -41,10 +50,19 @@ public static class TileDefs
         new(RedBrick, "Red brick", new Color(0.56f, 0.16f, 0.13f), Solid: true),
         new(SteelPlate, "Steel plate", new Color(0.55f, 0.60f, 0.72f), Solid: true),
         new(Girder, "Girder", new Color(0.45f, 0.48f, 0.55f), Solid: true),
+        new(Concrete, "Concrete", new Color(0.42f, 0.43f, 0.47f), Solid: true),
+        new(Sandbags, "Sandbags", new Color(0.65f, 0.53f, 0.32f), Solid: true),
+        new(Container, "Container", new Color(0.22f, 0.45f, 0.25f), Solid: true),
+        new(PipeWall, "Pipe wall", new Color(0.16f, 0.52f, 0.52f), Solid: true),
         // Background walls: scenery behind the agent, no collision.
         new(BackgroundMesh, "Background mesh", new Color(0.10f, 0.11f, 0.14f), Solid: false),
         new(BackgroundRock, "Background rock", new Color(0.24f, 0.25f, 0.29f), Solid: false),
         new(BackgroundPanel, "Background panel", new Color(0.13f, 0.15f, 0.21f), Solid: false),
+        new(BackgroundBrick, "Background brick", new Color(0.14f, 0.15f, 0.18f), Solid: false),
+        new(BackgroundCircuit, "Background circuit", new Color(0.08f, 0.14f, 0.10f), Solid: false),
+        new(BackgroundHangar, "Background hangar", new Color(0.12f, 0.13f, 0.16f), Solid: false),
+        new(BackgroundSky, "Night sky", new Color(0.05f, 0.06f, 0.10f), Solid: false),
+        new(BackgroundSkyDay, "Day sky", new Color(0.23f, 0.44f, 0.88f), Solid: false),
     };
 
     public static TileDef Get(int id)

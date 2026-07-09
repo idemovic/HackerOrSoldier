@@ -12,6 +12,7 @@ public static class TileSetBuilder
     public const int SourceId = 0;
 
     private static readonly Dictionary<int, ImageTexture> IconCache = new();
+    private static readonly Dictionary<int, ImageTexture> TextureCache = new();
 
     public static Vector2I AtlasCoordsFor(int tileId)
     {
@@ -52,6 +53,16 @@ public static class TileSetBuilder
             }
         }
         return tileSet;
+    }
+
+    // Full-size single tile texture (the level sky).
+    public static ImageTexture TileTexture(int tileId)
+    {
+        if (TextureCache.TryGetValue(tileId, out var cached))
+            return cached;
+        var texture = ImageTexture.CreateFromImage(BuildTileImage(tileId));
+        TextureCache[tileId] = texture;
+        return texture;
     }
 
     // Small version for palette buttons.
@@ -202,6 +213,135 @@ public static class TileSetBuilder
                         }
                         else if ((x + y) % 12 < 2 || (x - y + 96) % 12 < 2)
                             img.SetPixel(x, y, new Color("55555f"));     // lattice web
+                    }
+                break;
+            case TileDefs.Concrete:
+                for (int y = 0; y < TileSize; y++)
+                    for (int x = 0; x < TileSize; x++)
+                    {
+                        Color c = new Color("6a6d78");
+                        if (x == 31 || y == 31 || y == 15)
+                            c = new Color("3f424c");                     // slab seams
+                        else if (x == 0 || y is 0 or 16)
+                            c = new Color("7d818e");                     // lit edge
+                        else if (x % 16 is 7 or 8 && y % 16 is 7 or 8)
+                            c = new Color("4a4d57");                     // form tie holes
+                        else if ((x * 5 + y * 3) % 29 == 0)
+                            c = new Color("5c5f6a");                     // stains
+                        img.SetPixel(x, y, c);
+                    }
+                break;
+            case TileDefs.Sandbags:
+                for (int y = 0; y < TileSize; y++)
+                    for (int x = 0; x < TileSize; x++)
+                    {
+                        int rowOffset = (y / 8) % 2 == 0 ? 0 : 8;
+                        int lx = (x + rowOffset) % 16, ly = y % 8;
+                        Color c = new Color("b5915a");
+                        if (ly == 7 || lx == 15 || lx == 15 - 1 && ly is 0 or 6 || lx == 0 && ly is 0 or 6)
+                            c = new Color("5a4526");                     // gaps, rounded ends
+                        else if (ly == 0 || lx == 1 && ly == 1 || lx == 13 && ly == 1)
+                            c = new Color("cfa96b");                     // lit top
+                        else if (ly > 3 && (x + y) % 2 == 0)
+                            c = new Color("8a6a3d");                     // dithered underside
+                        img.SetPixel(x, y, c);
+                    }
+                break;
+            case TileDefs.Container:
+                for (int y = 0; y < TileSize; y++)
+                    for (int x = 0; x < TileSize; x++)
+                    {
+                        Color c;
+                        if (y < 3 || y > 28)
+                        {
+                            c = new Color("55555f");                     // frame rails
+                            if (x % 8 is 3 or 4 && y is 1 or 30)
+                                c = new Color("2a2a33");                 // rivets
+                        }
+                        else
+                        {
+                            c = x % 8 < 4 ? new Color("2e5c2a") : new Color("22471f");   // corrugation
+                            if (x % 8 == 0)
+                                c = new Color("3a7334");                 // rib highlight
+                            else if ((x + y) % 2 == 0 && y > 22)
+                                c = new Color("1b3a19");                 // dithered grime
+                        }
+                        img.SetPixel(x, y, c);
+                    }
+                break;
+            case TileDefs.PipeWall:
+                for (int y = 0; y < TileSize; y++)
+                    for (int x = 0; x < TileSize; x++)
+                    {
+                        int ly = y % 8;
+                        Color c = new Color("1f8f8f");
+                        if (ly == 1)
+                            c = new Color("45d6d6");                     // pipe highlight
+                        else if (ly is 6 or 7)
+                            c = new Color("11504f");                     // pipe underside
+                        else if (ly > 3 && (x + y) % 2 == 0)
+                            c = new Color("187676");                     // dither
+                        if (x % 16 < 2 && ly is not 6 and not 7)
+                            c = ly == 1 ? new Color("9adede") : new Color("2fb0b0");   // couplings
+                        img.SetPixel(x, y, c);
+                    }
+                break;
+            case TileDefs.BackgroundBrick:
+                DrawBricks(img, new Color("23252e"), new Color("2b2e38"), new Color("0e0f14"));
+                break;
+            case TileDefs.BackgroundCircuit:
+                for (int y = 0; y < TileSize; y++)
+                    for (int x = 0; x < TileSize; x++)
+                    {
+                        Color c = new Color("10141a");
+                        if (y % 8 == 2 && (x + 4) % 16 < 10 || x % 8 == 5 && (y + 6) % 16 < 12)
+                            c = new Color("1b3a26");                     // traces
+                        if (y % 8 == 2 && x % 8 == 5)
+                            c = new Color("2a5f38");                     // solder pads
+                        else if ((x * 7 + y * 11) % 67 == 0)
+                            c = new Color("2a8f3a");                     // blinking LEDs
+                        img.SetPixel(x, y, c);
+                    }
+                break;
+            case TileDefs.BackgroundHangar:
+                for (int y = 0; y < TileSize; y++)
+                    for (int x = 0; x < TileSize; x++)
+                    {
+                        Color c = x % 4 < 2 ? new Color("1c1f26") : new Color("23262e");   // corrugation
+                        if (y % 16 == 15)
+                            c = new Color("12141a");                     // sheet seams
+                        else if (x % 16 == 8 && y % 16 == 7)
+                            c = new Color("2e323c");                     // bolts
+                        img.SetPixel(x, y, c);
+                    }
+                break;
+            case TileDefs.BackgroundSky:
+                for (int y = 0; y < TileSize; y++)
+                    for (int x = 0; x < TileSize; x++)
+                    {
+                        Color c = new Color("0b0e1a");
+                        if (y % 16 == 9 && (x + y) % 4 == 0)
+                            c = new Color("12162a");                     // faint cloud band
+                        if ((x * 13 + y * 29) % 97 == 0)
+                            c = new Color("9a9aa5");                     // stars
+                        if ((x * 31 + y * 17) % 211 == 0)
+                            c = new Color("f2f2f2");                     // bright stars
+                        img.SetPixel(x, y, c);
+                    }
+                break;
+            case TileDefs.BackgroundSkyDay:
+                for (int y = 0; y < TileSize; y++)
+                    for (int x = 0; x < TileSize; x++)
+                    {
+                        Color c = new Color("3b6fe0");
+                        int dash = (x + y / 16 * 9 + 3) % 16;
+                        if (y % 16 == 4 && dash < 6)
+                            c = new Color("e8f0fa");                     // cloud dashes
+                        else if (y % 16 == 5 && dash is > 0 and < 7)
+                            c = new Color("b8ccf2");                     // cloud underside
+                        else if ((x * 7 + y * 13) % 61 == 0)
+                            c = new Color("5c8aec");                     // haze specks
+                        img.SetPixel(x, y, c);
                     }
                 break;
             case TileDefs.BackgroundMesh:

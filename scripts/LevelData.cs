@@ -20,6 +20,9 @@ public class LevelData
 
     public string Name { get; set; } = "";
     public string Description { get; set; } = "";
+    // Cells with no tile are the outdoors; the sky ("night" or "day")
+    // fills the level behind everything.
+    public string Sky { get; set; } = "night";
     public int Width { get; set; } = DefaultWidth;
     public int Height { get; set; } = DefaultHeight;
     public int[] Tiles { get; set; } = new int[DefaultWidth * DefaultHeight];

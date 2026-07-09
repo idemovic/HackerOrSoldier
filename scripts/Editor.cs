@@ -16,6 +16,7 @@ public partial class Editor : Node2D
     private LevelData _level = LevelData.NewDefault();
     private PackedScene _agentScene;
 
+    private Sprite2D _sky;
     private TileMapLayer _grid;
     private TileMapLayer _hiddenGrid;
     private Node2D _markers;
@@ -25,6 +26,7 @@ public partial class Editor : Node2D
 
     private Label _status;
     private Button _playButton;
+    private Button _skyButton;
     private AcceptDialog _saveDialog;
     private LineEdit _nameEdit;
     private TextEdit _descEdit;
@@ -54,6 +56,9 @@ public partial class Editor : Node2D
     public override void _Ready()
     {
         _agentScene = GD.Load<PackedScene>("res://scenes/agent.tscn");
+
+        _sky = new Sprite2D();
+        AddChild(_sky);   // behind the grids: empty cells show the sky
 
         _grid = new TileMapLayer { TileSet = TileSetBuilder.Build() };
         AddChild(_grid);
@@ -270,6 +275,9 @@ public partial class Editor : Node2D
 
     private void RedrawLevel()
     {
+        LevelGrids.UpdateSky(_sky, _level);
+        if (_skyButton != null)
+            _skyButton.Text = _level.Sky == "day" ? "Sky: Day" : "Sky: Night";
         LevelGrids.Fill(_grid, _hiddenGrid, _level);
         RebuildMarkers();
         ApplyCameraLimits(_camera);
@@ -347,6 +355,10 @@ public partial class Editor : Node2D
                 StartPlay();
         };
         bar.AddChild(_playButton);
+
+        _skyButton = new Button { Text = "Sky: Night" };
+        _skyButton.Pressed += ToggleSky;
+        bar.AddChild(_skyButton);
 
         var menuButton = new Button { Text = "Menu" };
         menuButton.Pressed += () => GetTree().ChangeSceneToFile("res://scenes/main_menu.tscn");
@@ -479,8 +491,11 @@ public partial class Editor : Node2D
         var wallIds = new[]
         {
             TileDefs.Wall, TileDefs.DestructibleWall, TileDefs.StoneBlocks, TileDefs.RedBrick,
-            TileDefs.SteelPlate, TileDefs.Girder,
+            TileDefs.SteelPlate, TileDefs.Girder, TileDefs.Concrete, TileDefs.Sandbags,
+            TileDefs.Container, TileDefs.PipeWall,
             TileDefs.BackgroundMesh, TileDefs.BackgroundRock, TileDefs.BackgroundPanel,
+            TileDefs.BackgroundBrick, TileDefs.BackgroundCircuit, TileDefs.BackgroundHangar,
+            TileDefs.BackgroundSky, TileDefs.BackgroundSkyDay,
         };
         var walls = wallIds.Select(id => Tile(TileDefs.Get(id))).ToArray();
 
@@ -611,6 +626,12 @@ public partial class Editor : Node2D
     public void SetLevel(LevelData level)
     {
         _level = level;
+        RedrawLevel();
+    }
+
+    public void ToggleSky()
+    {
+        _level.Sky = _level.Sky == "day" ? "night" : "day";
         RedrawLevel();
     }
 }

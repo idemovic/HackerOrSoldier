@@ -19,6 +19,7 @@ public partial class SmokeTest : Node
         await CorridorCheck();
         await DefaultLevelCheck();
         await WallTilesCheck();
+        await SkyCheck();
         await LivesAndFailCheck();
         await VestCheck();
         await KillPlaneCheck();
@@ -182,6 +183,21 @@ public partial class SmokeTest : Node
         Check(agent != null && agent.Position.X < 9 * 32 - 8,
             "stone block wall stops the agent");
         editor.StopPlay();
+    }
+
+    // Empty cells are the outdoors: a per-level night/day sky fills the
+    // level behind the tiles, toggled from the toolbar and saved with the
+    // level.
+    private async Task SkyCheck()
+    {
+        var editor = await FreshEditor();
+        Check(editor.Level.Sky == "night", "new levels default to the night sky");
+        editor.ToggleSky();
+        Check(editor.Level.Sky == "day", "sky toggle switches to day");
+        editor.Level.Name = "Sky Test";
+        LevelStore.Save(editor.Level);
+        var loaded = LevelStore.Load(LevelStore.FileNameFor("Sky Test"));
+        Check(loaded != null && loaded.Sky == "day", "sky choice round-trips through save/load");
     }
 
     // Lava on the start cell drains all three lives, which ends the run.
