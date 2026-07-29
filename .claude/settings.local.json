@@ -1,8 +1,18 @@
 {
   "permissions": {
     "allow": [
-      "WebSearch", "WebFetch", "Bash", "Read", "Write",
-      "Edit", "Glob", "Grep", "Task", "TodoWrite", "PowerShell"
+      "WebSearch",
+      "WebFetch",
+      "Bash",
+      "Read",
+      "Write",
+      "Edit",
+      "Glob",
+      "Grep",
+      "Task",
+      "TodoWrite",
+      "PowerShell",
+      "Bash(dotnet build *)"
     ],
     "deny": [],
     "defaultMode": "bypassPermissions"
