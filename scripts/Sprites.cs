@@ -329,6 +329,95 @@ public static class Sprites
             "...kk....dd.....",
             "..kkkk...kkkk...",
         }),
+        // Death, in four beats: struck, buckling, down on the backside, flat.
+        // This is the one set that lets the collar and tie leave their fixed
+        // rows - the body is on its way to the floor, so the whole silhouette
+        // has to travel down the frame. The head keeps its profile all the
+        // way, so the agent still reads as facing the way it was hit.
+        // Struck: chin snapped up, both arms flung wide, the whole body a row
+        // taller than it stands and clear of the floor - knocked off his feet.
+        ["agent_hit"] = new(new[]
+        {
+            "....hhhhh.......",
+            "...hhhhhhh......",
+            "...hhssss.......",
+            "...hhkkkk.......",
+            "..s.hsssss..s...",
+            "..d...hsss.d....",
+            "...ddkkkkkdd....",
+            "....kkkkkww.....",
+            "....kkkkkrw.....",
+            "....kkkkkkk.....",
+            "....kkkkkkk.....",
+            "....kkdddd......",
+            "...kk...dd......",
+            "..kk.....dd.....",
+            "..kkkk...kkkk...",
+            "................",
+        }),
+        // Buckling: the whole figure sinks two rows, knees give way, arms
+        // drop out to the sides.
+        ["agent_die0"] = new(new[]
+        {
+            "................",
+            "................",
+            "................",
+            "....hhhhh.......",
+            "...hhhhhhh......",
+            "...hhssss.......",
+            "...hhkkkk.......",
+            "...hhsssss......",
+            "....hsss........",
+            "...kkkkkkk......",
+            "...kkkkkww......",
+            "..skkkkkrw.s....",
+            "..dkkkkkkkkd....",
+            "...kkdddd.......",
+            "..kkk....dd.....",
+            ".kkkk....kkkk...",
+        }),
+        // Down: sat back on the floor, one arm still out behind, legs run
+        // along the ground in front instead of standing under the body.
+        ["agent_die1"] = new(new[]
+        {
+            "................",
+            "................",
+            "................",
+            "................",
+            "................",
+            "...hhhhh........",
+            "..hhhhhhh.......",
+            "..hhssss........",
+            "..hhkkkk........",
+            "..hhsssss.......",
+            "...hsss.........",
+            ".s.kkkkkkk......",
+            ".d.kkkkkww......",
+            "..dkkkkkrw......",
+            "...kkkkkkddddd..",
+            "...kkkkkddkkkk..",
+        }),
+        // Flat: the body lying along the floor line, head to the back, one
+        // arm still up. Held until the respawn.
+        ["agent_dead"] = new(new[]
+        {
+            "................",
+            "................",
+            "................",
+            "................",
+            "................",
+            "................",
+            "................",
+            "................",
+            "................",
+            "................",
+            "................",
+            "..........s.....",
+            ".........d......",
+            ".hhhkkkwkkkkk...",
+            ".hhhssskrkkkddd.",
+            "..hhkkkkkkkkkkk.",
+        }),
         // Enemy animation set (see EnemyAnimator for the timing). Same
         // profile treatment as the agent: everything faces right and flips
         // with the walk direction, so an enemy visibly looks where it is

@@ -63,6 +63,7 @@ public partial class SmokeTest : Node
         await RocketLauncherCheck();
         await DecorationCheck();
         await AgentAnimationCheck();
+        await AgentDeathCheck();
         await EnemyAnimationCheck();
         await MenuSceneCheck();
 
@@ -205,13 +206,14 @@ public partial class SmokeTest : Node
     }
 
     // Lava on the start cell drains all three lives, which ends the run.
+    // Each of them costs a full death sequence, so this takes a while.
     private async Task LivesAndFailCheck()
     {
         var editor = await FreshEditor();
         editor.SetBrushTile(TileDefs.Lava);
         editor.PaintCell(new Vector2I(2, 10));
         Check(editor.StartPlay(), "lava level starts");
-        await Frames(20);
+        await Frames(270);
         Check(!editor.IsPlaying, "losing all lives returns to edit mode");
     }
 
@@ -243,7 +245,7 @@ public partial class SmokeTest : Node
         Input.ActionPress("move_right");
         await Frames(40);
         Input.ActionRelease("move_right");
-        await Frames(60);
+        await Frames(140);   // the fall, then the death sequence before the respawn
         Check(editor.IsPlaying && editor.Session.Lives == 2, "falling below the level costs one life");
         Check(editor.PlayerAgent != null && editor.PlayerAgent.Position.X < 6 * 32,
             "agent respawned at the start");
@@ -914,14 +916,19 @@ public partial class SmokeTest : Node
         await Frames(12);
         Input.ActionRelease("move_right");
         Check(editor.Session.Weapon == "chainsaw", "weapon pickup equips the chainsaw");
-        for (int i = 0; i < 30 && editor.Session.Enemies.Count > 0; i++)
+        // Swinging as fast as the input allows. The chainsaw reaches 44px and
+        // the fighter closes to 28px before it can touch the agent, so the
+        // kill has to land inside that window - swinging on a slower cadence
+        // trades the melee check for a test of what happens after a death.
+        for (int i = 0; i < 200 && editor.Session.Enemies.Count > 0; i++)
         {
             Input.ActionPress("shoot");
-            await Frames(2);
+            await Frames(1);
             Input.ActionRelease("shoot");
-            await Frames(8);
+            await Frames(1);
         }
         Check(editor.Session.Enemies.Count == 0, "chainsaw kills the charging fighter in melee range");
+        Check(editor.Session.Lives == 3, "the fighter dies before it lands a contact hit");
         Check(editor.Session.Ammo == 10, "chainsaw uses no ammo");
         editor.StopPlay();
     }
@@ -1102,6 +1109,44 @@ public partial class SmokeTest : Node
         await Frames(1);
         Input.ActionRelease("shoot");
         Check(agent.AnimationFrame is "agent" or "agent_breathe", "shooting with no ammo stays idle");
+        editor.StopPlay();
+    }
+
+    // Losing a life plays out as a sequence rather than an instant respawn:
+    // the life goes on the hit, the agent crumples where it stood, the screen
+    // effect covers the level, and the respawn happens behind it.
+    private async Task AgentDeathCheck()
+    {
+        var editor = await FreshEditor();
+        editor.SetBrushTile(TileDefs.Lava);
+        editor.PaintCell(new Vector2I(6, 10));
+        Check(editor.StartPlay(), "death level starts");
+        var agent = editor.PlayerAgent;
+
+        Input.ActionPress("move_right");
+        await Frames(40);
+        Input.ActionRelease("move_right");
+        Check(editor.Session.Lives == 2, "the life goes the moment the hit lands");
+        Check(agent.IsDead && editor.Session.AgentDown, "a lethal hit puts the agent down");
+        Check(editor.Session.GetChildren().OfType<DeathEffect>().Any(),
+            "the death effect covers the screen");
+
+        float fellAt = agent.Position.X;
+        await Frames(6);
+        Check(Mathf.Abs(agent.Position.X - fellAt) < 1f, "the body stays where it fell");
+        Check(agent.AnimationFrame is "agent_hit" or "agent_die0" or "agent_die1",
+            "the death sequence plays through its poses");
+
+        await Frames(30);
+        Check(agent.AnimationFrame == "agent_dead", "the death sequence holds the final pose");
+        editor.Session.AgentHit();
+        Check(editor.Session.Lives == 2, "a downed agent cannot lose a second life");
+
+        await Frames(60);
+        Check(!agent.IsDead && agent.Position.X < 6 * 32, "the respawn follows the death sequence");
+        Check(agent.AnimationFrame is "agent" or "agent_breathe", "the respawned agent is back on its feet");
+        Check(!editor.Session.GetChildren().OfType<DeathEffect>().Any(),
+            "the screen effect clears with the respawn");
         editor.StopPlay();
     }
 

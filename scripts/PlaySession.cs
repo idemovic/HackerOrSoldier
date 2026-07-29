@@ -23,6 +23,10 @@ public partial class PlaySession : Node2D
     private const float RobotOffTime = 1f;
     private const float AlarmDuration = 30f;         // README: alarm stays on 30s from the last trigger
     private const float ExplosionRadius = 5 * 32f;   // README: dynamite kills in a 5 square radius
+    // How long a lost life holds the screen: the agent crumples, the death
+    // effect dissolves the screen to black, and only then does the respawn
+    // (or the fail screen) happen behind it.
+    private const float DeathDuration = 1.2f;
 
     public Agent Agent { get; private set; }
     public int Lives { get; private set; } = 3;   // README: default 3 lives
@@ -46,6 +50,7 @@ public partial class PlaySession : Node2D
     public bool AlarmActive => _alarmTime > 0;
     public bool DisguiseActive => _disguiseTime > 0;
     public bool ElectricFloorsOff { get; private set; }
+    public bool AgentDown => _agentDown;
     public float DropChance { get; set; } = 0.3f;   // README: some enemies "sometimes" drop an ammo pack
     public System.Collections.Generic.IReadOnlyList<Enemy> Enemies => _enemies;
     public System.Collections.Generic.IReadOnlyList<WallSwitch> Switches => _switches;
@@ -77,9 +82,14 @@ public partial class PlaySession : Node2D
     private float _gogglesTime;
     private float _disguiseTime;
     private Vector2 _startPosition;
+    private Camera2D _camera;
     private Node2D _spikes;
     private Label _hud;
     private bool _ended;
+    private bool _agentDown;      // a life is being lost right now
+    private bool _failAfterDeath; // it was the last one
+    private float _deathTime;
+    private DeathEffect _death;
 
     public void Setup(LevelData level, TileMapLayer grid, TileMapLayer hiddenGrid, PackedScene agentScene, RunState run = null)
     {
@@ -120,6 +130,7 @@ public partial class PlaySession : Node2D
                     Agent.AddChild(camera);
                     AddChild(Agent);
                     camera.MakeCurrent();
+                    _camera = camera;
                     break;
                 case ObjectDefs.ExitDoor:
                     var exit = new ExitDoor { Position = pos };
@@ -231,6 +242,20 @@ public partial class PlaySession : Node2D
         if (_ended)
             return;
         float dt = (float)delta;
+
+        // The level keeps running behind the death effect - only the agent is
+        // down, and it cannot be hurt again until the respawn.
+        if (_agentDown)
+        {
+            _deathTime -= dt;
+            if (_deathTime <= 0f)
+            {
+                FinishDeath();
+                if (_ended)
+                    return;
+            }
+        }
+
         Time += dt;
         _spikes.Visible = SpikesUp;
 
@@ -532,20 +557,39 @@ public partial class PlaySession : Node2D
 
     public void AgentHit()
     {
-        if (_ended)
+        if (_ended || _agentDown)   // one hit per death; the body is immune
             return;
         if (HasVest)
         {
-            HasVest = false;   // README: the vest saves 1 life, then is destroyed
+            // README: the vest saves 1 life, then is destroyed. Surviving a
+            // hit is not a death, so it costs the agent its ground, not the
+            // whole death sequence.
+            HasVest = false;
+            Agent.ResetForRespawn(_startPosition);
+            return;
         }
-        else
+
+        // The life is gone the moment the hit lands; only the respawn waits
+        // for the death sequence to play out.
+        Lives--;
+        _agentDown = true;
+        _failAfterDeath = Lives <= 0;
+        _deathTime = DeathDuration;
+        Agent.Die();
+        _death = new DeathEffect { Duration = DeathDuration, Camera = _camera };
+        AddChild(_death);
+    }
+
+    private void FinishDeath()
+    {
+        _agentDown = false;
+        if (IsInstanceValid(_death))
+            _death.QueueFree();
+        _death = null;
+        if (_failAfterDeath)
         {
-            Lives--;
-            if (Lives <= 0)
-            {
-                End(SignalName.Failed);
-                return;
-            }
+            End(SignalName.Failed);
+            return;
         }
         Agent.ResetForRespawn(_startPosition);
     }

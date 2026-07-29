@@ -32,6 +32,7 @@ public partial class Agent : CharacterBody2D
     public PlaySession Session { get; set; }
     public int Facing { get; private set; } = 1;
     public bool IsHiding { get; private set; }
+    public bool IsDead { get; private set; }
     public string AnimationFrame => _animator?.Frame;
 
     private float _electricTime;
@@ -45,11 +46,24 @@ public partial class Agent : CharacterBody2D
         _animator = new AgentAnimator(_sprite);
     }
 
+    // Loses a life: the agent stops taking input and crumples where it
+    // stands. PlaySession holds it there and decides when to respawn it.
+    public void Die()
+    {
+        if (IsDead)
+            return;
+        IsDead = true;
+        Velocity = Vector2.Zero;
+        _animator.Die();
+    }
+
     public void ResetForRespawn(Vector2 position)
     {
         Position = position;
         Velocity = Vector2.Zero;
         _electricTime = 0f;
+        IsDead = false;
+        SetHiding(false);   // dying inside a closet must not respawn a ghost
         _animator.Reset();
     }
 
@@ -62,6 +76,15 @@ public partial class Agent : CharacterBody2D
     public override void _PhysicsProcess(double delta)
     {
         float dt = (float)delta;
+
+        // A downed agent takes no input and does not move: the body stays
+        // where it fell until the respawn, hazards included.
+        if (IsDead)
+        {
+            Velocity = Vector2.Zero;
+            _animator.Update(dt, Vector2.Zero, true, false, Facing);
+            return;
+        }
 
         if (Session != null && Input.IsActionJustPressed("activate"))
             Session.ActivateAction();

@@ -17,20 +17,29 @@ public sealed class AgentAnimator
     private static readonly string[] FallFrames = { "agent_fall" };
     // The flash burns for one beat, then the aim pose holds for two.
     private static readonly string[] ShootFrames = { "agent_fire", "agent_aim", "agent_aim" };
+    // Struck, buckling, down, flat. Plays once and stops on the last pose.
+    private static readonly string[] DeathFrames =
+        { "agent_hit", "agent_die0", "agent_die1", "agent_dead" };
 
     // Every distinct frame the animator can reach; the smoke test builds them
     // all so a malformed pixel map fails the run.
     public static readonly string[] AllFrames = IdleFrames
         .Concat(RunFrames).Concat(JumpFrames).Concat(FallFrames).Concat(ShootFrames)
+        .Concat(DeathFrames)
         .Distinct().ToArray();
 
     private const float IdleFrameTime = 0.7f;    // slow breath
     private const float SwimFrameTime = 0.18f;   // lazy paddle
     private const float ShootFrameTime = 0.08f;
+    private const float DeathFrameTime = 0.12f;  // the crumple, one beat per pose
     private const float RunFrameStride = 18f;    // px travelled per run frame
 
     // The shoot pose holds for exactly one pass over its frames.
     private const float ShootPoseTime = 3 * ShootFrameTime;
+
+    // How long the crumple takes; the last pose holds indefinitely after it,
+    // so PlaySession is free to keep the body down for longer.
+    private static readonly float DeathTime = DeathFrames.Length * DeathFrameTime;
 
     private enum Pose { Idle, Run, Jump, Fall, Swim, Shoot }
 
@@ -38,6 +47,7 @@ public sealed class AgentAnimator
     private Pose _pose = Pose.Idle;
     private float _phase;
     private float _shootTime;
+    private bool _dying;
     private string _frame;
 
     // Sprite key currently on screen; the smoke test asserts against it.
@@ -53,16 +63,36 @@ public sealed class AgentAnimator
         _phase = 0f;
     }
 
+    // Takes over from every other pose until Reset; the session decides when
+    // the body gets up again.
+    public void Die()
+    {
+        _dying = true;
+        _phase = 0f;
+        _shootTime = 0f;
+    }
+
     public void Reset()
     {
         _pose = Pose.Idle;
         _phase = 0f;
         _shootTime = 0f;
+        _dying = false;
     }
 
     public void Update(float dt, Vector2 velocity, bool onFloor, bool submerged, int facing)
     {
         _sprite.FlipH = facing < 0;
+
+        // The death cycle runs once and stops on the last pose, rather than
+        // wrapping like every other cycle: the agent stays down.
+        if (_dying)
+        {
+            _phase = Mathf.Min(_phase + dt, DeathTime - 0.5f * DeathFrameTime);
+            Show(DeathFrames[(int)(_phase / DeathFrameTime)]);
+            return;
+        }
+
         _shootTime = Mathf.Max(_shootTime - dt, 0f);
 
         var pose = SelectPose(velocity, onFloor, submerged);

@@ -245,8 +245,8 @@ Known simplifications (tuning constants, not README rules):
 ### Agent animation
 - Ten hand-authored agent poses in scripts/Sprites.cs, same runtime pixel
   maps as the rest of the art: idle + breath, a four-frame run cycle, jump,
-  fall, aim and fire. Frame swapping only, no tweening or skeletal rig -
-  the DOS platformer idiom the README asks for
+  fall, aim and fire (plus the four death poses below). Frame swapping only,
+  no tweening or skeletal rig - the DOS platformer idiom the README asks for
 - The agent is drawn in profile facing right (hair mass at the back, shades
   band and nose bump at the front, shoe toes pointing forward), so FlipH on
   the facing direction makes the agent visibly look where it is heading.
@@ -268,6 +268,33 @@ Known simplifications (tuning constants, not README rules):
 - Smoke test drives the real inputs through idle, run, jump, fall and the
   fire -> aim -> idle sequence, and force-builds every frame via
   AgentAnimator.AllFrames
+### Agent death
+- Four more poses in scripts/Sprites.cs, played once and then held: struck
+  (chin snapped up, arms flung wide, the body a row taller than it stands and
+  clear of the floor), buckling, down on the floor, flat. This is the one set
+  that lets the collar and tie leave their fixed rows - the whole silhouette
+  has to travel down the frame - and the head keeps its profile throughout,
+  so the agent still reads as facing the way it was hit
+- Losing a life is a sequence rather than an instant respawn: the life goes
+  on the hit, the agent stops taking input and crumples where it stood, and
+  the respawn (or the fail screen, when it was the last life) happens 1.2s
+  later behind a fully covered screen. The agent cannot be hurt again while
+  it is down, which also stops standing in lava from draining three lives in
+  three frames
+- The vest keeps the old instant behaviour: surviving a hit is not a death,
+  so it costs the agent its ground but plays no death sequence
+- scripts/DeathEffect.cs is the whole-screen part, in the same DOS idiom as
+  the sprites and with no shader: a hard red palette flash, a few frames of
+  whole-pixel camera shake decaying to nothing, then a chunky block dissolve
+  to black on the 32px tile grid. The block order is a shuffle from a fixed
+  seed - stepping through the grid by any fixed stride bands into diagonals
+  instead of scattering - and it finishes before the respawn, so the level
+  snaps back rather than popping the agent across the screen
+- The level keeps running behind the effect; only the agent is down
+- Smoke test drives a real lava death through the whole sequence: the life on
+  the hit, the body staying where it fell, the poses, the held final pose,
+  the immunity while down, and the respawn clearing the effect
+
 ### Enemy animation
 - All ten README enemies redrawn in profile to match the agent, with 24
   frames total in scripts/Sprites.cs: a two-frame walk each, plus a firing
