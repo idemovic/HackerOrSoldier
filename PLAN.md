@@ -268,10 +268,35 @@ Known simplifications (tuning constants, not README rules):
 - Smoke test drives the real inputs through idle, run, jump, fall and the
   fire -> aim -> idle sequence, and force-builds every frame via
   AgentAnimator.AllFrames
-- scenes/agent_frames.tscn renders a contact sheet of all frames to
-  user://agent_frames.png - dark background, mid-tone background, and a
-  mirrored band for the other facing - the sprite-art equivalent of
-  screenshot.tscn
+### Enemy animation
+- All ten README enemies redrawn in profile to match the agent, with 24
+  frames total in scripts/Sprites.cs: a two-frame walk each, plus a firing
+  pose for the soldier, super soldier, turret and robot, and a powered-down
+  pose for the robot's off window
+- The five bipeds (fighter, soldier, super soldier, ultimate soldier,
+  robot) are one 16x16 skeleton parameterised by palette, so the soldier
+  degradation chain reads as the same trooper losing armour. The robot gets
+  a boxy machine head and darker steel so it never reads as another
+  armoured trooper
+- Non-humanoids are hand drawn: robodog (four legs, trotting), drone
+  (spinning rotor plus a hover bob), turret (barrel and muzzle flash),
+  landmine (blinking LED), electric eel (flicking tail fin)
+- scripts/EnemyAnimator.cs mirrors AgentAnimator with one table for all ten
+  types: off pose wins, then the firing pose, then the walk cycle. Walkers
+  advance on distance travelled; the drone rotor and landmine LED have
+  nothing to travel so they run on the wall clock instead
+- The first frame of every cycle is the plain type key, so editor markers
+  and palette icons keep working with no changes
+- Enemy sprites now face right like the agent (Enemy.cs flipped its FlipH
+  test to match), and the turret turns to track the agent so its barrel
+  points where the plasma actually goes
+- Smoke test covers the patrol cycle, the turret hold-then-fire, the robot
+  off pose, and that degrading swaps the whole pose set
+
+- scenes/agent_frames.tscn renders contact sheets of every agent and enemy
+  frame to user://agent_frames.png and user://enemy_frames.png - dark
+  background, mid-tone background, and a mirrored band for the other
+  facing - the sprite-art equivalent of screenshot.tscn
 
 ## Milestone 6 - Steam prep (next)
 - Export presets for Windows and Linux

@@ -1,27 +1,34 @@
+using System.Linq;
 using Godot;
 
 namespace HackerOrSoldier;
 
-// Temporary helper: renders every agent animation frame into a contact sheet
-// at user://agent_frames.png and quits. Not part of the game. Each band is
-// the full set on one background; the flipped band is what the player sees
-// walking the other way.
+// Temporary helper: renders every character animation frame into contact
+// sheets at user://agent_frames.png and user://enemy_frames.png, then quits.
+// Not part of the game. Each sheet has the set on a dark background, on a
+// mid-tone background, and mirrored - the mirrored band is what the player
+// sees when the character walks the other way.
 public partial class AgentFramesPreview : Node
 {
     private const int Cell = 40;
-    private const int Columns = 6;
 
     public override void _Ready()
     {
-        var frames = AgentAnimator.AllFrames;
-        int rows = (frames.Length + Columns - 1) / Columns;
+        Sheet("user://agent_frames.png", AgentAnimator.AllFrames, columns: 6);
+        Sheet("user://enemy_frames.png", EnemyAnimator.AllFrames, columns: 8);
+        GetTree().Quit();
+    }
+
+    private static void Sheet(string path, string[] frames, int columns)
+    {
+        int rows = (frames.Length + columns - 1) / columns;
         var bands = new[]
         {
             (Background: new Color(0.10f, 0.10f, 0.16f), Flip: false),
             (Background: new Color(0.42f, 0.42f, 0.46f), Flip: false),
             (Background: new Color(0.42f, 0.42f, 0.46f), Flip: true),
         };
-        var sheet = Image.CreateEmpty(Columns * Cell, bands.Length * rows * Cell, false, Image.Format.Rgba8);
+        var sheet = Image.CreateEmpty(columns * Cell, bands.Length * rows * Cell, false, Image.Format.Rgba8);
 
         for (int band = 0; band < bands.Length; band++)
         {
@@ -33,14 +40,13 @@ public partial class AgentFramesPreview : Node
                 frame.Convert(Image.Format.Rgba8);
                 if (bands[band].Flip)
                     frame.FlipX();
-                var at = new Vector2I(i % Columns * Cell + 4, top + i / Columns * Cell + 4);
+                var at = new Vector2I(i % columns * Cell + 4, top + i / columns * Cell + 4);
                 sheet.BlendRect(frame, new Rect2I(Vector2I.Zero, frame.GetSize()), at);
             }
         }
 
         sheet.Resize(sheet.GetWidth() * 4, sheet.GetHeight() * 4, Image.Interpolation.Nearest);
-        sheet.SavePng("user://agent_frames.png");
-        GD.Print($"wrote {frames.Length} frames");
-        GetTree().Quit();
+        sheet.SavePng(path);
+        GD.Print($"{path}: {frames.Length} frames -> {string.Join(", ", frames.Take(3))}...");
     }
 }

@@ -1,3 +1,4 @@
+using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
 using Godot;
@@ -62,6 +63,7 @@ public partial class SmokeTest : Node
         await RocketLauncherCheck();
         await DecorationCheck();
         await AgentAnimationCheck();
+        await EnemyAnimationCheck();
         await MenuSceneCheck();
 
         GD.Print(_failures == 0 ? "SMOKE OK" : $"SMOKE FAILED ({_failures})");
@@ -99,7 +101,7 @@ public partial class SmokeTest : Node
             foreach (var def in TileDefs.All)
                 TileSetBuilder.TileIcon(def.Id);
             foreach (var key in new[] { "platform", "flame", "bullet", "plasma", "rocket", "dynamite" }
-                .Concat(AgentAnimator.AllFrames))
+                .Concat(AgentAnimator.AllFrames).Concat(EnemyAnimator.AllFrames))
                 Check(Sprites.Get(key) != null, $"sprite '{key}' exists");
             Check(true, "all object sprites build");
         }
@@ -1101,6 +1103,70 @@ public partial class SmokeTest : Node
         Input.ActionRelease("shoot");
         Check(agent.AnimationFrame is "agent" or "agent_breathe", "shooting with no ammo stays idle");
         editor.StopPlay();
+    }
+
+    // Enemy poses are picked from the same state the behaviour already uses,
+    // so spawning, patrolling, firing and powering down covers the table.
+    private async Task EnemyAnimationCheck()
+    {
+        var editor = await FreshEditor();
+        editor.SetBrushObject(EnemyDefs.Fighter);
+        editor.PaintCell(new Vector2I(14, 10));
+        Check(editor.StartPlay(), "enemy animation level starts");
+        var fighter = editor.Session.Enemies[0];
+        var walked = await SampleFrames(fighter, 60);
+        Check(walked.Contains(EnemyDefs.Fighter) && walked.Contains("fighter_walk"),
+            "a patrolling fighter cycles its walk frames");
+        editor.StopPlay();
+
+        // The turret never travels, so its cycle holds until it fires.
+        editor = await FreshEditor();
+        editor.SetBrushObject(EnemyDefs.Turret);
+        editor.PaintCell(new Vector2I(8, 10));
+        Check(editor.StartPlay(), "turret animation level starts");
+        var fired = await SampleFrames(editor.Session.Enemies[0], 90);
+        Check(fired.Contains(EnemyDefs.Turret), "an idle turret holds its first frame");
+        Check(fired.Contains("turret_fire"), "a firing turret shows the muzzle flash");
+        editor.StopPlay();
+
+        // The robot has a dedicated powered-down pose for its off window.
+        editor = await FreshEditor();
+        editor.SetBrushObject(EnemyDefs.Robot);
+        editor.PaintCell(new Vector2I(8, 10));
+        Check(editor.StartPlay(), "robot animation level starts");
+        var robot = editor.Session.Enemies[0];
+        await Frames(4);
+        Check(robot.AnimationFrame != "robot_off", "an active robot is not in the off pose");
+        editor.Session.Time = 9.0f;   // inside the off-window (9..10)
+        await Frames(4);
+        Check(robot.AnimationFrame == "robot_off", "a turned-off robot slumps");
+        editor.StopPlay();
+
+        // Degrading swaps the whole pose set, not just one texture.
+        editor = await FreshEditor();
+        editor.SetBrushObject(EnemyDefs.UltimateSoldier);
+        editor.PaintCell(new Vector2I(8, 10));
+        Check(editor.StartPlay(), "degradation animation level starts");
+        var trooper = editor.Session.Enemies[0];
+        await Frames(4);
+        Check(trooper.AnimationFrame?.StartsWith(EnemyDefs.UltimateSoldier) == true,
+            "the ultimate soldier uses its own pose set");
+        trooper.TakeHit();
+        await Frames(4);
+        Check(trooper.AnimationFrame?.StartsWith(EnemyDefs.SuperSoldier) == true,
+            "degrading swaps the pose set with the type");
+        editor.StopPlay();
+    }
+
+    private async Task<HashSet<string>> SampleFrames(Enemy enemy, int frames)
+    {
+        var seen = new HashSet<string>();
+        for (int i = 0; i < frames; i++)
+        {
+            await Frames(1);
+            seen.Add(enemy.AnimationFrame);
+        }
+        return seen;
     }
 
     private async Task<Editor> FreshEditor(bool legacySize = true)

@@ -22,8 +22,10 @@ public partial class Enemy : CharacterBody2D
     private float _shootCooldown = 0.5f;   // small delay before the first attack
     private float _contactCooldown;
     private Sprite2D _sprite;
+    private EnemyAnimator _animator;
 
     public bool IsTurnedOff => Def.Type == EnemyDefs.Robot && Session.RobotsOff;
+    public string AnimationFrame => _animator?.Frame;
 
     public override void _Ready()
     {
@@ -36,6 +38,7 @@ public partial class Enemy : CharacterBody2D
         });
         _sprite = new Sprite2D { Texture = Sprites.ForObject(Def.Type) };
         AddChild(_sprite);
+        _animator = new EnemyAnimator(_sprite, Def.Type);
     }
 
     public override void _PhysicsProcess(double delta)
@@ -50,10 +53,10 @@ public partial class Enemy : CharacterBody2D
             // then can it be killed.
             _sprite.Modulate = new Color(0.4f, 0.4f, 0.5f);
             Velocity = Vector2.Zero;
+            _animator.Update(dt, Vector2.Zero, turnedOff: true, _facing);
             return;
         }
         _sprite.Modulate = Colors.White;
-        _sprite.FlipH = _facing > 0;
 
         bool spotted = SeesAgent();
         bool ranged = Def.Attack is EnemyAttack.Pistol or EnemyAttack.MiniGun or EnemyAttack.Plasma;
@@ -61,6 +64,8 @@ public partial class Enemy : CharacterBody2D
 
         if (spotted && Def.Attack == EnemyAttack.Contact)
             _facing = Session.Agent.Position.X < Position.X ? -1 : 1;   // chase
+        else if (spotted && Def.Speed == 0 && Def.LoS == EnemyLoS.All)
+            _facing = Session.Agent.Position.X < Position.X ? -1 : 1;   // the turret tracks its target
 
         Vector2 velocity = Velocity;
         bool stands = Def.Speed == 0 || (ranged && spotted);
@@ -98,6 +103,7 @@ public partial class Enemy : CharacterBody2D
         if (spotted && _shootCooldown <= 0)
             Attack();
 
+        _animator.Update(dt, Velocity, turnedOff: false, _facing);
         CheckContact();
     }
 
@@ -124,7 +130,7 @@ public partial class Enemy : CharacterBody2D
             // README: Ultimate -> Super -> Soldier, one stage per hit.
             Def = EnemyDefs.Get(Def.DegradesTo);
             _lives = StageLives(Def);
-            _sprite.Texture = Sprites.ForObject(Def.Type);
+            _animator.SetType(Def.Type);
             return;
         }
         _lives--;
@@ -172,6 +178,8 @@ public partial class Enemy : CharacterBody2D
 
     private void Attack()
     {
+        if (Def.Attack != EnemyAttack.Contact && Def.Attack != EnemyAttack.Mine)
+            _animator.Attack();
         switch (Def.Attack)
         {
             case EnemyAttack.Pistol:
