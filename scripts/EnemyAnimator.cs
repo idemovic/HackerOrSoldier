@@ -33,7 +33,13 @@ public sealed class EnemyAnimator
         [EnemyDefs.Robot] = new(new[] { EnemyDefs.Robot, "robot_walk" },
             Attack: "robot_fire", Off: "robot_off"),
         [EnemyDefs.Landmine] = new(new[] { EnemyDefs.Landmine, "landmine_blink" }, ClockDriven: true),
-        [EnemyDefs.ElectricEel] = new(new[] { EnemyDefs.ElectricEel, "electric_eel_swim" }),
+        // Four phases of a travelling wave, on the clock so the eel keeps
+        // undulating at a steady rate instead of one governed by its speed.
+        [EnemyDefs.ElectricEel] = new(new[]
+        {
+            EnemyDefs.ElectricEel, "electric_eel_swim1",
+            "electric_eel_swim2", "electric_eel_swim3",
+        }, ClockDriven: true),
     };
 
     // Every frame any enemy can reach; the smoke test builds them all so a

@@ -280,7 +280,14 @@ Known simplifications (tuning constants, not README rules):
   armoured trooper
 - Non-humanoids are hand drawn: robodog (four legs, trotting), drone
   (spinning rotor plus a hover bob), turret (barrel and muzzle flash),
-  landmine (blinking LED), electric eel (flicking tail fin)
+  landmine (blinking LED)
+- The electric eel is generated rather than drawn: four phases of a sine
+  wave travelling backwards along the body, so it swims by undulating. The
+  amplitude is one pixel, which is the most the body can shift per column
+  without tearing, and the thickness grows downward from the wave so the
+  back stays one smooth curve while the belly deepens into the head. It
+  runs on the clock, not on distance, so the ripple rate does not depend on
+  the eel's speed
 - scripts/EnemyAnimator.cs mirrors AgentAnimator with one table for all ten
   types: off pose wins, then the firing pose, then the walk cycle. Walkers
   advance on distance travelled; the drone rotor and landmine LED have
