@@ -242,6 +242,37 @@ Known simplifications (tuning constants, not README rules):
 - scenes/screenshot.tscn renders the editor and saves user://editor_ui.png
   for quick visual checks of UI changes
 
+### Agent animation
+- Ten hand-authored agent poses in scripts/Sprites.cs, same runtime pixel
+  maps as the rest of the art: idle + breath, a four-frame run cycle, jump,
+  fall, aim and fire. Frame swapping only, no tweening or skeletal rig -
+  the DOS platformer idiom the README asks for
+- The agent is drawn in profile facing right (hair mass at the back, shades
+  band and nose bump at the front, shoe toes pointing forward), so FlipH on
+  the facing direction makes the agent visibly look where it is heading.
+  The original front-facing sprite was symmetric, which made FlipH a no-op
+  and left facing unreadable
+- The white collar and red tie sit on the same two rows in every pose, so
+  the suit reads continuously instead of flickering through the cycle; the
+  near leg is dark grey against the black far leg, which is what makes the
+  two run contact frames read as opposite strides
+- The aim/fire arm is level with the shoulders so the muzzle lines up with
+  the bullet spawn (PlaySession.SpawnAgentBullet, y = -2)
+- scripts/AgentAnimator.cs is the state machine: shoot pose wins, then
+  swim, then jump/fall by vertical velocity, then run/idle. The run cycle
+  advances on distance travelled rather than a clock, so the feet never
+  slide at any speed; the pass frames sit a pixel higher than the contact
+  frames for the bob. Swimming reuses the run frames on a slower clock
+- PlaySession.TryShoot returns whether the weapon actually went off, so an
+  empty magazine never flashes a muzzle
+- Smoke test drives the real inputs through idle, run, jump, fall and the
+  fire -> aim -> idle sequence, and force-builds every frame via
+  AgentAnimator.AllFrames
+- scenes/agent_frames.tscn renders a contact sheet of all frames to
+  user://agent_frames.png - dark background, mid-tone background, and a
+  mirrored band for the other facing - the sprite-art equivalent of
+  screenshot.tscn
+
 ## Milestone 6 - Steam prep (next)
 - Export presets for Windows and Linux
 - GodotSteam integration: achievements, cloud saves

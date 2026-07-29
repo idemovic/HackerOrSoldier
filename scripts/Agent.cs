@@ -32,14 +32,17 @@ public partial class Agent : CharacterBody2D
     public PlaySession Session { get; set; }
     public int Facing { get; private set; } = 1;
     public bool IsHiding { get; private set; }
+    public string AnimationFrame => _animator?.Frame;
 
     private float _electricTime;
     private Sprite2D _sprite;
+    private AgentAnimator _animator;
 
     public override void _Ready()
     {
         _sprite = new Sprite2D { Texture = Sprites.Get("agent") };
         AddChild(_sprite);
+        _animator = new AgentAnimator(_sprite);
     }
 
     public void ResetForRespawn(Vector2 position)
@@ -47,6 +50,7 @@ public partial class Agent : CharacterBody2D
         Position = position;
         Velocity = Vector2.Zero;
         _electricTime = 0f;
+        _animator.Reset();
     }
 
     public void SetHiding(bool hiding)
@@ -64,6 +68,7 @@ public partial class Agent : CharacterBody2D
         if (IsHiding)
         {
             Velocity = Vector2.Zero;
+            _animator.Update(dt, Vector2.Zero, true, false, Facing);
             return;
         }
 
@@ -90,7 +95,6 @@ public partial class Agent : CharacterBody2D
         float axis = Input.GetAxis("move_left", "move_right");
         if (axis != 0)
             Facing = axis > 0 ? 1 : -1;
-        _sprite.FlipH = Facing < 0;
         velocity.X = axis * RunSpeed * (submerged ? 0.5f : 1f);
 
         Velocity = velocity;
@@ -103,13 +107,15 @@ public partial class Agent : CharacterBody2D
                 barrel.Push(collision.GetNormal().X < 0 ? 1 : -1);   // the normal points back at the agent
         }
 
-        if (Session == null)
-            return;
+        // The shoot pose only plays when a shot actually left the weapon, so
+        // an empty magazine never flashes a muzzle.
+        if (Session != null && Input.IsActionJustPressed("shoot") && Session.TryShoot(this))
+            _animator.Shoot();
 
-        if (Input.IsActionJustPressed("shoot"))
-            Session.TryShoot(this);
+        _animator.Update(dt, Velocity, IsOnFloor(), submerged, Facing);
 
-        CheckHazards(dt);
+        if (Session != null)
+            CheckHazards(dt);
     }
 
     private int TileAt(float dx, float dy) =>

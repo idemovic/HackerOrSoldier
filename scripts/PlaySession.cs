@@ -317,7 +317,9 @@ public partial class PlaySession : Node2D
         _grid.EraseCell(cell);
     }
 
-    public void TryShoot(Agent agent)
+    // Returns true when the weapon actually went off, so the caller can play
+    // the shoot animation only for a real shot.
+    public bool TryShoot(Agent agent)
     {
         switch (Weapon)
         {
@@ -329,33 +331,33 @@ public partial class PlaySession : Node2D
                     if (Mathf.Abs(to.Y) < 28 && to.X * agent.Facing > 0 && Mathf.Abs(to.X) < 44)
                         enemy.TakeHit();
                 }
-                return;
+                return true;
             case "crossbow":
                 if (Arrows <= 0)
-                    return;
+                    return false;
                 Arrows--;
                 ShotsFired++;
                 SpawnAgentBullet(agent, 0);   // README: the crossbow does not trigger the alarm
-                return;
+                return true;
             case "dynamite":
                 if (DynamiteSticks <= 0)
-                    return;
+                    return false;
                 DynamiteSticks--;
                 SpawnDynamite(agent.Position);
-                return;
+                return true;
             default:
                 // README: pistol 1 bullet, mini gun 2, assault rifle 3 per shot,
                 // all feeding on the shared bullet pool.
                 int burst = Weapon == "assault_rifle" ? 3 : Weapon == "minigun" ? 2 : 1;
                 burst = Mathf.Min(burst, Ammo);
                 if (burst <= 0)
-                    return;
+                    return false;
                 Ammo -= burst;
                 ShotsFired += burst;
                 TriggerAlarm();   // README: a gun shot triggers the alarm
                 for (int i = 0; i < burst; i++)
                     SpawnAgentBullet(agent, (i - (burst - 1) / 2f) * 6f);
-                return;
+                return true;
         }
     }
 

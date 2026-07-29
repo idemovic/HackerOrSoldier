@@ -61,6 +61,7 @@ public partial class SmokeTest : Node
         await FlameTrapCheck();
         await RocketLauncherCheck();
         await DecorationCheck();
+        await AgentAnimationCheck();
         await MenuSceneCheck();
 
         GD.Print(_failures == 0 ? "SMOKE OK" : $"SMOKE FAILED ({_failures})");
@@ -97,7 +98,8 @@ public partial class SmokeTest : Node
                 Sprites.ForObject(def.Type);
             foreach (var def in TileDefs.All)
                 TileSetBuilder.TileIcon(def.Id);
-            foreach (var key in new[] { "agent", "platform", "flame", "bullet", "plasma", "rocket", "dynamite" })
+            foreach (var key in new[] { "platform", "flame", "bullet", "plasma", "rocket", "dynamite" }
+                .Concat(AgentAnimator.AllFrames))
                 Check(Sprites.Get(key) != null, $"sprite '{key}' exists");
             Check(true, "all object sprites build");
         }
@@ -1039,6 +1041,68 @@ public partial class SmokeTest : Node
     // Scenarios are written against the legacy 12-row layout (floor at
     // row 11, agent start at (2, 10)); pass legacySize: false to keep the
     // 40x40 default level.
+    // The agent animator picks a pose from the movement state alone, so the
+    // whole state machine is reachable by driving the normal inputs.
+    private async Task AgentAnimationCheck()
+    {
+        var editor = await FreshEditor();
+        Check(editor.StartPlay(), "animation level starts");
+        var agent = editor.PlayerAgent;
+
+        await Frames(4);
+        Check(agent.AnimationFrame is "agent" or "agent_breathe", "standing still shows an idle frame");
+
+        Input.ActionPress("move_right");
+        await Frames(10);
+        Check(agent.AnimationFrame?.StartsWith("agent_run") == true, "running shows the run cycle");
+        string first = agent.AnimationFrame;
+        await Frames(10);
+        Check(agent.AnimationFrame != first, "the run cycle advances between frames");
+        Input.ActionRelease("move_right");
+
+        await Frames(4);
+        Input.ActionPress("jump");
+        await Frames(2);
+        Input.ActionRelease("jump");
+        Check(agent.AnimationFrame == "agent_jump", "rising shows the jump pose");
+        await Frames(30);
+        Check(agent.AnimationFrame == "agent_fall", "falling shows the fall pose");
+
+        await Frames(40);   // land before shooting
+
+        // Sample the pose frame by frame: the muzzle flash leads, the aim
+        // pose holds, then the agent drops back to idle. Holding the button
+        // fires once, so the whole sequence comes from a single shot.
+        var seen = new string[30];
+        Input.ActionPress("shoot");
+        for (int i = 0; i < seen.Length; i++)
+        {
+            await Frames(1);
+            seen[i] = agent.AnimationFrame;
+        }
+        Input.ActionRelease("shoot");
+        int flash = System.Array.IndexOf(seen, "agent_fire");
+        int aim = System.Array.IndexOf(seen, "agent_aim");
+        Check(flash >= 0, "firing flashes the muzzle");
+        Check(aim > flash, "the aim pose holds after the flash");
+        Check(seen[^1] is "agent" or "agent_breathe", "the agent returns to idle after shooting");
+
+        // An empty magazine must not play the shoot pose.
+        while (editor.Session.Ammo > 0)
+        {
+            Input.ActionPress("shoot");
+            await Frames(2);
+            Input.ActionRelease("shoot");
+            await Frames(2);
+        }
+        await Frames(30);   // let the last shoot pose expire
+        Input.ActionPress("shoot");
+        await Frames(1);
+        Input.ActionRelease("shoot");
+        Check(agent.AnimationFrame is "agent" or "agent_breathe", "shooting with no ammo stays idle");
+        editor.StopPlay();
+    }
+
     private async Task<Editor> FreshEditor(bool legacySize = true)
     {
         _editor?.QueueFree();
