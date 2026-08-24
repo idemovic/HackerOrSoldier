@@ -11,7 +11,10 @@ public static class LevelGrids
         var target = tileId == TileDefs.HiddenPlatform ? hiddenGrid : grid;
         var other = tileId == TileDefs.HiddenPlatform ? grid : hiddenGrid;
         other.EraseCell(cell);
-        target.SetCell(cell, TileSetBuilder.SourceId, TileSetBuilder.AtlasCoordsFor(tileId));
+        var coords = tileId == TileDefs.BackgroundSky
+            ? TileSetBuilder.NightSkyCoordsFor(cell)
+            : TileSetBuilder.AtlasCoordsFor(tileId);
+        target.SetCell(cell, TileSetBuilder.SourceId, coords);
     }
 
     // Cells with no tile are the outdoors: the level's sky (night or day)
@@ -19,8 +22,9 @@ public static class LevelGrids
     // background tiles cover it per cell.
     public static void UpdateSky(Sprite2D sky, LevelData level)
     {
-        sky.Texture = TileSetBuilder.TileTexture(
-            level.Sky == "day" ? TileDefs.BackgroundSkyDay : TileDefs.BackgroundSky);
+        sky.Texture = level.Sky == "day"
+            ? TileSetBuilder.TileTexture(TileDefs.BackgroundSkyDay)
+            : TileSetBuilder.NightSkySheet();
         sky.TextureRepeat = CanvasItem.TextureRepeatEnum.Enabled;
         sky.Centered = false;
         sky.RegionEnabled = true;

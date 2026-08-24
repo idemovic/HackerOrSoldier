@@ -25,6 +25,9 @@ public partial class Editor : Node2D
     private PlaySession _session;
 
     private Label _status;
+    private HBoxContainer _bar;
+    private HBoxContainer _paletteRoot;
+    private Label _playHint;
     private Button _playButton;
     private Button _skyButton;
     private AcceptDialog _saveDialog;
@@ -231,8 +234,9 @@ public partial class Editor : Node2D
         _markers.Visible = false;
         _cursor.Visible = false;
         _minimap.Visible = false;
-        _playButton.Text = "Stop (Esc)";
-        _status.Text = "Playing - Esc to return to editor.";
+        _bar.Visible = false;
+        _paletteRoot.Visible = false;
+        _playHint.Visible = true;
         return true;
     }
 
@@ -247,8 +251,10 @@ public partial class Editor : Node2D
         RedrawLevel();   // restores walls destroyed during play
         _markers.Visible = true;
         _minimap.Visible = true;
+        _bar.Visible = true;
+        _paletteRoot.Visible = true;
+        _playHint.Visible = false;
         _camera.MakeCurrent();
-        _playButton.Text = "Play (P)";
     }
 
     private void EndPlay(string message)
@@ -325,7 +331,7 @@ public partial class Editor : Node2D
 
         var theme = new Theme { DefaultFontSize = 10 };
 
-        var bar = new HBoxContainer { Theme = theme };
+        var bar = _bar = new HBoxContainer { Theme = theme };
         bar.SetAnchorsPreset(Control.LayoutPreset.TopWide);
         ui.AddChild(bar);
 
@@ -375,8 +381,14 @@ public partial class Editor : Node2D
         // Palette: vertical category list on the left, a horizontal row of
         // swatch buttons for the selected category, and the property row
         // (brush name, color, number) beneath it.
-        var paletteRoot = new HBoxContainer { Theme = theme, Position = new Vector2(0, 32) };
+        var paletteRoot = _paletteRoot = new HBoxContainer { Theme = theme, Position = new Vector2(0, 32) };
         ui.AddChild(paletteRoot);
+
+        // Shown instead of the editor UI while playtesting.
+        _playHint = new Label { Text = "ESC to return to editor", Theme = theme, Visible = false };
+        _playHint.SetAnchorsAndOffsetsPreset(Control.LayoutPreset.TopRight, Control.LayoutPresetMode.Minsize, 4);
+        _playHint.GrowHorizontal = Control.GrowDirection.Begin;
+        ui.AddChild(_playHint);
 
         var categoryPanel = new PanelContainer();
         paletteRoot.AddChild(categoryPanel);

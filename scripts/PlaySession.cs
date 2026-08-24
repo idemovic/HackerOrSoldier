@@ -84,6 +84,7 @@ public partial class PlaySession : Node2D
     private Vector2 _startPosition;
     private Camera2D _camera;
     private Node2D _spikes;
+    private HBoxContainer _hearts;
     private Label _hud;
     private bool _ended;
     private bool _agentDown;      // a life is being lost right now
@@ -228,12 +229,16 @@ public partial class PlaySession : Node2D
 
         var canvas = new CanvasLayer();
         AddChild(canvas);
+        var hudRow = new HBoxContainer { Position = new Vector2(4, 4) };
+        canvas.AddChild(hudRow);
+        _hearts = new HBoxContainer();
+        hudRow.AddChild(_hearts);
         _hud = new Label
         {
-            Position = new Vector2(4, 34),
             Theme = new Theme { DefaultFontSize = 10 },
+            VerticalAlignment = VerticalAlignment.Center,
         };
-        canvas.AddChild(_hud);
+        hudRow.AddChild(_hud);
         UpdateHud();
     }
 
@@ -689,7 +694,21 @@ public partial class PlaySession : Node2D
             "minigun" => $"Mini gun {Ammo}",
             _ => $"Pistol {Ammo}",
         };
-        var text = $"Lives {Lives}  {weaponText}";
+        int hearts = Mathf.Max(Lives, 0);
+        while (_hearts.GetChildCount() > hearts)
+        {
+            var heart = _hearts.GetChild(_hearts.GetChildCount() - 1);
+            _hearts.RemoveChild(heart);
+            heart.QueueFree();
+        }
+        while (_hearts.GetChildCount() < hearts)
+            _hearts.AddChild(new TextureRect
+            {
+                Texture = Sprites.Get("heart"),
+                StretchMode = TextureRect.StretchModeEnum.KeepCentered,
+            });
+
+        var text = $"  {weaponText}";
         if (_keys.Count > 0)
             text += "  Keys: " + string.Join(" ", _keys);
         if (_usbKeys.Count > 0)

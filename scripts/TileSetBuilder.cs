@@ -11,8 +11,15 @@ public static class TileSetBuilder
     public const int TileSize = 32;
     public const int SourceId = 0;
 
+    // Night-sky star layouts. One level tile id and one palette entry; the
+    // variant is picked per cell from its coordinates, so nothing extra is
+    // serialized and a reload always reproduces the same sky. Variant 0 sits
+    // in the defs row of the atlas, the rest in a second row.
+    public const int SkyVariants = 10;
+
     private static readonly Dictionary<int, ImageTexture> IconCache = new();
     private static readonly Dictionary<int, ImageTexture> TextureCache = new();
+    private static ImageTexture _nightSkySheet;
 
     public static Vector2I AtlasCoordsFor(int tileId)
     {
@@ -22,12 +29,23 @@ public static class TileSetBuilder
         return Vector2I.Zero;
     }
 
+    public static int SkyVariantFor(Vector2I cell) =>
+        (int)((uint)(cell.X * 73856093 ^ cell.Y * 19349663) % SkyVariants);
+
+    public static Vector2I NightSkyCoordsFor(Vector2I cell)
+    {
+        int variant = SkyVariantFor(cell);
+        return variant == 0 ? AtlasCoordsFor(TileDefs.BackgroundSky) : new Vector2I(variant - 1, 1);
+    }
+
     public static TileSet Build()
     {
         var defs = TileDefs.All;
-        var image = Image.CreateEmpty(TileSize * defs.Length, TileSize, false, Image.Format.Rgba8);
+        var image = Image.CreateEmpty(TileSize * defs.Length, TileSize * 2, false, Image.Format.Rgba8);
         for (int i = 0; i < defs.Length; i++)
             image.BlitRect(BuildTileImage(defs[i].Id), new Rect2I(0, 0, TileSize, TileSize), new Vector2I(i * TileSize, 0));
+        for (int v = 1; v < SkyVariants; v++)
+            image.BlitRect(BuildNightSkyImage(v), new Rect2I(0, 0, TileSize, TileSize), new Vector2I((v - 1) * TileSize, TileSize));
 
         var tileSet = new TileSet { TileSize = new Vector2I(TileSize, TileSize) };
         tileSet.AddPhysicsLayer();
@@ -52,7 +70,42 @@ public static class TileSetBuilder
                 data.SetCollisionPolygonPoints(0, 0, square);
             }
         }
+        for (int v = 1; v < SkyVariants; v++)
+            source.CreateTile(new Vector2I(v - 1, 1));
         return tileSet;
+    }
+
+    // 4x4 sheet of night-sky variants for the outdoors backdrop, so its
+    // repeat period is 4 tiles instead of 1.
+    public static ImageTexture NightSkySheet()
+    {
+        if (_nightSkySheet != null)
+            return _nightSkySheet;
+        const int Cells = 4;
+        var img = Image.CreateEmpty(TileSize * Cells, TileSize * Cells, false, Image.Format.Rgba8);
+        for (int cy = 0; cy < Cells; cy++)
+            for (int cx = 0; cx < Cells; cx++)
+                img.BlitRect(BuildNightSkyImage(SkyVariantFor(new Vector2I(cx, cy))),
+                    new Rect2I(0, 0, TileSize, TileSize), new Vector2I(cx * TileSize, cy * TileSize));
+        _nightSkySheet = ImageTexture.CreateFromImage(img);
+        return _nightSkySheet;
+    }
+
+    // One night-sky tile: the base blue-black, a faint cloud band, and a few
+    // stars scattered by the variant's seed.
+    private static Image BuildNightSkyImage(int variant)
+    {
+        var img = Image.CreateEmpty(TileSize, TileSize, false, Image.Format.Rgba8);
+        for (int y = 0; y < TileSize; y++)
+            for (int x = 0; x < TileSize; x++)
+                img.SetPixel(x, y, y % 16 == 9 && (x + y) % 4 == 0
+                    ? new Color("12162a") : new Color("0b0e1a"));
+        uint seed = (uint)variant * 747796405u + 2891336453u;
+        uint Next() { seed = seed * 1664525u + 1013904223u; return seed >> 8; }
+        int stars = 3 + (int)(Next() % 3);
+        for (int i = 0; i < stars; i++)
+            img.SetPixel((int)(Next() % TileSize), (int)(Next() % TileSize), new Color("9a9aa5"));
+        return img;
     }
 
     // Full-size single tile texture (the level sky).
@@ -316,30 +369,13 @@ public static class TileSetBuilder
                     }
                 break;
             case TileDefs.BackgroundSky:
-                for (int y = 0; y < TileSize; y++)
-                    for (int x = 0; x < TileSize; x++)
-                    {
-                        Color c = new Color("0b0e1a");
-                        if (y % 16 == 9 && (x + y) % 4 == 0)
-                            c = new Color("12162a");                     // faint cloud band
-                        if ((x * 13 + y * 29) % 97 == 0)
-                            c = new Color("9a9aa5");                     // stars
-                        if ((x * 31 + y * 17) % 211 == 0)
-                            c = new Color("f2f2f2");                     // bright stars
-                        img.SetPixel(x, y, c);
-                    }
-                break;
+                return BuildNightSkyImage(0);
             case TileDefs.BackgroundSkyDay:
                 for (int y = 0; y < TileSize; y++)
                     for (int x = 0; x < TileSize; x++)
                     {
                         Color c = new Color("3b6fe0");
-                        int dash = (x + y / 16 * 9 + 3) % 16;
-                        if (y % 16 == 4 && dash < 6)
-                            c = new Color("e8f0fa");                     // cloud dashes
-                        else if (y % 16 == 5 && dash is > 0 and < 7)
-                            c = new Color("b8ccf2");                     // cloud underside
-                        else if ((x * 7 + y * 13) % 61 == 0)
+                        if ((x * 7 + y * 13) % 331 == 0)
                             c = new Color("5c8aec");                     // haze specks
                         img.SetPixel(x, y, c);
                     }

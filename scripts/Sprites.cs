@@ -1874,6 +1874,18 @@ public static class Sprites
             "................",
             "................",
         }),
+        // HUD life counter.
+        ["heart"] = new(new[]
+        {
+            ".rr..rr.",
+            "rwrrrrRr",
+            "rrrrrrrR",
+            "rrrrrrrR",
+            ".rrrrrR.",
+            "..rrrR..",
+            "...rR...",
+            "........",
+        }),
         ["bullet"] = new(new[]
         {
             ".yyyy.",
