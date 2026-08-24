@@ -17,6 +17,13 @@ public static class TileSetBuilder
     // in the defs row of the atlas, the rest in a second row.
     public const int SkyVariants = 10;
 
+    // Water and lava animate via native TileSet animations; their frames
+    // fill dedicated atlas rows below the defs row and the sky variants.
+    private const int WaterFrames = 4;
+    private const int LavaFrames = 3;
+    private static readonly Vector2I WaterCoords = new(0, 2);
+    private static readonly Vector2I LavaCoords = new(0, 3);
+
     private static readonly Dictionary<int, ImageTexture> IconCache = new();
     private static readonly Dictionary<int, ImageTexture> TextureCache = new();
     private static ImageTexture _nightSkySheet;
@@ -38,14 +45,29 @@ public static class TileSetBuilder
         return variant == 0 ? AtlasCoordsFor(TileDefs.BackgroundSky) : new Vector2I(variant - 1, 1);
     }
 
+    // Atlas coords for a painted cell: the night sky picks its per-cell
+    // variant, water and lava point at their animated tiles.
+    public static Vector2I GridCoordsFor(int tileId, Vector2I cell) => tileId switch
+    {
+        TileDefs.BackgroundSky => NightSkyCoordsFor(cell),
+        TileDefs.Water => WaterCoords,
+        TileDefs.Lava => LavaCoords,
+        _ => AtlasCoordsFor(tileId),
+    };
+
     public static TileSet Build()
     {
         var defs = TileDefs.All;
-        var image = Image.CreateEmpty(TileSize * defs.Length, TileSize * 2, false, Image.Format.Rgba8);
+        var tileRect = new Rect2I(0, 0, TileSize, TileSize);
+        var image = Image.CreateEmpty(TileSize * defs.Length, TileSize * 4, false, Image.Format.Rgba8);
         for (int i = 0; i < defs.Length; i++)
-            image.BlitRect(BuildTileImage(defs[i].Id), new Rect2I(0, 0, TileSize, TileSize), new Vector2I(i * TileSize, 0));
+            image.BlitRect(BuildTileImage(defs[i].Id), tileRect, new Vector2I(i * TileSize, 0));
         for (int v = 1; v < SkyVariants; v++)
-            image.BlitRect(BuildNightSkyImage(v), new Rect2I(0, 0, TileSize, TileSize), new Vector2I((v - 1) * TileSize, TileSize));
+            image.BlitRect(BuildNightSkyImage(v), tileRect, new Vector2I((v - 1) * TileSize, TileSize));
+        for (int f = 0; f < WaterFrames; f++)
+            image.BlitRect(BuildWaterImage(f), tileRect, new Vector2I(f * TileSize, WaterCoords.Y * TileSize));
+        for (int f = 0; f < LavaFrames; f++)
+            image.BlitRect(BuildLavaImage(f), tileRect, new Vector2I(f * TileSize, LavaCoords.Y * TileSize));
 
         var tileSet = new TileSet { TileSize = new Vector2I(TileSize, TileSize) };
         tileSet.AddPhysicsLayer();
@@ -72,6 +94,15 @@ public static class TileSetBuilder
         }
         for (int v = 1; v < SkyVariants; v++)
             source.CreateTile(new Vector2I(v - 1, 1));
+
+        source.CreateTile(WaterCoords);
+        source.SetTileAnimationFramesCount(WaterCoords, WaterFrames);
+        for (int f = 0; f < WaterFrames; f++)
+            source.SetTileAnimationFrameDuration(WaterCoords, f, 0.25f);
+        source.CreateTile(LavaCoords);
+        source.SetTileAnimationFramesCount(LavaCoords, LavaFrames);
+        for (int f = 0; f < LavaFrames; f++)
+            source.SetTileAnimationFrameDuration(LavaCoords, f, 0.3f);
         return tileSet;
     }
 
@@ -89,6 +120,39 @@ public static class TileSetBuilder
                     new Rect2I(0, 0, TileSize, TileSize), new Vector2I(cx * TileSize, cy * TileSize));
         _nightSkySheet = ImageTexture.CreateFromImage(img);
         return _nightSkySheet;
+    }
+
+    // Water frame: the waves crawl sideways one pixel per frame and the
+    // surface dither shimmers on the half beat.
+    private static Image BuildWaterImage(int frame)
+    {
+        var img = Image.CreateEmpty(TileSize, TileSize, false, Image.Format.Rgba8);
+        img.Fill(new Color("1f3a8f"));
+        for (int y = 0; y < TileSize; y++)
+            for (int x = 0; x < TileSize; x++)
+            {
+                if (y < 4 && (x + y + frame / 2) % 2 == 0)
+                    img.SetPixel(x, y, new Color("45d6d6"));   // dithered surface
+                else if (y % 8 == 5 && (x + frame) % 4 < 2)
+                    img.SetPixel(x, y, new Color("3b6fe0"));   // waves
+            }
+        return img;
+    }
+
+    // Lava frame: the glow churn shifts phase and the sparks twinkle.
+    private static Image BuildLavaImage(int frame)
+    {
+        var img = Image.CreateEmpty(TileSize, TileSize, false, Image.Format.Rgba8);
+        img.Fill(new Color("8f1f1a"));
+        for (int y = 0; y < TileSize; y++)
+            for (int x = 0; x < TileSize; x++)
+            {
+                if ((x / 2 + y / 2) % 2 == 0 && (x + y + frame) % 3 != 0)
+                    img.SetPixel(x, y, new Color("f28022"));   // dithered glow
+                else if ((x * 5 + y * 11 + frame * 13) % 53 == 0)
+                    img.SetPixel(x, y, new Color("f2d43b"));   // sparks
+            }
+        return img;
     }
 
     // One night-sky tile: the base blue-black, a faint cloud band, and a few
@@ -165,27 +229,9 @@ public static class TileSetBuilder
                     }
                 break;
             case TileDefs.Water:
-                img.Fill(new Color("1f3a8f"));
-                for (int y = 0; y < TileSize; y++)
-                    for (int x = 0; x < TileSize; x++)
-                    {
-                        if (y < 4 && (x + y) % 2 == 0)
-                            img.SetPixel(x, y, new Color("45d6d6"));   // dithered surface
-                        else if (y % 8 == 5 && x % 4 < 2)
-                            img.SetPixel(x, y, new Color("3b6fe0"));   // waves
-                    }
-                break;
+                return BuildWaterImage(0);
             case TileDefs.Lava:
-                img.Fill(new Color("8f1f1a"));
-                for (int y = 0; y < TileSize; y++)
-                    for (int x = 0; x < TileSize; x++)
-                    {
-                        if ((x / 2 + y / 2) % 2 == 0 && (x + y) % 3 != 0)
-                            img.SetPixel(x, y, new Color("f28022"));   // dithered glow
-                        else if ((x * 5 + y * 11) % 53 == 0)
-                            img.SetPixel(x, y, new Color("f2d43b"));   // sparks
-                    }
-                break;
+                return BuildLavaImage(0);
             case TileDefs.Spikes:
                 img.Fill(bg);
                 img.FillRect(new Rect2I(0, 28, TileSize, 4), new Color("2a2a33"));
@@ -264,7 +310,7 @@ public static class TileSetBuilder
                                 c = new Color("2a2a33");                 // bolts
                             img.SetPixel(x, y, c);
                         }
-                        else if ((x + y) % 12 < 2 || (x - y + 96) % 12 < 2)
+                        else if ((x + y) % 16 < 2 || (x - y + 96) % 16 < 2)
                             img.SetPixel(x, y, new Color("55555f"));     // lattice web
                     }
                 break;

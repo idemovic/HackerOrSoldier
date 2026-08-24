@@ -11,10 +11,7 @@ public static class LevelGrids
         var target = tileId == TileDefs.HiddenPlatform ? hiddenGrid : grid;
         var other = tileId == TileDefs.HiddenPlatform ? grid : hiddenGrid;
         other.EraseCell(cell);
-        var coords = tileId == TileDefs.BackgroundSky
-            ? TileSetBuilder.NightSkyCoordsFor(cell)
-            : TileSetBuilder.AtlasCoordsFor(tileId);
-        target.SetCell(cell, TileSetBuilder.SourceId, coords);
+        target.SetCell(cell, TileSetBuilder.SourceId, TileSetBuilder.GridCoordsFor(tileId, cell));
     }
 
     // Cells with no tile are the outdoors: the level's sky (night or day)
