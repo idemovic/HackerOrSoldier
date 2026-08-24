@@ -30,6 +30,7 @@ public partial class SmokeTest : Node
         await SpikeCheck();
         await ElectricFloorCheck();
         await GogglesCheck();
+        await HiddenPlatformCheck();
         await FighterContactCheck();
         await DegradationCheck();
         await TurretCheck();
@@ -394,6 +395,40 @@ public partial class SmokeTest : Node
         await Frames(2);
         Input.ActionRelease("activate");
         Check(editor.Session.GogglesActive, "activate turns on picked-up infra goggles");
+        editor.StopPlay();
+    }
+
+    // Hidden platforms only exist while the goggles reveal them: hidden, the
+    // agent walks straight through; revealed, they block. Stopping play
+    // brings the editor's semi-transparent tint back.
+    private async Task HiddenPlatformCheck()
+    {
+        var editor = await FreshEditor();
+        editor.SetBrushTile(TileDefs.HiddenPlatform);
+        editor.PaintCell(new Vector2I(8, 10));
+        Check(editor.StartPlay(), "hidden platform level starts");
+        Input.ActionPress("move_right");
+        await Frames(90);
+        Input.ActionRelease("move_right");
+        Check(editor.PlayerAgent.Position.X > 9 * 32, "a hidden platform does not block the agent");
+        editor.StopPlay();
+        await Frames(2);
+        Check(editor.HiddenGrid.Modulate.A > 0.1f, "hidden platforms show again in the editor after play");
+
+        editor.SetBrushObject(ObjectDefs.InfraGoggles);
+        editor.PaintCell(new Vector2I(3, 10));
+        Check(editor.StartPlay(), "goggles and hidden platform level starts");
+        Input.ActionPress("move_right");
+        await Frames(20);
+        Input.ActionRelease("move_right");
+        Input.ActionPress("activate");
+        await Frames(2);
+        Input.ActionRelease("activate");
+        Check(editor.Session.GogglesActive, "goggles reveal the platform");
+        Input.ActionPress("move_right");
+        await Frames(60);
+        Input.ActionRelease("move_right");
+        Check(editor.PlayerAgent.Position.X < 8 * 32, "a revealed platform blocks the agent");
         editor.StopPlay();
     }
 

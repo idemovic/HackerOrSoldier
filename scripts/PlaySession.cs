@@ -267,6 +267,7 @@ public partial class PlaySession : Node2D
         if (_gogglesTime > 0)
             _gogglesTime -= dt;
         _hiddenGrid.Modulate = GogglesActive ? new Color(1f, 0.7f, 0.6f) : new Color(1, 1, 1, 0);
+        _hiddenGrid.CollisionEnabled = GogglesActive;   // hidden platforms are only solid while revealed
         if (_disguiseTime > 0)
             _disguiseTime -= dt;
 
@@ -330,8 +331,12 @@ public partial class PlaySession : Node2D
         UpdateHud();
     }
 
-    public int TileAt(int x, int y) =>
-        _destroyed.Contains(new Vector2I(x, y)) ? TileDefs.Empty : _level.GetTile(x, y);
+    // Hidden platforms only exist while the goggles reveal them.
+    public int TileAt(int x, int y)
+    {
+        int id = _destroyed.Contains(new Vector2I(x, y)) ? TileDefs.Empty : _level.GetTile(x, y);
+        return id == TileDefs.HiddenPlatform && !GogglesActive ? TileDefs.Empty : id;
+    }
 
     public int TileAtPosition(Vector2 position)
     {

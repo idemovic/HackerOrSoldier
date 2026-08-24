@@ -64,6 +64,7 @@ public partial class Editor : Node2D
     public bool IsPlaying => _session != null;
     public PlaySession Session => _session;
     public Agent PlayerAgent => _session?.Agent;
+    public TileMapLayer HiddenGrid => _hiddenGrid;   // for tests
 
     public override void _Ready()
     {
@@ -274,9 +275,13 @@ public partial class Editor : Node2D
     {
         if (_session == null)
             return;
+        // The freed session still gets this frame's physics tick, which would
+        // hide the hidden grid again after the tint below is restored.
+        _session.SetPhysicsProcess(false);
         _session.QueueFree();
         _session = null;
         _hiddenGrid.Modulate = HiddenEditTint;
+        _hiddenGrid.CollisionEnabled = true;
         _grid.Modulate = Colors.White;   // clears the alarm tint
         RedrawLevel();   // restores walls destroyed during play
         _markers.Visible = true;
