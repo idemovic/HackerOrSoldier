@@ -38,6 +38,23 @@ public class LevelData
             Tiles[y * Width + x] = tileId;
     }
 
+    public LevelData Clone() => new()
+    {
+        Name = Name,
+        Description = Description,
+        Sky = Sky,
+        Width = Width,
+        Height = Height,
+        Tiles = (int[])Tiles.Clone(),
+        Objects = Objects.Select(o => new LevelObject
+        {
+            Type = o.Type,
+            X = o.X,
+            Y = o.Y,
+            Properties = new Dictionary<string, string>(o.Properties),
+        }).ToList(),
+    };
+
     // Null means valid, otherwise a user-facing error message.
     public string Validate()
     {

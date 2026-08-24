@@ -21,8 +21,10 @@ public static class TileSetBuilder
     // fill dedicated atlas rows below the defs row and the sky variants.
     private const int WaterFrames = 4;
     private const int LavaFrames = 3;
+    private const int SpikeFrames = 8;
     private static readonly Vector2I WaterCoords = new(0, 2);
     private static readonly Vector2I LavaCoords = new(0, 3);
+    private static readonly Vector2I SpikesCoords = new(0, 4);
 
     private static readonly Dictionary<int, ImageTexture> IconCache = new();
     private static readonly Dictionary<int, ImageTexture> TextureCache = new();
@@ -52,6 +54,7 @@ public static class TileSetBuilder
         TileDefs.BackgroundSky => NightSkyCoordsFor(cell),
         TileDefs.Water => WaterCoords,
         TileDefs.Lava => LavaCoords,
+        TileDefs.Spikes => SpikesCoords,
         _ => AtlasCoordsFor(tileId),
     };
 
@@ -59,7 +62,7 @@ public static class TileSetBuilder
     {
         var defs = TileDefs.All;
         var tileRect = new Rect2I(0, 0, TileSize, TileSize);
-        var image = Image.CreateEmpty(TileSize * defs.Length, TileSize * 4, false, Image.Format.Rgba8);
+        var image = Image.CreateEmpty(TileSize * defs.Length, TileSize * 5, false, Image.Format.Rgba8);
         for (int i = 0; i < defs.Length; i++)
             image.BlitRect(BuildTileImage(defs[i].Id), tileRect, new Vector2I(i * TileSize, 0));
         for (int v = 1; v < SkyVariants; v++)
@@ -68,6 +71,8 @@ public static class TileSetBuilder
             image.BlitRect(BuildWaterImage(f), tileRect, new Vector2I(f * TileSize, WaterCoords.Y * TileSize));
         for (int f = 0; f < LavaFrames; f++)
             image.BlitRect(BuildLavaImage(f), tileRect, new Vector2I(f * TileSize, LavaCoords.Y * TileSize));
+        for (int f = 0; f < SpikeFrames; f++)
+            image.BlitRect(BuildSpikesImage(f), tileRect, new Vector2I(f * TileSize, SpikesCoords.Y * TileSize));
 
         var tileSet = new TileSet { TileSize = new Vector2I(TileSize, TileSize) };
         tileSet.AddPhysicsLayer();
@@ -103,6 +108,10 @@ public static class TileSetBuilder
         source.SetTileAnimationFramesCount(LavaCoords, LavaFrames);
         for (int f = 0; f < LavaFrames; f++)
             source.SetTileAnimationFrameDuration(LavaCoords, f, 0.3f);
+        source.CreateTile(SpikesCoords);
+        source.SetTileAnimationFramesCount(SpikesCoords, SpikeFrames);
+        for (int f = 0; f < SpikeFrames; f++)
+            source.SetTileAnimationFrameDuration(SpikesCoords, f, 0.2f);
         return tileSet;
     }
 
@@ -135,6 +144,28 @@ public static class TileSetBuilder
                     img.SetPixel(x, y, new Color("45d6d6"));   // dithered surface
                 else if (y % 8 == 5 && (x + frame) % 4 < 2)
                     img.SetPixel(x, y, new Color("3b6fe0"));   // waves
+            }
+        return img;
+    }
+
+    // Spikes frame: the four spikes rise one by one from the left (frames
+    // 0-4), then sink one by one from the left (frames 5-7), a sweep that
+    // loops. Frame 4 is the fully raised tile used for the palette icon.
+    private static Image BuildSpikesImage(int frame)
+    {
+        var img = Image.CreateEmpty(TileSize, TileSize, false, Image.Format.Rgba8);
+        img.Fill(new Color("141419"));
+        img.FillRect(new Rect2I(0, 28, TileSize, 4), new Color("2a2a33"));
+        int first = frame <= 4 ? 0 : frame - 4;
+        int last = frame <= 4 ? frame - 1 : 3;
+        for (int spike = first; spike <= last; spike++)
+            for (int y = 6; y < 28; y++)
+            {
+                int halfWidth = (y - 4) / 6 + 1;
+                int center = spike * 8 + 4;
+                for (int x = center - halfWidth; x <= center + halfWidth; x++)
+                    img.SetPixel(Mathf.Clamp(x, 0, 31), y,
+                        x < center ? new Color("c9c9d4") : new Color("7d7d8a"));
             }
         return img;
     }
@@ -233,27 +264,19 @@ public static class TileSetBuilder
             case TileDefs.Lava:
                 return BuildLavaImage(0);
             case TileDefs.Spikes:
-                img.Fill(bg);
-                img.FillRect(new Rect2I(0, 28, TileSize, 4), new Color("2a2a33"));
-                for (int spike = 0; spike < 4; spike++)
-                    for (int y = 6; y < 28; y++)
-                    {
-                        int halfWidth = (y - 4) / 6 + 1;
-                        int center = spike * 8 + 4;
-                        for (int x = center - halfWidth; x <= center + halfWidth; x++)
-                            img.SetPixel(Mathf.Clamp(x, 0, 31), y,
-                                x < center ? new Color("c9c9d4") : new Color("7d7d8a"));
-                    }
-                break;
+                return BuildSpikesImage(4);
             case TileDefs.Spear:
                 img.Fill(bg);
-                img.FillRect(new Rect2I(14, 10, 4, 22), new Color("8a5a2b"));       // shaft
-                img.FillRect(new Rect2I(10, 12, 12, 2), new Color("55555f"));       // guard
-                for (int y = 2; y < 10; y++)
+                foreach (int center in new[] { 6, 16, 26 })
                 {
-                    int halfWidth = (y - 1) / 2;
-                    for (int x = 16 - halfWidth; x < 16 + halfWidth; x++)
-                        img.SetPixel(x, y, x < 16 ? new Color("f2f2f2") : new Color("9a9aa5"));
+                    img.FillRect(new Rect2I(center - 1, 10, 2, 22), new Color("8a5a2b"));   // shaft
+                    img.FillRect(new Rect2I(center - 4, 12, 8, 2), new Color("55555f"));    // guard
+                    for (int y = 2; y < 10; y++)
+                    {
+                        int halfWidth = (y - 1) / 2;
+                        for (int x = center - halfWidth; x < center + halfWidth; x++)
+                            img.SetPixel(x, y, x < center ? new Color("f2f2f2") : new Color("9a9aa5"));
+                    }
                 }
                 break;
             case TileDefs.HiddenPlatform:

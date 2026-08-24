@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.Linq;
 using Godot;
 
@@ -8,6 +9,7 @@ public partial class Editor : Node2D
 {
     private const int TileSize = TileSetBuilder.TileSize;
     private const float PanSpeed = 400f;
+    private const int MaxUndo = 100;
 
     // Hidden platforms live on their own layer so play mode can hide them
     // (infra goggles reveal them); in edit mode they show semi-transparent.
@@ -15,6 +17,13 @@ public partial class Editor : Node2D
 
     private LevelData _level = LevelData.NewDefault();
     private PackedScene _agentScene;
+
+    // Undo and redo hold whole-level snapshots taken before each change. A
+    // mouse stroke (press to release) records once, so Ctrl+Z reverts the
+    // whole drag.
+    private readonly List<LevelData> _undo = new();
+    private readonly List<LevelData> _redo = new();
+    private bool _strokeOpen;
 
     private Sprite2D _sky;
     private TileMapLayer _grid;
@@ -119,13 +128,28 @@ public partial class Editor : Node2D
             StartPlay();
             return;
         }
+        if (@event.IsActionPressed("ui_undo"))
+        {
+            Undo();
+            return;
+        }
+        if (@event.IsActionPressed("ui_redo"))
+        {
+            Redo();
+            return;
+        }
 
         if (@event is InputEventMouseButton { Pressed: true } button)
         {
+            _strokeOpen = false;
             if (button.ButtonIndex == MouseButton.Left)
                 PaintCell(MouseCell());
             else if (button.ButtonIndex == MouseButton.Right)
                 EraseCell(MouseCell());
+        }
+        else if (@event is InputEventMouseButton)
+        {
+            _strokeOpen = false;   // released: the next paint starts a new stroke
         }
         else if (@event is InputEventMouseMotion motion)
         {
@@ -190,6 +214,9 @@ public partial class Editor : Node2D
         switch (_brushKind)
         {
             case BrushKind.Tile:
+                if (_level.GetTile(cell.X, cell.Y) == _brushTile)
+                    return;
+                RecordStroke();
                 _level.SetTile(cell.X, cell.Y, _brushTile);
                 SetGridCell(cell, _brushTile);
                 break;
@@ -206,6 +233,9 @@ public partial class Editor : Node2D
     {
         if (!_level.InBounds(cell.X, cell.Y))
             return;
+        if (_level.GetTile(cell.X, cell.Y) == TileDefs.Empty && !_level.Objects.Any(o => o.X == cell.X && o.Y == cell.Y))
+            return;
+        RecordStroke();
         _level.SetTile(cell.X, cell.Y, TileDefs.Empty);
         _grid.EraseCell(cell);
         _hiddenGrid.EraseCell(cell);
@@ -265,8 +295,56 @@ public partial class Editor : Node2D
 
     private Vector2I MouseCell() => _grid.LocalToMap(_grid.ToLocal(GetGlobalMousePosition()));
 
+    // Snapshots the level before a change. Cell edits go through
+    // RecordStroke, which records once per mouse stroke.
+    private void RecordUndo()
+    {
+        _undo.Add(_level.Clone());
+        if (_undo.Count > MaxUndo)
+            _undo.RemoveAt(0);
+        _redo.Clear();
+        _strokeOpen = false;
+    }
+
+    private void RecordStroke()
+    {
+        if (!_strokeOpen)
+            RecordUndo();
+        _strokeOpen = true;
+    }
+
+    public void Undo()
+    {
+        if (_undo.Count == 0)
+            return;
+        _redo.Add(_level);
+        _level = _undo[^1];
+        _undo.RemoveAt(_undo.Count - 1);
+        _strokeOpen = false;
+        RedrawLevel();
+        _status.Text = "Undo.";
+    }
+
+    public void Redo()
+    {
+        if (_redo.Count == 0)
+            return;
+        _undo.Add(_level);
+        _level = _redo[^1];
+        _redo.RemoveAt(_redo.Count - 1);
+        _strokeOpen = false;
+        RedrawLevel();
+        _status.Text = "Redo.";
+    }
+
     private void PlaceObject(Vector2I cell, string type)
     {
+        var existing = _level.Objects.Find(o => o.X == cell.X && o.Y == cell.Y);
+        if (existing?.Type == type
+            && (!ObjectDefs.HasColorProperty(type) || existing.Properties.GetValueOrDefault("color") == _brushColor)
+            && (!ObjectDefs.HasNumberProperty(type) || existing.Properties.GetValueOrDefault("number") == _brushNumber))
+            return;
+        RecordStroke();
         _level.Objects.RemoveAll(o => o.X == cell.X && o.Y == cell.Y);
         if (type == ObjectDefs.AgentStart)
             _level.Objects.RemoveAll(o => o.Type == ObjectDefs.AgentStart);
@@ -372,7 +450,7 @@ public partial class Editor : Node2D
 
         _status = new Label
         {
-            Text = "Left click: paint, right click: erase, arrows: pan, P: play.",
+            Text = "Left click: paint, right click: erase, arrows: pan, P: play, Ctrl+Z/Y: undo/redo.",
             SizeFlagsHorizontal = Control.SizeFlags.ExpandFill,
             ClipText = true,
         };
@@ -590,6 +668,7 @@ public partial class Editor : Node2D
     {
         if (IsPlaying)
             StopPlay();
+        RecordUndo();
         _level = LevelData.NewDefault();
         RedrawLevel();
         _status.Text = "New level.";
@@ -630,6 +709,7 @@ public partial class Editor : Node2D
         }
         if (IsPlaying)
             StopPlay();
+        RecordUndo();
         SetLevel(loaded);
         _status.Text = $"Loaded '{_level.Name}'";
     }
@@ -643,6 +723,7 @@ public partial class Editor : Node2D
 
     public void ToggleSky()
     {
+        RecordUndo();
         _level.Sky = _level.Sky == "day" ? "night" : "day";
         RedrawLevel();
     }

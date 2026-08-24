@@ -21,6 +21,8 @@ public partial class Screenshot : Node
         editor.PaintCell(new Vector2I(5, 38));
         editor.SetBrushObject(ObjectDefs.Door, "red");
         editor.PaintCell(new Vector2I(6, 38));
+        editor.SetBrushTile(TileDefs.Spear);
+        editor.PaintCell(new Vector2I(7, 38));
         editor.SetBrushTile(TileDefs.Spikes);
         editor.PaintCell(new Vector2I(8, 38));
         editor.SetBrushObject(ObjectDefs.Barrel);

@@ -17,6 +17,7 @@ public partial class SmokeTest : Node
     {
         DataModelChecks();
         await EditorLoopChecks();
+        await UndoRedoCheck();
         await CorridorCheck();
         await DefaultLevelCheck();
         await WallTilesCheck();
@@ -110,6 +111,38 @@ public partial class SmokeTest : Node
         {
             Check(false, $"sprite build failed: {ex.Message}");
         }
+    }
+
+    // Ctrl+Z / Ctrl+Y. Direct edits here are not grouped by a mouse stroke,
+    // so each undo step is one edit; undo and redo restore tiles, objects
+    // and the sky, and a fresh edit drops the redo history.
+    private async Task UndoRedoCheck()
+    {
+        Check(InputMap.HasAction("ui_undo") && InputMap.HasAction("ui_redo"), "built-in undo/redo actions exist");
+        var editor = await FreshEditor();
+        editor.SetBrushTile(1);
+        editor.PaintCell(new Vector2I(4, 8));
+        editor.Undo();
+        Check(editor.Level.GetTile(4, 8) == TileDefs.Empty, "undo reverts a painted tile");
+        editor.Redo();
+        Check(editor.Level.GetTile(4, 8) == 1, "redo restores the tile");
+
+        editor.SetBrushObject(ObjectDefs.Barrel);
+        editor.PaintCell(new Vector2I(6, 8));
+        editor.ToggleSky();
+        editor.Undo();
+        Check(editor.Level.Sky == "night" && editor.Level.Objects.Any(o => o.Type == ObjectDefs.Barrel),
+            "undo reverts the sky toggle and keeps the placed object");
+        editor.Undo();
+        Check(!editor.Level.Objects.Any(o => o.Type == ObjectDefs.Barrel), "undo removes the placed object");
+        editor.Redo();
+        editor.Redo();
+        Check(editor.Level.Sky == "day" && editor.Level.Objects.Any(o => o.Type == ObjectDefs.Barrel),
+            "redo replays both steps");
+
+        editor.EraseCell(new Vector2I(6, 8));
+        editor.Redo();
+        Check(!editor.Level.Objects.Any(o => o.Type == ObjectDefs.Barrel), "a new edit clears the redo history");
     }
 
     private async Task EditorLoopChecks()
