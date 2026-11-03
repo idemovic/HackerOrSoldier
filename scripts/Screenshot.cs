@@ -3,9 +3,6 @@ using Godot;
 
 namespace HackerOrSoldier;
 
-// Temporary helper: renders the editor for a few frames, saves a screenshot
-// to user://editor_ui.png and the tile atlas to user://tiles_sheet.png, and
-// quits. Not part of the game.
 public partial class Screenshot : Node
 {
     private int _frames;
@@ -97,8 +94,6 @@ public partial class Screenshot : Node
         editor.PaintCell(new Vector2I(18, 33));
         editor.PaintCell(new Vector2I(19, 33));
 
-        // A wall and ceiling over background brick, with the sample blocks
-        // sitting in the brick, so the solid tiles cast their shade onto it.
         editor.SetBrushTile(TileDefs.Wall);
         for (int y = 32; y <= 35; y++)
             editor.PaintCell(new Vector2I(3, y));
@@ -114,8 +109,6 @@ public partial class Screenshot : Node
         SaveTileSheet();
     }
 
-    // Every atlas tile at 4x, eight per row on grey, for judging texel-level
-    // detail. The translucent shadow tiles show as darker grey.
     private static void SaveTileSheet()
     {
         const int PerRow = 8, Scale = 4, Size = TileSetBuilder.TileSize, Pitch = Size + 2;

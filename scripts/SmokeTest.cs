@@ -225,9 +225,6 @@ public partial class SmokeTest : Node
         editor.StopPlay();
     }
 
-    // Solid tiles shade the painted scenery next to them. The shadow grid
-    // is derived, so it follows painting, erasing, a wall destroyed in
-    // play and the restore on stop, and never touches the level data.
     private async Task ShadowCheck()
     {
         var editor = await FreshEditor();
@@ -250,6 +247,12 @@ public partial class SmokeTest : Node
         editor.SetBrushTile(TileDefs.Wall);
         editor.PaintCell(new Vector2I(8, 5));
         Check(!HasShadow(editor, new Vector2I(8, 6)), "water under a ceiling gets no shade");
+
+        editor.SetBrushTile(TileDefs.BackgroundBrick);
+        editor.PaintCell(new Vector2I(10, 6));
+        editor.SetBrushTile(TileDefs.HiddenPlatform);
+        editor.PaintCell(new Vector2I(10, 5));
+        Check(!HasShadow(editor, new Vector2I(10, 6)), "a hidden platform casts no shade that would reveal it");
 
         editor.SetBrushTile(TileDefs.DestructibleWall);
         editor.PaintCell(wall);

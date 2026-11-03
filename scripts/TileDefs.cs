@@ -73,10 +73,7 @@ public static class TileDefs
         return null;
     }
 
-    // Solid tiles shade the painted scenery next to them. Hidden platforms
-    // never cast (a shadow would give them away in play); the open sky and
-    // the liquids never receive.
-    public static bool CastsShadow(int id) => id != HiddenPlatform && Get(id) is { Solid: true };
+    public static bool CastsShadow(int id) => Get(id) is { Solid: true };
 
     public static bool ReceivesShadow(int id) =>
         id is not (Empty or Water or Lava or BackgroundSky or BackgroundSkyDay) && Get(id) is { Solid: false };

@@ -2,14 +2,6 @@ using Godot;
 
 namespace HackerOrSoldier;
 
-// The three tile layers a level renders with, owned together so the editor
-// and the game keep them in step. Solid and background tiles sit on the
-// main grid, hidden platforms on their own grid (play mode hides it, the
-// goggles reveal it), and the shadow grid above both. The shadow grid is
-// derived from the main grid and never stored in the level: a receiving
-// cell gets the shadow tile for whichever of its upper, left and lower
-// neighbours is solid, so it follows painting, erasing, walls destroyed in
-// play and the restore on returning to the editor.
 public sealed class LevelGrids
 {
     public TileMapLayer Main { get; }
@@ -57,7 +49,6 @@ public sealed class LevelGrids
                 RefreshShadow(new Vector2I(x, y));
     }
 
-    // The tile id drawn on the main grid at a cell, Empty when there is none.
     public int TileIdAt(Vector2I cell) =>
         Main.GetCellTileData(cell) is { } data ? data.GetCustomData(TileSetBuilder.TileIdData).AsInt32() : TileDefs.Empty;
 
@@ -84,27 +75,27 @@ public sealed class LevelGrids
         target.SetCell(cell, TileSetBuilder.SourceId, TileSetBuilder.GridCoordsFor(tileId, cell));
     }
 
-    // A changed cell shades itself and the cells it sits above, left of and below.
+    private static readonly (Vector2I Offset, ShadowMask Band)[] Casters =
+    {
+        (Vector2I.Up, ShadowMask.Above),
+        (Vector2I.Left, ShadowMask.Left),
+        (Vector2I.Down, ShadowMask.Below),
+    };
+
     private void RefreshShadowsAround(Vector2I cell)
     {
         RefreshShadow(cell);
-        RefreshShadow(cell + Vector2I.Down);
-        RefreshShadow(cell + Vector2I.Right);
-        RefreshShadow(cell + Vector2I.Up);
+        foreach (var (offset, _) in Casters)
+            RefreshShadow(cell - offset);
     }
 
     private void RefreshShadow(Vector2I cell)
     {
         var mask = ShadowMask.None;
         if (TileDefs.ReceivesShadow(TileIdAt(cell)))
-        {
-            if (TileDefs.CastsShadow(TileIdAt(cell + Vector2I.Up)))
-                mask |= ShadowMask.Above;
-            if (TileDefs.CastsShadow(TileIdAt(cell + Vector2I.Left)))
-                mask |= ShadowMask.Left;
-            if (TileDefs.CastsShadow(TileIdAt(cell + Vector2I.Down)))
-                mask |= ShadowMask.Below;
-        }
+            foreach (var (offset, band) in Casters)
+                if (TileDefs.CastsShadow(TileIdAt(cell + offset)))
+                    mask |= band;
         if (mask == ShadowMask.None)
             Shadow.EraseCell(cell);
         else
