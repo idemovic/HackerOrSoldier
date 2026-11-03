@@ -35,8 +35,10 @@ Placeholder colored rects stand in for art until the systems are done.
 - Lives (default 3) with HUD during play; losing a life respawns at the agent
   start but keeps level state (opened doors stay open, picked items stay
   picked); losing all lives returns to edit mode
-- Killing terrain: lava and spear instant kill, spikes raised during the last
-  2s of each 10s cycle, electric floor takes a life after each 3s of contact (per-region circuits, see milestone 4),
+- Killing terrain: lava instant kill, spears instant kill while out (holes,
+  tips, out: 3s each), spike tiles hold two spikes
+  that take turns (left up seconds 3-5, right up the last 2s of each 10s
+  cycle), each hurting only over its own half, electric floor takes a life after each 3s of contact (per-region circuits, see milestone 4),
   kill plane below the level bounds
 - Water: half horizontal speed, capped sink/swim speed while submerged, full
   jump velocity when jumping from the top water tile (surface line)
@@ -165,7 +167,7 @@ Known simplifications (tuning constants, not README rules):
   by a solid tile; carries whoever stands on them. A movement-range property
   UI can replace the fixed range later
 - Electric door: passable frame whose field engages during the last 2s of
-  each 10s cycle (same phase as spikes) and takes a life on contact
+  each 10s cycle (same phase as the right spike) and takes a life on contact
 - Flame trap: burns its own cell plus the cell above during seconds 4-6 of
   each cycle (offset from spikes so both can be combined)
 - Rocket launcher: fires a rocket every 3 seconds, alternating left/right;

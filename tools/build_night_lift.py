@@ -260,8 +260,6 @@ def dressing():
     put("mobile", 2, 37)
     put("smartwatch", 65, 15)
     put("audio_recorder", 26, 7)
-    put("deco_sign", 8, 70)
-    put("deco_pipe", 40, 69)
     put("deco_machine", 64, 74)
     put("deco_clock", 50, 53)
     put("deco_poster", 34, 53)
@@ -269,7 +267,6 @@ def dressing():
     put("deco_machine", 25, 24)
     put("deco_machine", 64, 24)
     put("deco_crate_steel", 46, 35)
-    put("deco_sign", 66, 13)
     put("deco_crate_wood", 4, 71)
     rect(1, 69, 2, 69, STONE)
 
@@ -286,7 +283,7 @@ def build():
     checkpoints()
     dressing()
     return {
-        "formatVersion": 1,
+        "formatVersion": 2,
         "name": "Operation Night Lift",
         "description": (
             "Helix Corp keeps its prototype codes in the tower's server vault. "

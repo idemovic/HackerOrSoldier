@@ -4,14 +4,14 @@ namespace HackerOrSoldier;
 
 // README: an electric door cyclically (10s) engages an electric field that
 // takes a life. The field is on during the last 2 seconds of each cycle,
-// same phase as the spikes.
+// same phase as the right spike of a spike tile.
 public partial class ElectricDoorField : Node2D
 {
     public PlaySession Session { get; set; }
 
     private ColorRect _field;
 
-    public bool Active => Session.SpikesUp;
+    public bool Active => Session.RaisedSpike == 1;
 
     public override void _Ready()
     {

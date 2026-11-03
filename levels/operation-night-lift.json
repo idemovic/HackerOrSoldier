@@ -1,5 +1,5 @@
 {
-  "formatVersion": 1,
+  "formatVersion": 2,
   "name": "Operation Night Lift",
   "description": "Helix Corp keeps its prototype codes in the tower's server vault. Come in through the sewer, climb the tower floor by floor and get out from the helipad on the roof. Every floor splits two ways: a short guarded route for the soldier, and a longer, quiet one for the hacker. Fetch USB keys, hack computers to open security doors and kill the lasers and floors, wear the briefcase past a guard, and let the goggles show you the hidden steps.",
   "sky": "night",
@@ -7055,18 +7055,6 @@
       "properties": {}
     },
     {
-      "type": "deco_sign",
-      "x": 8,
-      "y": 70,
-      "properties": {}
-    },
-    {
-      "type": "deco_pipe",
-      "x": 40,
-      "y": 69,
-      "properties": {}
-    },
-    {
       "type": "deco_machine",
       "x": 64,
       "y": 74,
@@ -7106,12 +7094,6 @@
       "type": "deco_crate_steel",
       "x": 46,
       "y": 35,
-      "properties": {}
-    },
-    {
-      "type": "deco_sign",
-      "x": 66,
-      "y": 13,
       "properties": {}
     },
     {

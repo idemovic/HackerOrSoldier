@@ -21,7 +21,8 @@ public class LevelData
     // Bump CurrentFormatVersion when a change would misread older files,
     // and convert those files in LevelStore.Load. Files saved before the
     // field existed have none and read as version 1.
-    public const int CurrentFormatVersion = 1;
+    // 2: the pipe and sign decorations were removed.
+    public const int CurrentFormatVersion = 2;
 
     public int FormatVersion { get; set; } = 1;
     public string Name { get; set; } = "";
@@ -121,6 +122,9 @@ public static class LevelStore
         if (level.FormatVersion > LevelData.CurrentFormatVersion)
             return null;
         level.Objects ??= new List<LevelObject>();
+        // Unknown types would otherwise load as pickups.
+        if (level.FormatVersion < 2)
+            level.Objects.RemoveAll(o => o.Type is "deco_pipe" or "deco_sign");
         return level;
     }
 

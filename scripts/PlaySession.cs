@@ -18,7 +18,9 @@ public partial class PlaySession : Node2D
     public delegate void FailedEventHandler();
 
     private const float SpikeCycle = 10f;   // README: spike trap cycles every 10s
-    private const float SpikeUpTime = 2f;   // raised during the last 2s of each cycle
+    private const float SpikeUpTime = 2f;   // each of the two spikes is raised 2s per cycle
+    private const float SpikeMoveTime = 0.15f;   // the rise and the sink, inside the up time
+    private const float SpearStateTime = 3f;   // spears: holes, tips, out - 3s each
     private const float ItemDuration = 30f; // README: briefcase and goggles last 30s
     private const float RobotCycle = 10f;   // README: robots stop and turn off every 10s
     private const float RobotOffTime = 1f;
@@ -46,7 +48,38 @@ public partial class PlaySession : Node2D
     public int CompletenessPercent => _collectibleTotal == 0 ? 100 : Mathf.RoundToInt(100f * _collectibleGot / _collectibleTotal);
     public bool GogglesActive => _gogglesTime > 0;
     public float Time { get; set; }               // settable so tests can skip ahead
-    public bool SpikesUp => Time % SpikeCycle >= SpikeCycle - SpikeUpTime;
+    // The two spikes of a spike tile take turns: the left one (0) is raised
+    // during seconds 3-5 of each cycle, the right one (1) during the last
+    // 2s. -1 while both are down.
+    public int RaisedSpike
+    {
+        get
+        {
+            float turn = SpikeCycle / 2f;
+            return Time % turn >= turn - SpikeUpTime ? (int)(Time % SpikeCycle / turn) : -1;
+        }
+    }
+    // The spear state for the clock, also its tile frame: 0 bare holes,
+    // 1 tips in the holes (a warning, harmless), 2 spears out (deadly).
+    private int SpearFrame => (int)(Time / SpearStateTime) % TileSetBuilder.SpearFrames;
+    public bool SpearsOut => SpearFrame == TileSetBuilder.SpearFrames - 1;
+
+    // The spike tile frame for the clock, rising and sinking like the spears.
+    private Vector2I SpikeCoords
+    {
+        get
+        {
+            int spike = RaisedSpike;
+            if (spike < 0)
+                return TileSetBuilder.SpikeCoordsFor(0, 0);
+            float turn = SpikeCycle / 2f;
+            float since = Time % turn - (turn - SpikeUpTime);
+            float edge = Mathf.Min(since, SpikeUpTime - since);
+            int full = TileSetBuilder.SpikeLevels;
+            int level = edge >= SpikeMoveTime ? full : 1 + (int)(edge / SpikeMoveTime * (full - 1));
+            return TileSetBuilder.SpikeCoordsFor(spike, level);
+        }
+    }
     public bool RobotsOff => Time % RobotCycle >= RobotCycle - RobotOffTime;
     public bool AlarmActive => _alarmTime > 0;
     public bool DisguiseActive => _disguiseTime > 0;
@@ -87,7 +120,10 @@ public partial class PlaySession : Node2D
     private Vector2 _respawnPoint;
     private Checkpoint _checkpoint;   // the lit one, null until the first is touched
     private Camera2D _camera;
-    private Node2D _spikes;
+    private readonly List<Vector2I> _spikeCells = new();
+    private Vector2I _spikeCoords = new(-1, -1);
+    private readonly List<Vector2I> _spearCells = new();
+    private int _spearFrame = -1;
     private HBoxContainer _hearts;
     private TextureRect _weaponIcon;
     private Label _weaponCount;
@@ -182,6 +218,8 @@ public partial class PlaySession : Node2D
                     var closet = new Closet { Position = pos };
                     _closets.Add(closet);
                     AddChild(closet);
+                    if (Agent != null)
+                        MoveChild(closet, Agent.GetIndex());   // draw behind the agent
                     break;
                 case ObjectDefs.Barrel:
                     AddChild(new Barrel { Position = pos });
@@ -235,18 +273,16 @@ public partial class PlaySession : Node2D
 
         MapFloorCircuits();
 
-        _spikes = new Node2D { Visible = false };
-        AddChild(_spikes);
         for (int y = 0; y < _level.Height; y++)
             for (int x = 0; x < _level.Width; x++)
                 if (_level.GetTile(x, y) == TileDefs.Spikes)
-                    _spikes.AddChild(new ColorRect
-                    {
-                        Position = new Vector2(x * tile + 6, y * tile + 6),
-                        Size = new Vector2(tile - 12, tile - 6),
-                        Color = new Color(0.95f, 0.95f, 1f),
-                        MouseFilter = Control.MouseFilterEnum.Ignore,
-                    });
+                    _spikeCells.Add(new Vector2I(x, y));
+        UpdateSpikes();
+        for (int y = 0; y < _level.Height; y++)
+            for (int x = 0; x < _level.Width; x++)
+                if (_level.GetTile(x, y) == TileDefs.Spear)
+                    _spearCells.Add(new Vector2I(x, y));
+        UpdateSpears();
 
         var canvas = new CanvasLayer();
         AddChild(canvas);
@@ -303,7 +339,8 @@ public partial class PlaySession : Node2D
         }
 
         Time += dt;
-        _spikes.Visible = SpikesUp;
+        UpdateSpikes();
+        UpdateSpears();
 
         if (_gogglesTime > 0)
             _gogglesTime -= dt;
@@ -370,6 +407,30 @@ public partial class PlaySession : Node2D
         }
 
         UpdateHud();
+    }
+
+    // Spike cells show the frame for the clock; the editor redraws the
+    // level when play stops, which puts the icon tile back.
+    private void UpdateSpikes()
+    {
+        var coords = SpikeCoords;
+        if (coords == _spikeCoords)
+            return;
+        _spikeCoords = coords;
+        foreach (var cell in _spikeCells)
+            _grids.Main.SetCell(cell, TileSetBuilder.SourceId, coords);
+    }
+
+    // Spear cells show the frame for the clock. The editor redraws the
+    // level when play stops, which puts the fully-out tile back.
+    private void UpdateSpears()
+    {
+        int frame = SpearFrame;
+        if (frame == _spearFrame)
+            return;
+        _spearFrame = frame;
+        foreach (var cell in _spearCells)
+            _grids.Main.SetCell(cell, TileSetBuilder.SourceId, TileSetBuilder.SpearCoordsFor(frame));
     }
 
     // Hidden platforms only exist while the goggles reveal them.

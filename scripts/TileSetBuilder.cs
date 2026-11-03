@@ -31,30 +31,43 @@ public static class TileSetBuilder
     // in the defs row of the atlas, the rest in a second row.
     public const int SkyVariants = 10;
 
-    // Water, lava and spikes animate via native TileSet animations; their
-    // frames fill dedicated atlas rows below the defs row and the sky
-    // variants. The shadow masks take the last row, one column per mask.
+    // Water and lava animate via native TileSet animations; their frames
+    // fill dedicated atlas rows below the defs row and the sky variants.
+    // The shadow masks take the last row, one column per mask.
     private const int WaterFrames = 4;
-    private const int LavaFrames = 3;
-    private const int SpikeFrames = 8;
+    private const int LavaFrames = 6;
     private static readonly Vector2I WaterCoords = new(0, 2);
     // Water under water: same row, after the surface frames.
     private static readonly Vector2I DeepWaterCoords = new(WaterFrames, 2);
     private static readonly Vector2I LavaCoords = new(0, 3);
+    // Lava under lava: same row, after the surface frames.
+    private static readonly Vector2I DeepLavaCoords = new(LavaFrames, 3);
+    // Spike frames: frame 0 is both spikes down, then the left spike rising
+    // through SpikeLevels heights, then the right one. Not a native
+    // animation: the play session picks the frame from its own clock.
+    public const int SpikeLevels = 3;
+    private const int SpikeFrames = 1 + 2 * SpikeLevels;
     private static readonly Vector2I SpikesCoords = new(0, 4);
+    // Spear frames: same row, after the spike frames. One frame per state:
+    // bare holes, tips showing in the holes, spears out. Not a native
+    // animation: the play session picks the frame from its own clock.
+    public const int SpearFrames = 3;
+    private static readonly int[] SpearRise = { 0, 3, 12 };   // pixels above the plate, per frame
     private const int ShadowRow = 5;
     private const int ShadowMasks = 8;
-    // Electric floor joins: column = (left neighbour is electric ? 1 : 0) |
-    // (right ? 2 : 0). Join 0, a lone tile, is the defs-row tile.
+    // Electric floor joins: join = (left neighbour is electric ? 1 : 0) |
+    // (right ? 2 : 0), each an animated run of frames in its own row.
     private const int ElectricJoinRow = 6;
     private const int ElectricJoins = 4;
-    private static Vector2I ElectricJoinCoords(int join) => new(join, ElectricJoinRow);
+    private const int ElectricFrames = 4;
+    private static Vector2I ElectricJoinCoords(int join) => new(join * ElectricFrames, ElectricJoinRow);
     // Pipe walls: column = the PipeLinks mask of the cell.
     private const int PipeRow = 7;
     private const int PipeVariants = 16;
     // The circuit board: a Span x Span block of tiles, picked per cell.
     private const int CircuitRow = 8;
-    private const int AtlasRows = CircuitRow + CircuitBoard.Span;
+    private const int RockRow = CircuitRow + CircuitBoard.Span;
+    private const int AtlasRows = RockRow + RockFace.Span;
 
     // Custom data layer: every atlas tile carries the level tile id it
     // draws, so a grid cell reads back without inverting GridCoordsFor.
@@ -82,7 +95,6 @@ public static class TileSetBuilder
     private static readonly Color[] BladeRamp = Ramp("4a4a55", "7d7d8a", "a0a0ac", "c9c9d4", "f2f2f2");
     private static readonly Color[] CopperRamp = Ramp("5a2e10", "7a4418", "a05a22", "c47a30", "e0a050");
     private static readonly Color[] DimBrickRamp = Ramp("0e0f14", "1a1c23", "23252e", "2b2e38", "343845");
-    private static readonly Color[] RockRamp = Ramp("1a1c23", "262930", "32353e", "3e424c", "4a4f5b");
     private static readonly Color[] PanelRamp = Ramp("141824", "1a1e2c", "1e2230", "262b3c", "303650");
     private static readonly Color[] HangarRamp = Ramp("15171d", "1c1f26", "23262e", "2a2e38", "343843");
     private static readonly Color[] HollowRamp = Ramp("07080b", "0e0f14", "14161c");
@@ -107,20 +119,31 @@ public static class TileSetBuilder
     }
 
     // Atlas coords for a painted cell: the night sky picks its per-cell
-    // variant, water, lava and spikes point at their animated tiles.
+    // variant, water, lava and electric floor point at their animated
+    // tiles.
     public static Vector2I GridCoordsFor(int tileId, Vector2I cell) => tileId switch
     {
         TileDefs.BackgroundSky => NightSkyCoordsFor(cell),
         TileDefs.BackgroundCircuit => CircuitCoordsFor(cell),
+        TileDefs.BackgroundRock => RockCoordsFor(cell),
+        TileDefs.ElectricFloor => ElectricJoinCoords(0),
         TileDefs.Water => WaterCoords,
         TileDefs.Lava => LavaCoords,
-        TileDefs.Spikes => SpikesCoords,
         _ => AtlasCoordsFor(tileId),
     };
 
     // Only the top cell of a water column draws the surface; the cells
     // under it continue the body without foam.
     public static Vector2I WaterCoordsFor(bool waterAbove) => waterAbove ? DeepWaterCoords : WaterCoords;
+
+    // Lava follows the same rule: bubbles only on the top cell.
+    public static Vector2I LavaCoordsFor(bool lavaAbove) => lavaAbove ? DeepLavaCoords : LavaCoords;
+
+    // spike 0 is the left one, 1 the right one; level 0 is fully down.
+    public static Vector2I SpikeCoordsFor(int spike, int level) =>
+        new(level == 0 ? 0 : 1 + spike * SpikeLevels + level - 1, SpikesCoords.Y);
+
+    public static Vector2I SpearCoordsFor(int frame) => new(SpikeFrames + frame, SpikesCoords.Y);
 
     public static Vector2I ShadowCoordsFor(ShadowMask mask) => new((int)mask, ShadowRow);
 
@@ -129,13 +152,13 @@ public static class TileSetBuilder
     public static Vector2I CircuitCoordsFor(Vector2I cell) => new(
         Mathf.PosMod(cell.X, CircuitBoard.Span), CircuitRow + Mathf.PosMod(cell.Y, CircuitBoard.Span));
 
+    public static Vector2I RockCoordsFor(Vector2I cell) => new(
+        Mathf.PosMod(cell.X, RockFace.Span), RockRow + Mathf.PosMod(cell.Y, RockFace.Span));
+
     // An electric floor cell joined to its electric neighbours: one arc runs
     // through a whole run, with electrodes only at its two ends.
-    public static Vector2I ElectricFloorCoordsFor(bool joinLeft, bool joinRight)
-    {
-        int join = (joinLeft ? 1 : 0) | (joinRight ? 2 : 0);
-        return join == 0 ? AtlasCoordsFor(TileDefs.ElectricFloor) : ElectricJoinCoords(join);
-    }
+    public static Vector2I ElectricFloorCoordsFor(bool joinLeft, bool joinRight) =>
+        ElectricJoinCoords((joinLeft ? 1 : 0) | (joinRight ? 2 : 0));
 
     public static Image AtlasImage()
     {
@@ -154,23 +177,39 @@ public static class TileSetBuilder
             Put(BuildWaterImage(f, surface: false), DeepWaterCoords.X + f, DeepWaterCoords.Y);
         }
         for (int f = 0; f < LavaFrames; f++)
-            Put(BuildLavaImage(f), f, LavaCoords.Y);
-        for (int f = 0; f < SpikeFrames; f++)
-            Put(BuildSpikesImage(f), f, SpikesCoords.Y);
+        {
+            Put(BuildLavaImage(f, surface: true), LavaCoords.X + f, LavaCoords.Y);
+            Put(BuildLavaImage(f, surface: false), DeepLavaCoords.X + f, DeepLavaCoords.Y);
+        }
+        Put(BuildSpikesImage(0, 0), 0, SpikesCoords.Y);
+        for (int level = 1; level <= SpikeLevels; level++)
+        {
+            Put(BuildSpikesImage(level, 0), SpikeCoordsFor(0, level).X, SpikesCoords.Y);
+            Put(BuildSpikesImage(0, level), SpikeCoordsFor(1, level).X, SpikesCoords.Y);
+        }
+        for (int f = 0; f < SpearFrames; f++)
+        {
+            var at = SpearCoordsFor(f);
+            Put(BuildSpearImage(f), at.X, at.Y);
+        }
         for (int m = 1; m < ShadowMasks; m++)
             Put(BuildShadowImage((ShadowMask)m), m, ShadowRow);
-        for (int join = 1; join < ElectricJoins; join++)
-        {
-            var tile = Image.CreateEmpty(TileSize, TileSize, false, Image.Format.Rgba8);
-            DrawElectricFloor(tile, joinLeft: (join & 1) != 0, joinRight: (join & 2) != 0);
-            var at = ElectricJoinCoords(join);
-            Put(tile, at.X, at.Y);
-        }
+        for (int join = 0; join < ElectricJoins; join++)
+            for (int f = 0; f < ElectricFrames; f++)
+            {
+                var tile = Image.CreateEmpty(TileSize, TileSize, false, Image.Format.Rgba8);
+                DrawElectricFloor(tile, joinLeft: (join & 1) != 0, joinRight: (join & 2) != 0, f);
+                var at = ElectricJoinCoords(join);
+                Put(tile, at.X + f, at.Y);
+            }
         for (int l = 0; l < PipeVariants; l++)
             Put(BuildPipeImage((PipeLinks)l), l, PipeRow);
         for (int y = 0; y < CircuitBoard.Span; y++)
             for (int x = 0; x < CircuitBoard.Span; x++)
                 Put(CircuitBoard.Tile(x, y), x, CircuitRow + y);
+        for (int y = 0; y < RockFace.Span; y++)
+            for (int x = 0; x < RockFace.Span; x++)
+                Put(RockFace.Tile(x, y), x, RockRow + y);
         return image;
     }
 
@@ -198,12 +237,13 @@ public static class TileSetBuilder
             return data;
         }
 
-        void Animated(Vector2I coords, int tileId, int frames, float frameDuration)
+        TileData Animated(Vector2I coords, int tileId, int frames, float frameDuration)
         {
-            Create(coords, tileId);
+            var data = Create(coords, tileId);
             source.SetTileAnimationFramesCount(coords, frames);
             for (int f = 0; f < frames; f++)
                 source.SetTileAnimationFrameDuration(coords, f, frameDuration);
+            return data;
         }
 
         float half = TileSize / 2f;
@@ -224,16 +264,23 @@ public static class TileSetBuilder
         Animated(WaterCoords, TileDefs.Water, WaterFrames, 0.25f);
         Animated(DeepWaterCoords, TileDefs.Water, WaterFrames, 0.25f);
         Animated(LavaCoords, TileDefs.Lava, LavaFrames, 0.3f);
-        Animated(SpikesCoords, TileDefs.Spikes, SpikeFrames, 0.2f);
+        Animated(DeepLavaCoords, TileDefs.Lava, LavaFrames, 0.3f);
+        for (int f = 0; f < SpikeFrames; f++)
+            Create(new Vector2I(f, SpikesCoords.Y), TileDefs.Spikes);
+        for (int f = 0; f < SpearFrames; f++)
+            Create(SpearCoordsFor(f), TileDefs.Spear);
         for (int m = 1; m < ShadowMasks; m++)
             Create(ShadowCoordsFor((ShadowMask)m), TileDefs.Empty);
-        for (int join = 1; join < ElectricJoins; join++)
-            Solid(Create(ElectricJoinCoords(join), TileDefs.ElectricFloor));
+        for (int join = 0; join < ElectricJoins; join++)
+            Solid(Animated(ElectricJoinCoords(join), TileDefs.ElectricFloor, ElectricFrames, 0.09f));
         for (int l = 0; l < PipeVariants; l++)
             Solid(Create(PipeCoordsFor((PipeLinks)l), TileDefs.PipeWall));
         for (int y = 0; y < CircuitBoard.Span; y++)
             for (int x = 0; x < CircuitBoard.Span; x++)
                 Create(new Vector2I(x, CircuitRow + y), TileDefs.BackgroundCircuit);
+        for (int y = 0; y < RockFace.Span; y++)
+            for (int x = 0; x < RockFace.Span; x++)
+                Create(new Vector2I(x, RockRow + y), TileDefs.BackgroundRock);
         return tileSet;
     }
 
@@ -275,17 +322,16 @@ public static class TileSetBuilder
                 DrawAlarmFloor(img);
                 break;
             case TileDefs.ElectricFloor:
-                DrawElectricFloor(img, joinLeft: false, joinRight: false);
+                DrawElectricFloor(img, joinLeft: false, joinRight: false, frame: 0);
                 break;
             case TileDefs.Water:
                 return BuildWaterImage(0, surface: true);
             case TileDefs.Lava:
-                return BuildLavaImage(0);
+                return BuildLavaImage(3, surface: true);
             case TileDefs.Spikes:
-                return BuildSpikesImage(4);
+                return BuildSpikesImage(SpikeLevels, SpikeLevels);
             case TileDefs.Spear:
-                DrawSpears(img);
-                break;
+                return BuildSpearImage(SpearFrames - 1);
             case TileDefs.HiddenPlatform:
                 DrawHiddenPlatform(img);
                 break;
@@ -334,8 +380,7 @@ public static class TileSetBuilder
                 DrawMesh(img);
                 break;
             case TileDefs.BackgroundRock:
-                DrawRock(img);
-                break;
+                return RockFace.Tile(0, 0);
             case TileDefs.BackgroundPanel:
                 DrawPanels(img);
                 break;
@@ -385,12 +430,19 @@ public static class TileSetBuilder
         -1, 0, 1, 2, 3, 2, 1, 0, -1, -2, -1, 0, 1, 2, 1, 1,
     };
 
+    // Per animation frame, how far the bolt shape slides along the tile and
+    // whether it flips. A shift keeps the offsets periodic in the tile, so
+    // every frame still joins seamlessly into its neighbour.
+    private static readonly (int Shift, int Sign)[] BoltFrames = { (0, 1), (11, -1), (5, 1), (21, -1) };
+
     // A dark steel plate carrying a lightning arc: a pale core, a yellow glow
     // and cyan sparks. A side joined to another electric floor has no bevel
     // and no electrode, so the plate and arc run straight on into it; an
-    // open side ends in a copper electrode.
-    private static void DrawElectricFloor(Image img, bool joinLeft, bool joinRight)
+    // open side ends in a copper electrode. Each frame reshapes the arc and
+    // rescatters the sparks, so the floor crackles.
+    private static void DrawElectricFloor(Image img, bool joinLeft, bool joinRight, int frame)
     {
+        var (shift, sign) = BoltFrames[frame];
         for (int y = 0; y < TileSize; y++)
             for (int x = 0; x < TileSize; x++)
             {
@@ -412,7 +464,7 @@ public static class TileSetBuilder
         int x0 = joinLeft ? 0 : 5, x1 = joinRight ? TileSize : 27;
         for (int x = x0; x < x1; x++)
         {
-            int yc = 15 + BoltOffset[x];
+            int yc = 15 + sign * BoltOffset[(x + shift) % TileSize];
             var haze = Threshold(x, yc) < 0.5f ? HazardRamp[0] : PlateRamp[2];
             Dot(img, x, yc - 2, haze);
             Dot(img, x, yc + 2, haze);
@@ -422,31 +474,52 @@ public static class TileSetBuilder
         }
         for (int y = 6; y < 26; y++)
             for (int x = x0; x < x1; x++)
-                if (Noise(x, y, 43) < 0.025f)
+                if (Noise(x, y, 43 + frame) < 0.025f)
                     img.SetPixel(x, y, TealRamp[4]);
     }
 
-    // Three spears on a dark pit floor: a two-tone shaft, a steel guard and
-    // a blade lit along its left edge.
-    private static void DrawSpears(Image img)
+    // Spear frame on a transparent tile: an iron ground plate with three
+    // holes, and three short spears standing SpearRise[frame] pixels out of
+    // them (frame 0 shows only the holes, frame 1 just the tips). Each
+    // spear is a lit tip, a blade lit along its left edge, a steel guard and
+    // a two-tone shaft.
+    private static Image BuildSpearImage(int frame)
     {
-        DrawPit(img, 44);
+        const int plateTop = 28;
+        var img = Image.CreateEmpty(TileSize, TileSize, false, Image.Format.Rgba8);
+        DrawBlock(img, new Rect2I(-2, plateTop, 36, 4), IronRamp, 44, wear: 0.03f);
+        int rise = SpearRise[frame];
+        int tip = plateTop - rise;
         foreach (int center in new[] { 6, 16, 26 })
         {
-            for (int y = 14; y < 29; y++)
+            for (int dx = -2; dx <= 2; dx++)
+                img.SetPixel(center + dx, plateTop, HollowRamp[0]);
+            for (int dx = -1; dx <= 1; dx++)
+                img.SetPixel(center + dx, plateTop + 1, HollowRamp[1]);
+            for (int y = tip; y <= plateTop && rise > 0; y++)
             {
-                img.SetPixel(center - 1, y, ClayRamp[3]);
-                img.SetPixel(center, y, ClayRamp[1]);
+                int dy = y - tip;
+                if (y == plateTop && dy <= 7)
+                    continue;   // only a shaft shows in the hole; a blade stays dark
+                if (dy == 0)
+                    img.SetPixel(center, y, Colors.White);
+                else if (dy <= 6 && y < plateTop)
+                {
+                    int halfWidth = (dy + 1) / 3;
+                    for (int dx = -halfWidth; dx <= halfWidth; dx++)
+                        img.SetPixel(center + dx, y, BladeTone(dx, halfWidth));
+                }
+                else if (dy == 7 && y < plateTop)
+                    for (int dx = -2; dx <= 2; dx++)
+                        img.SetPixel(center + dx, y, SteelRamp[dx < 0 ? 3 : dx == 0 ? 2 : 1]);
+                else
+                {
+                    img.SetPixel(center - 1, y, ClayRamp[3]);
+                    img.SetPixel(center, y, ClayRamp[1]);
+                }
             }
-            DrawBlock(img, new Rect2I(center - 4, 12, 8, 2), SteelRamp, 45, wear: 0f);
-            for (int y = 2; y < 12; y++)
-            {
-                int halfWidth = (y - 1) / 3;
-                for (int dx = -halfWidth; dx <= halfWidth; dx++)
-                    img.SetPixel(center + dx, y, BladeTone(dx, halfWidth));
-            }
-            img.SetPixel(center, 1, Colors.White);
         }
+        return img;
     }
 
     // A hologram tile: cyan frame, diagonal stripe dither and a dot grid.
@@ -725,31 +798,6 @@ public static class TileSetBuilder
             }
     }
 
-    // Cave rock: smooth noise quantised into facets, each a flat tone with
-    // fine grain, a dark crack along every facet boundary with a lit lip on
-    // its lower-right side, and pits.
-    private static void DrawRock(Image img)
-    {
-        for (int y = 0; y < TileSize; y++)
-            for (int x = 0; x < TileSize; x++)
-            {
-                // Background rock stays quiet: two close tones per facet and
-                // only some facet edges cracked, so it never competes with
-                // the playfield in front of it.
-                float t = 1.6f + 0.5f * (Facet(x, y) % 2) + 0.4f * (Smooth(x, y, 4, 133) - 0.5f);
-                Color c = Tone(RockRamp, t, x, y);
-                if (IsCrack(x, y) && Smooth(x, y, 8, 134) > 0.55f || Noise(x, y, 130) < 0.01f)
-                    c = RockRamp[1];
-                else if (IsCrack(x - 1, y - 1) && Smooth(x - 1, y - 1, 8, 134) > 0.55f)
-                    c = RockRamp[3];
-                img.SetPixel(x, y, c);
-            }
-
-        static int Facet(int x, int y) =>
-            (int)((0.65f * Smooth(x, y, 8, 131) + 0.35f * Smooth(x, y, 4, 132)) * 6f);
-        static bool IsCrack(int x, int y) => Facet(x, y) != Facet(x - 1, y) || Facet(x, y) != Facet(x, y - 1);
-    }
-
     // Four wall panels with corner screws and a diagonal sheen.
     private static void DrawPanels(Image img)
     {
@@ -763,14 +811,6 @@ public static class TileSetBuilder
                 foreach (var (sx, sy) in new[] { (2, 2), (11, 2), (2, 11), (11, 11) })
                     DrawRivet(img, x0 + sx, y0 + sy, PanelRamp);
             }
-    }
-
-    // A dark pit floor whose dither deepens toward the bottom.
-    private static void DrawPit(Image img, int seed)
-    {
-        for (int y = 0; y < TileSize; y++)
-            for (int x = 0; x < TileSize; x++)
-                img.SetPixel(x, y, Tone(HollowRamp, 1.6f - y / 20f + (Noise(x, y, seed) < 0.05f ? -1f : 0f), x, y));
     }
 
     // A jagged crack down the brick face with its right lip lit, and a
@@ -907,44 +947,137 @@ public static class TileSetBuilder
     }
 
     // Lava frame: a churn of crust and glow from drifting smooth noise,
-    // with sparks that twinkle frame to frame.
-    private static Image BuildLavaImage(int frame)
+    // with sparks that twinkle frame to frame. The churn loops every three
+    // frames; a surface frame adds a glowing skin where small bubbles rise,
+    // swell and pop over the full six-frame cycle, each on its own phase.
+    private static readonly (int X, int Phase)[] LavaBubbles = { (5, 0), (16, 2), (26, 4) };
+
+    private static Image BuildLavaImage(int frame, bool surface)
     {
         var img = Image.CreateEmpty(TileSize, TileSize, false, Image.Format.Rgba8);
+        int churn = frame % 3;
         for (int y = 0; y < TileSize; y++)
             for (int x = 0; x < TileSize; x++)
             {
-                float n = 0.6f * Smooth(x, y, 8, 160) + 0.4f * Smooth(x + frame * 3, y + frame, 4, 161);
-                Color c = Tone(LavaRamp, n * 7f - 0.8f, x, y);
-                if (Noise(x, y, 162 + frame) < 0.012f)
+                Color c;
+                if (surface && y == 0)
+                    c = (x + frame) % 6 < 3 ? LavaRamp[5] : LavaRamp[4];
+                else if (surface && y == 1)
+                    c = (x + frame / 2) % 2 == 0 ? LavaRamp[4] : LavaRamp[3];
+                else if (surface && y == 2)
+                    c = (x + frame) % 3 == 0 ? LavaRamp[1] : LavaRamp[2];
+                else
                 {
-                    c = LavaRamp[6];
-                    Dot(img, x, y - 1, LavaRamp[5]);
+                    float n = 0.6f * Smooth(x, y, 8, 160) + 0.4f * Smooth(x + churn * 3, y + churn, 4, 161);
+                    c = Tone(LavaRamp, n * 7f - 0.8f, x, y);
+                    if ((!surface || y > 11) && Noise(x, y, 162 + frame) < 0.012f)
+                    {
+                        c = LavaRamp[6];
+                        Dot(img, x, y - 1, LavaRamp[5]);
+                    }
                 }
                 img.SetPixel(x, y, c);
             }
+        if (surface)
+            foreach (var (bx, phase) in LavaBubbles)
+                DrawLavaBubble(img, bx, (frame + phase) % LavaFrames);
         return img;
     }
 
-    // Spikes frame: the four spikes rise one by one from the left (frames
-    // 0-4), then sink one by one from the left (frames 5-7), a sweep that
-    // loops. Frame 4 is the fully raised tile used for the palette icon.
-    private static Image BuildSpikesImage(int frame)
+    // One bubble's stage: a speck rising (0), a small then a grown bubble
+    // under the skin (1-2), a dome breaking the surface (3), a burst crater
+    // with splash (4) and the crater closing (5). Bubbles carry a dark rim
+    // so they read against the churn.
+    private static void DrawLavaBubble(Image img, int x, int stage)
     {
+        void Bubble(int cy, int r)
+        {
+            for (int dy = -r - 1; dy <= r + 1; dy++)
+                for (int dx = -r - 1; dx <= r + 1; dx++)
+                {
+                    int d = Mathf.Max(Mathf.Abs(dx), Mathf.Abs(dy));
+                    if (Mathf.Abs(dx) == r + 1 && Mathf.Abs(dy) == r + 1)
+                        continue;   // round the corners
+                    Dot(img, x + dx, cy + dy, d > r ? LavaRamp[1] : LavaRamp[5]);
+                }
+            Dot(img, x - r, cy - r, LavaRamp[6]);
+        }
+        switch (stage)
+        {
+            case 0:
+                Dot(img, x, 11, LavaRamp[1]);
+                Dot(img, x, 10, LavaRamp[6]);
+                break;
+            case 1:
+                Bubble(8, 0);
+                break;
+            case 2:
+                Bubble(5, 1);
+                break;
+            case 3:
+                for (int dx = -2; dx <= 2; dx++)
+                {
+                    Dot(img, x + dx, 0, Mathf.Abs(dx) == 2 ? LavaRamp[1] : LavaRamp[6]);
+                    Dot(img, x + dx, 1, dx == -1 ? LavaRamp[6] : LavaRamp[5]);
+                    Dot(img, x + dx, 2, LavaRamp[5]);
+                    Dot(img, x + dx, 3, LavaRamp[1]);
+                }
+                for (int dy = 1; dy <= 2; dy++)
+                {
+                    Dot(img, x - 3, dy, LavaRamp[1]);
+                    Dot(img, x + 3, dy, LavaRamp[1]);
+                }
+                break;
+            case 4:
+                for (int dx = -1; dx <= 1; dx++)
+                {
+                    Dot(img, x + dx, 0, LavaRamp[0]);
+                    Dot(img, x + dx, 1, LavaRamp[1]);
+                }
+                Dot(img, x - 2, 0, LavaRamp[1]);
+                Dot(img, x + 2, 0, LavaRamp[1]);
+                Dot(img, x - 3, 0, LavaRamp[6]);
+                Dot(img, x + 3, 0, LavaRamp[6]);
+                Dot(img, x - 4, 1, LavaRamp[5]);
+                Dot(img, x + 4, 1, LavaRamp[5]);
+                break;
+            case 5:
+                Dot(img, x, 0, LavaRamp[1]);
+                Dot(img, x - 1, 0, LavaRamp[2]);
+                Dot(img, x + 1, 0, LavaRamp[2]);
+                break;
+        }
+    }
+
+    // Spikes frame: a steel plate with two slots, one per tile half, and a
+    // broad spike pushed up out of each slot by its level (0 = down,
+    // SpikeLevels = fully raised). The palette icon shows both raised.
+    private static Image BuildSpikesImage(int leftLevel, int rightLevel)
+    {
+        const int plateTop = 28;
+        const int fullRise = 22;
         var img = Image.CreateEmpty(TileSize, TileSize, false, Image.Format.Rgba8);
-        DrawPit(img, 170);
-        DrawBlock(img, new Rect2I(-2, 28, 36, 4), SteelRamp, 171, wear: 0.03f);
+        DrawBlock(img, new Rect2I(-2, plateTop, 36, 4), SteelRamp, 171, wear: 0.03f);
         foreach (int rx in new[] { 1, 15, 29 })
             DrawRivet(img, rx, 29, SteelRamp);
-        int first = frame <= 4 ? 0 : frame - 4;
-        int last = frame <= 4 ? frame - 1 : 3;
-        for (int spike = first; spike <= last; spike++)
+        for (int spike = 0; spike < 2; spike++)
         {
-            int center = spike * 8 + 4;
-            img.SetPixel(center, 5, Colors.White);
-            for (int y = 6; y < 28; y++)
+            int center = spike * 16 + 8;
+            for (int dx = -4; dx <= 4; dx++)
+                img.SetPixel(center + dx, plateTop, HollowRamp[0]);
+            for (int dx = -2; dx <= 2; dx++)
+                img.SetPixel(center + dx, plateTop + 1, HollowRamp[1]);
+            int level = spike == 0 ? leftLevel : rightLevel;
+            int tip = plateTop - fullRise * level / SpikeLevels;
+            for (int y = tip; y < plateTop; y++)
             {
-                int halfWidth = (y - 4) / 6 + 1;
+                int dy = y - tip;
+                if (dy == 0)
+                {
+                    img.SetPixel(center, y, Colors.White);
+                    continue;
+                }
+                int halfWidth = Mathf.Min((dy + 2) / 3, 7);
                 for (int dx = -halfWidth; dx <= halfWidth; dx++)
                     Dot(img, center + dx, y, BladeTone(dx, halfWidth));
             }

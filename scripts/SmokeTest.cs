@@ -35,6 +35,7 @@ public partial class SmokeTest : Node
         await ItemCourseCheck();
         await WaterCheck();
         await SpikeCheck();
+        await SpearCheck();
         await ElectricFloorCheck();
         await GogglesCheck();
         await HiddenPlatformCheck();
@@ -130,7 +131,7 @@ public partial class SmokeTest : Node
             "electric_eel",
             "letter_a", "letter_g", "letter_e", "letter_n", "letter_t", "admin_password", "diamond", "notebook", "mobile",
             "smartwatch", "audio_recorder", "sim_card", "cash_stack", "business_card", "tombstone",
-            "deco_clock", "deco_poster", "deco_plant", "deco_toilet", "deco_pipe", "deco_sign", "deco_machine",
+            "deco_clock", "deco_poster", "deco_plant", "deco_toilet", "deco_machine", "deco_copier",
             "deco_table", "deco_crate_wood", "deco_crate_steel",
         };
         var types = ObjectDefs.All.Select(d => d.Type).Concat(EnemyDefs.All.Select(d => d.Type))
@@ -163,6 +164,8 @@ public partial class SmokeTest : Node
         Check(LoadRaw("_format-old.json", unversioned)?.FormatVersion == 1, "a level without formatVersion loads as version 1");
         Check(LoadRaw("_format-new.json", unversioned.Replace("{ ", $"{{ \"formatVersion\": {LevelData.CurrentFormatVersion + 1}, ")) == null,
             "a level from a newer format version is refused");
+        Check(LoadRaw("_format-v1-deco.json", unversioned.Replace("[] }", "[{ \"type\": \"deco_pipe\", \"x\": 0, \"y\": 0 }] }"))?.Objects.Count == 0,
+            "a version 1 level drops the removed pipe and sign decorations");
         FormatPinChecks();
 
         var tileSet = TileSetBuilder.Build();
@@ -661,6 +664,15 @@ public partial class SmokeTest : Node
         editor.EraseCell(new Vector2I(20, 3));
         Check(WaterAt(4) == TileSetBuilder.WaterCoordsFor(waterAbove: false), "erasing the top cell moves the surface down");
         editor.PaintCell(new Vector2I(20, 3));
+        editor.SetBrushTile(TileDefs.Lava);
+        editor.PaintCell(new Vector2I(22, 9));
+        editor.PaintCell(new Vector2I(22, 10));
+        Vector2I LavaAt(int y) => editor.Grids.Main.GetCellAtlasCoords(new Vector2I(22, y));
+        Check(LavaAt(9) == TileSetBuilder.LavaCoordsFor(lavaAbove: false)
+            && LavaAt(10) == TileSetBuilder.LavaCoordsFor(lavaAbove: true),
+            "only the top lava cell draws the bubbling surface");
+        editor.EraseCell(new Vector2I(22, 9));
+        editor.EraseCell(new Vector2I(22, 10));
         Check(editor.StartPlay(), "water level starts");
         var agent = editor.PlayerAgent;
         agent.Position = new Vector2(20 * 32 + 16, 3 * 32 + 16);
@@ -683,21 +695,55 @@ public partial class SmokeTest : Node
         editor.StopPlay();
     }
 
-    // Spikes only hurt while raised; the cycle clock is settable in tests.
+    // The two spikes take turns and each only hurts over its own half of the
+    // tile while raised; the cycle clock is settable in tests.
     private async Task SpikeCheck()
     {
         var editor = await FreshEditor();
         editor.SetBrushTile(TileDefs.Spikes);
-        editor.PaintCell(new Vector2I(5, 10));
+        var cell = new Vector2I(5, 10);
+        editor.PaintCell(cell);
         Check(editor.StartPlay(), "spike level starts");
+        var agent = editor.PlayerAgent;
+        agent.Position = new Vector2(5 * 32 + 30, 10 * 32 + 16);   // over the right half only
+        agent.Velocity = Vector2.Zero;
+        await Frames(5);
+        Check(editor.Session.Lives == 3, "lowered spikes are safe");
+        Check(editor.Grids.Main.GetCellAtlasCoords(cell) == TileSetBuilder.SpikeCoordsFor(0, 0), "lowered spikes show the bare plate");
+        editor.Session.Time = 3.5f;
+        await Frames(5);
+        Check(editor.Session.Lives == 3, "the raised left spike does not hurt over the right half");
+        Check(editor.Grids.Main.GetCellAtlasCoords(cell) == TileSetBuilder.SpikeCoordsFor(0, TileSetBuilder.SpikeLevels), "the left spike shows raised");
+        editor.Session.Time = 8.5f;
+        await Frames(5);
+        Check(editor.Session.Lives == 2, "the raised right spike takes a life");
+        Check(editor.Grids.Main.GetCellAtlasCoords(cell) == TileSetBuilder.SpikeCoordsFor(1, TileSetBuilder.SpikeLevels), "the right spike shows raised");
+        editor.StopPlay();
+    }
+
+    // Spears cycle holes, tips, out (3s each) and hurt only while out; the
+    // grid shows the matching frame.
+    private async Task SpearCheck()
+    {
+        var editor = await FreshEditor();
+        editor.SetBrushTile(TileDefs.Spear);
+        var cell = new Vector2I(5, 10);
+        editor.PaintCell(cell);
+        Check(editor.StartPlay(), "spear level starts");
         var agent = editor.PlayerAgent;
         agent.Position = new Vector2(5 * 32 + 16, 10 * 32 + 16);
         agent.Velocity = Vector2.Zero;
         await Frames(5);
-        Check(editor.Session.Lives == 3, "lowered spikes are safe");
-        editor.Session.Time = 8.5f;
+        Check(editor.Session.Lives == 3, "retracted spears are safe");
+        Check(editor.Grids.Main.GetCellAtlasCoords(cell) == TileSetBuilder.SpearCoordsFor(0), "retracted spears show bare holes");
+        editor.Session.Time = 4.5f;
         await Frames(5);
-        Check(editor.Session.Lives == 2, "raised spikes take a life");
+        Check(editor.Session.Lives == 3, "spear tips in the holes are safe");
+        Check(editor.Grids.Main.GetCellAtlasCoords(cell) == TileSetBuilder.SpearCoordsFor(1), "the warning state shows the tips");
+        editor.Session.Time = 7.5f;
+        await Frames(5);
+        Check(editor.Session.Lives == 2, "spears out take a life");
+        Check(editor.Grids.Main.GetCellAtlasCoords(cell) == TileSetBuilder.SpearCoordsFor(TileSetBuilder.SpearFrames - 1), "spears out show the full frame");
         editor.StopPlay();
     }
 

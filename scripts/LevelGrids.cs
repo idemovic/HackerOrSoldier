@@ -155,13 +155,16 @@ public sealed class LevelGrids
         RefreshWater(cell + Vector2I.Down);
     }
 
-    // Only the top cell of a water column draws the wave; water with water
-    // above it draws the body alone.
+    // Only the top cell of a water or lava column draws the surface; a cell
+    // with the same liquid above it draws the body alone.
     private void RefreshWater(Vector2I cell)
     {
-        if (TileIdAt(cell) != TileDefs.Water)
+        int id = TileIdAt(cell);
+        if (id != TileDefs.Water && id != TileDefs.Lava)
             return;
-        bool waterAbove = TileIdAt(cell + Vector2I.Up) == TileDefs.Water;
-        Main.SetCell(cell, TileSetBuilder.SourceId, TileSetBuilder.WaterCoordsFor(waterAbove));
+        bool sameAbove = TileIdAt(cell + Vector2I.Up) == id;
+        Main.SetCell(cell, TileSetBuilder.SourceId, id == TileDefs.Water
+            ? TileSetBuilder.WaterCoordsFor(sameAbove)
+            : TileSetBuilder.LavaCoordsFor(sameAbove));
     }
 }

@@ -15,7 +15,9 @@ public static class PixelArt
     private const float BodyShade = 0.16f;
     private const float OutlineDarken = 0.72f;
 
-    public static Image Finish(Image img, bool upscale)
+    // shadeBody: false keeps a map that fills its cell free of the lower-
+    // body dither, which would read as noise across a flat panel.
+    public static Image Finish(Image img, bool upscale, bool shadeBody = true)
     {
         if (upscale)
             img = Scale2x(img);
@@ -45,7 +47,7 @@ public static class PixelArt
                     c = c.Lightened(RimLight);
                 else if (shaded && !lit)
                     c = c.Darkened(EdgeShade);
-                else if (y >= shadeFrom && (x + y) % 2 == 0)
+                else if (shadeBody && y >= shadeFrom && (x + y) % 2 == 0)
                     c = c.Darkened(BodyShade);
                 img.SetPixel(x, y, c);
             }

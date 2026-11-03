@@ -144,6 +144,16 @@ public partial class Agent : CharacterBody2D
     private int TileAt(float dx, float dy) =>
         Session?.TileAtPosition(Position + new Vector2(dx, dy)) ?? TileDefs.Empty;
 
+    // A spike tile only hurts over the half whose spike is raised.
+    private bool OnRaisedSpike(int x)
+    {
+        int spike = Session.RaisedSpike;
+        if (spike < 0)
+            return false;
+        float left = x * Tile + spike * Tile / 2f;
+        return Position.X + HazardExtent > left && Position.X - HazardExtent < left + Tile / 2f;
+    }
+
     private void CheckHazards(float dt)
     {
         // Kill plane below the level bounds.
@@ -161,7 +171,8 @@ public partial class Agent : CharacterBody2D
             for (int x = minX; x <= maxX; x++)
             {
                 int id = Session.TileAt(x, y);
-                if (id == TileDefs.Lava || id == TileDefs.Spear || (id == TileDefs.Spikes && Session.SpikesUp))
+                if (id == TileDefs.Lava || (id == TileDefs.Spear && Session.SpearsOut)
+                    || (id == TileDefs.Spikes && OnRaisedSpike(x)))
                 {
                     Session.AgentHit();
                     return;
