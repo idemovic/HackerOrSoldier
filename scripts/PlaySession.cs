@@ -58,8 +58,7 @@ public partial class PlaySession : Node2D
     public float LevelRight => _level.Width * TileSetBuilder.TileSize;
 
     private LevelData _level;
-    private TileMapLayer _grid;
-    private TileMapLayer _hiddenGrid;
+    private LevelGrids _grids;
     private PackedScene _agentScene;
     private RunState _run;
     private readonly HashSet<string> _letters = new();
@@ -92,11 +91,10 @@ public partial class PlaySession : Node2D
     private float _deathTime;
     private DeathEffect _death;
 
-    public void Setup(LevelData level, TileMapLayer grid, TileMapLayer hiddenGrid, PackedScene agentScene, RunState run = null)
+    public void Setup(LevelData level, LevelGrids grids, PackedScene agentScene, RunState run = null)
     {
         _level = level;
-        _grid = grid;
-        _hiddenGrid = hiddenGrid;
+        _grids = grids;
         _agentScene = agentScene;
         _run = run;
     }
@@ -104,7 +102,7 @@ public partial class PlaySession : Node2D
     public override void _Ready()
     {
         int tile = TileSetBuilder.TileSize;
-        _hiddenGrid.Modulate = new Color(1, 1, 1, 0);
+        _grids.Hidden.Modulate = new Color(1, 1, 1, 0);
 
         Lives = _run?.Lives ?? 3 + Profile.Current.AgentLivesBonus;
         Ammo = _run?.Ammo ?? 10;
@@ -266,17 +264,17 @@ public partial class PlaySession : Node2D
 
         if (_gogglesTime > 0)
             _gogglesTime -= dt;
-        _hiddenGrid.Modulate = GogglesActive ? new Color(1f, 0.7f, 0.6f) : new Color(1, 1, 1, 0);
-        _hiddenGrid.CollisionEnabled = GogglesActive;   // hidden platforms are only solid while revealed
+        _grids.Hidden.Modulate = GogglesActive ? new Color(1f, 0.7f, 0.6f) : new Color(1, 1, 1, 0);
+        _grids.Hidden.CollisionEnabled = GogglesActive;   // hidden platforms are only solid while revealed
         if (_disguiseTime > 0)
             _disguiseTime -= dt;
 
         if (_alarmTime > 0)
         {
             _alarmTime -= dt;
-            _grid.Modulate = new Color(1f, 0.72f, 0.72f);   // README: rooms change appearance during an alarm
+            _grids.Main.Modulate = new Color(1f, 0.72f, 0.72f);   // README: rooms change appearance during an alarm
             if (_alarmTime <= 0)
-                _grid.Modulate = Colors.White;
+                _grids.Main.Modulate = Colors.White;
         }
 
         // Doors open on contact when the agent carries the matching key.
@@ -349,7 +347,7 @@ public partial class PlaySession : Node2D
     public void DestroyTile(Vector2I cell)
     {
         _destroyed.Add(cell);
-        _grid.EraseCell(cell);
+        _grids.EraseCell(cell);
     }
 
     // Returns true when the weapon actually went off, so the caller can play

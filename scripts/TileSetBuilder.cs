@@ -3,8 +3,15 @@ using Godot;
 
 namespace HackerOrSoldier;
 
+// Which neighbours of a shadow-receiving cell are solid. Light falls from
+// the top left, so a ceiling shades a band downward, a wall on the left a
+// band rightward, and a floor leaves a thin contact line. Each combination
+// is one pre-baked tile in the atlas.
+[System.Flags]
+public enum ShadowMask { None = 0, Above = 1, Left = 2, Below = 4 }
+
 // Builds the TileSet at runtime: pixel-art 32x32 tiles in the README
-// aesthetic (VGA-style saturated colors, checkerboard dithering), with a
+// aesthetic (VGA-style saturated colors, ordered dithering), with a
 // collision square on solid tiles. No binary assets.
 public static class TileSetBuilder
 {
@@ -17,14 +24,22 @@ public static class TileSetBuilder
     // in the defs row of the atlas, the rest in a second row.
     public const int SkyVariants = 10;
 
-    // Water and lava animate via native TileSet animations; their frames
-    // fill dedicated atlas rows below the defs row and the sky variants.
+    // Water, lava and spikes animate via native TileSet animations; their
+    // frames fill dedicated atlas rows below the defs row and the sky
+    // variants. The shadow masks take the last row, one column per mask.
     private const int WaterFrames = 4;
     private const int LavaFrames = 3;
     private const int SpikeFrames = 8;
     private static readonly Vector2I WaterCoords = new(0, 2);
     private static readonly Vector2I LavaCoords = new(0, 3);
     private static readonly Vector2I SpikesCoords = new(0, 4);
+    private const int ShadowRow = 5;
+    private const int ShadowMasks = 8;
+    private const int AtlasRows = 6;
+
+    // Custom data layer: every atlas tile carries the level tile id it
+    // draws, so a grid cell reads back without inverting GridCoordsFor.
+    public const string TileIdData = "tile_id";
 
     private static readonly Dictionary<int, ImageTexture> IconCache = new();
     private static readonly Dictionary<int, ImageTexture> TextureCache = new();
@@ -58,60 +73,82 @@ public static class TileSetBuilder
         _ => AtlasCoordsFor(tileId),
     };
 
-    public static TileSet Build()
+    public static Vector2I ShadowCoordsFor(ShadowMask mask) => new((int)mask, ShadowRow);
+
+    // The whole atlas texture: the defs row, the night-sky variants, the
+    // animation rows and the shadow masks.
+    public static Image AtlasImage()
     {
         var defs = TileDefs.All;
         var tileRect = new Rect2I(0, 0, TileSize, TileSize);
-        var image = Image.CreateEmpty(TileSize * defs.Length, TileSize * 5, false, Image.Format.Rgba8);
+        var image = Image.CreateEmpty(TileSize * defs.Length, TileSize * AtlasRows, false, Image.Format.Rgba8);
+        void Put(Image tile, int column, int row) =>
+            image.BlitRect(tile, tileRect, new Vector2I(column * TileSize, row * TileSize));
         for (int i = 0; i < defs.Length; i++)
-            image.BlitRect(BuildTileImage(defs[i].Id), tileRect, new Vector2I(i * TileSize, 0));
+            Put(BuildTileImage(defs[i].Id), i, 0);
         for (int v = 1; v < SkyVariants; v++)
-            image.BlitRect(BuildNightSkyImage(v), tileRect, new Vector2I((v - 1) * TileSize, TileSize));
+            Put(BuildNightSkyImage(v), v - 1, 1);
         for (int f = 0; f < WaterFrames; f++)
-            image.BlitRect(BuildWaterImage(f), tileRect, new Vector2I(f * TileSize, WaterCoords.Y * TileSize));
+            Put(BuildWaterImage(f), f, WaterCoords.Y);
         for (int f = 0; f < LavaFrames; f++)
-            image.BlitRect(BuildLavaImage(f), tileRect, new Vector2I(f * TileSize, LavaCoords.Y * TileSize));
+            Put(BuildLavaImage(f), f, LavaCoords.Y);
         for (int f = 0; f < SpikeFrames; f++)
-            image.BlitRect(BuildSpikesImage(f), tileRect, new Vector2I(f * TileSize, SpikesCoords.Y * TileSize));
+            Put(BuildSpikesImage(f), f, SpikesCoords.Y);
+        for (int m = 1; m < ShadowMasks; m++)
+            Put(BuildShadowImage((ShadowMask)m), m, ShadowRow);
+        return image;
+    }
 
+    public static TileSet Build()
+    {
+        var defs = TileDefs.All;
         var tileSet = new TileSet { TileSize = new Vector2I(TileSize, TileSize) };
         tileSet.AddPhysicsLayer();
+        tileSet.AddCustomDataLayer();
+        tileSet.SetCustomDataLayerName(0, TileIdData);
+        tileSet.SetCustomDataLayerType(0, Variant.Type.Int);
 
         var source = new TileSetAtlasSource
         {
-            Texture = ImageTexture.CreateFromImage(image),
+            Texture = ImageTexture.CreateFromImage(AtlasImage()),
             TextureRegionSize = new Vector2I(TileSize, TileSize),
         };
         tileSet.AddSource(source, SourceId);
+
+        TileData Create(Vector2I coords, int tileId)
+        {
+            source.CreateTile(coords);
+            var data = source.GetTileData(coords, 0);
+            data.SetCustomData(TileIdData, tileId);
+            return data;
+        }
+
+        void Animated(Vector2I coords, int tileId, int frames, float frameDuration)
+        {
+            Create(coords, tileId);
+            source.SetTileAnimationFramesCount(coords, frames);
+            for (int f = 0; f < frames; f++)
+                source.SetTileAnimationFrameDuration(coords, f, frameDuration);
+        }
 
         float half = TileSize / 2f;
         var square = new Vector2[] { new(-half, -half), new(half, -half), new(half, half), new(-half, half) };
         for (int i = 0; i < defs.Length; i++)
         {
-            var coords = new Vector2I(i, 0);
-            source.CreateTile(coords);
+            var data = Create(new Vector2I(i, 0), defs[i].Id);
             if (defs[i].Solid)
             {
-                var data = source.GetTileData(coords, 0);
                 data.AddCollisionPolygon(0);
                 data.SetCollisionPolygonPoints(0, 0, square);
             }
         }
         for (int v = 1; v < SkyVariants; v++)
-            source.CreateTile(new Vector2I(v - 1, 1));
-
-        source.CreateTile(WaterCoords);
-        source.SetTileAnimationFramesCount(WaterCoords, WaterFrames);
-        for (int f = 0; f < WaterFrames; f++)
-            source.SetTileAnimationFrameDuration(WaterCoords, f, 0.25f);
-        source.CreateTile(LavaCoords);
-        source.SetTileAnimationFramesCount(LavaCoords, LavaFrames);
-        for (int f = 0; f < LavaFrames; f++)
-            source.SetTileAnimationFrameDuration(LavaCoords, f, 0.3f);
-        source.CreateTile(SpikesCoords);
-        source.SetTileAnimationFramesCount(SpikesCoords, SpikeFrames);
-        for (int f = 0; f < SpikeFrames; f++)
-            source.SetTileAnimationFrameDuration(SpikesCoords, f, 0.2f);
+            Create(new Vector2I(v - 1, 1), TileDefs.BackgroundSky);
+        Animated(WaterCoords, TileDefs.Water, WaterFrames, 0.25f);
+        Animated(LavaCoords, TileDefs.Lava, LavaFrames, 0.3f);
+        Animated(SpikesCoords, TileDefs.Spikes, SpikeFrames, 0.2f);
+        for (int m = 1; m < ShadowMasks; m++)
+            Create(ShadowCoordsFor((ShadowMask)m), TileDefs.Empty);
         return tileSet;
     }
 
@@ -527,6 +564,49 @@ public static class TileSetBuilder
                     img.SetPixel(x, y, highlight);   // dithered brick top
             }
     }
+
+    // A shadow tile: translucent black laid down by ordered dithering,
+    // densest at the edge that touches the solid neighbour. Bands add up
+    // where they meet, so an inner corner comes out darker than either.
+    private const float ShadowAlpha = 0.55f;
+    private const int CeilingShade = 8;
+    private const int WallShade = 5;
+    private const int FloorContact = 2;
+
+    private static Image BuildShadowImage(ShadowMask mask)
+    {
+        var img = Image.CreateEmpty(TileSize, TileSize, false, Image.Format.Rgba8);
+        var ink = new Color(0, 0, 0, ShadowAlpha);
+        for (int y = 0; y < TileSize; y++)
+            for (int x = 0; x < TileSize; x++)
+            {
+                float cover = 0f;
+                if (mask.HasFlag(ShadowMask.Above))
+                    cover += Fade(y, CeilingShade);
+                if (mask.HasFlag(ShadowMask.Left))
+                    cover += Fade(x, WallShade);
+                if (mask.HasFlag(ShadowMask.Below))
+                    cover += Fade(TileSize - 1 - y, FloorContact);
+                if (Threshold(x, y) < cover)
+                    img.SetPixel(x, y, ink);
+            }
+        return img;
+
+        static float Fade(int distance, int length) =>
+            distance < length ? (length - distance) / (float)length : 0f;
+    }
+
+    private static readonly int[,] Bayer =
+    {
+        { 0, 8, 2, 10 },
+        { 12, 4, 14, 6 },
+        { 3, 11, 1, 9 },
+        { 15, 7, 13, 5 },
+    };
+
+    // Ordered-dither threshold in (0, 1): a pixel is "on" for a coverage
+    // when its threshold falls below it, which fills in Bayer order.
+    private static float Threshold(int x, int y) => (Bayer[y & 3, x & 3] + 0.5f) / 16f;
 
     private static int Wrap(int value) => ((value % TileSize) + TileSize) % TileSize;
 }
