@@ -84,6 +84,10 @@ public partial class PlaySession : Node2D
     private Camera2D _camera;
     private Node2D _spikes;
     private HBoxContainer _hearts;
+    private TextureRect _weaponIcon;
+    private Label _weaponCount;
+    private HBoxContainer _scoreStat;
+    private Label _scoreCount;
     private Label _hud;
     private bool _ended;
     private bool _agentDown;      // a life is being lost right now
@@ -227,17 +231,37 @@ public partial class PlaySession : Node2D
 
         var canvas = new CanvasLayer();
         AddChild(canvas);
-        var hudRow = new HBoxContainer { Position = new Vector2(4, 4) };
+        var hudRow = new HBoxContainer
+        {
+            Position = new Vector2(4, 4),
+            Theme = new Theme { DefaultFontSize = 10 },
+        };
+        hudRow.AddThemeConstantOverride("separation", 8);
         canvas.AddChild(hudRow);
         _hearts = new HBoxContainer();
         hudRow.AddChild(_hearts);
-        _hud = new Label
+        _weaponIcon = new TextureRect { StretchMode = TextureRect.StretchModeEnum.KeepCentered };
+        _weaponCount = new Label { VerticalAlignment = VerticalAlignment.Center };
+        hudRow.AddChild(HudStat(_weaponIcon, _weaponCount));
+        _scoreCount = new Label { VerticalAlignment = VerticalAlignment.Center };
+        _scoreStat = HudStat(new TextureRect
         {
-            Theme = new Theme { DefaultFontSize = 10 },
-            VerticalAlignment = VerticalAlignment.Center,
-        };
+            Texture = Sprites.Get("score"),
+            StretchMode = TextureRect.StretchModeEnum.KeepCentered,
+        }, _scoreCount);
+        hudRow.AddChild(_scoreStat);
+        _hud = new Label { VerticalAlignment = VerticalAlignment.Center };
         hudRow.AddChild(_hud);
         UpdateHud();
+    }
+
+    private static HBoxContainer HudStat(TextureRect icon, Label count)
+    {
+        var stat = new HBoxContainer();
+        stat.AddThemeConstantOverride("separation", 3);
+        stat.AddChild(icon);
+        stat.AddChild(count);
+        return stat;
     }
 
     public override void _PhysicsProcess(double delta)
@@ -688,15 +712,21 @@ public partial class PlaySession : Node2D
 
     private void UpdateHud()
     {
-        string weaponText = Weapon switch
+        var (weaponSprite, weaponCount) = Weapon switch
         {
-            "chainsaw" => "Chainsaw",
-            "crossbow" => $"Crossbow {Arrows}",
-            "dynamite" => $"Dynamite {DynamiteSticks}",
-            "assault_rifle" => $"Assault rifle {Ammo}",
-            "minigun" => $"Mini gun {Ammo}",
-            _ => $"Pistol {Ammo}",
+            "chainsaw" => (ObjectDefs.WeaponChainsaw, (int?)null),
+            "crossbow" => (ObjectDefs.WeaponCrossbow, Arrows),
+            "dynamite" => (ObjectDefs.WeaponDynamite, DynamiteSticks),
+            "assault_rifle" => (ObjectDefs.WeaponAssaultRifle, Ammo),
+            "minigun" => (ObjectDefs.WeaponMinigun, Ammo),
+            _ => ("pistol", Ammo),
         };
+        _weaponIcon.Texture = Sprites.Trimmed(weaponSprite);
+        _weaponCount.Visible = weaponCount != null;
+        _weaponCount.Text = weaponCount.ToString();
+        _scoreStat.Visible = Score > 0;
+        _scoreCount.Text = Score.ToString();
+
         int hearts = Mathf.Max(Lives, 0);
         while (_hearts.GetChildCount() > hearts)
         {
@@ -711,27 +741,25 @@ public partial class PlaySession : Node2D
                 StretchMode = TextureRect.StretchModeEnum.KeepCentered,
             });
 
-        var text = $"  {weaponText}";
+        var parts = new List<string>();
         if (_keys.Count > 0)
-            text += "  Keys: " + string.Join(" ", _keys);
+            parts.Add("Keys: " + string.Join(" ", _keys));
         if (_usbKeys.Count > 0)
-            text += "  USB: " + string.Join(" ", _usbKeys);
+            parts.Add("USB: " + string.Join(" ", _usbKeys));
         if (Agent != null && Agent.IsHiding)
-            text += "  Hidden (C to leave)";
-        if (Score > 0)
-            text += $"  Score {Score}";
+            parts.Add("Hidden (C to leave)");
         if (CoinsCollected > 0)
-            text += $"  Coins +{CoinsCollected}";
+            parts.Add($"Coins +{CoinsCollected}");
         if (HasVest)
-            text += "  Vest";
+            parts.Add("Vest");
         foreach (var item in _heldItems)
-            text += item == ObjectDefs.InfraGoggles ? "  Goggles (press C)" : "  Briefcase (press C)";
+            parts.Add(item == ObjectDefs.InfraGoggles ? "Goggles (press C)" : "Briefcase (press C)");
         if (GogglesActive)
-            text += $"  Infra {Mathf.CeilToInt(_gogglesTime)}s";
+            parts.Add($"Infra {Mathf.CeilToInt(_gogglesTime)}s");
         if (_disguiseTime > 0)
-            text += $"  Disguise {Mathf.CeilToInt(_disguiseTime)}s";
+            parts.Add($"Disguise {Mathf.CeilToInt(_disguiseTime)}s");
         if (AlarmActive)
-            text += $"  ALARM {Mathf.CeilToInt(_alarmTime)}s";
-        _hud.Text = text;
+            parts.Add($"ALARM {Mathf.CeilToInt(_alarmTime)}s");
+        _hud.Text = string.Join("  ", parts);
     }
 }
