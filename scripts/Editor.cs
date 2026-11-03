@@ -37,8 +37,8 @@ public partial class Editor : Node2D
     private HBoxContainer _bar;
     private HBoxContainer _paletteRoot;
     private Label _playHint;
-    private Button _playButton;
     private Button _skyButton;
+    private AcceptDialog _helpDialog;
     private AcceptDialog _saveDialog;
     private LineEdit _nameEdit;
     private TextEdit _descEdit;
@@ -65,9 +65,39 @@ public partial class Editor : Node2D
     public PlaySession Session => _session;
     public Agent PlayerAgent => _session?.Agent;
     public TileMapLayer HiddenGrid => _hiddenGrid;   // for tests
+    public Vector2 CameraPosition => _camera.Position;   // for tests
+
+    // One row per top-bar button: the label letter, the Ctrl shortcut and the
+    // action all come from here.
+    private record MenuItem(string Name, Key Key, Action Run);
+
+    private const string SkyItem = "Sky";
+
+    private MenuItem[] _menu;
+
+    private MenuItem[] BuildMenu() => new MenuItem[]
+    {
+        new("New", Key.N, OnNewPressed),
+        new("Save", Key.S, OpenSaveDialog),
+        new("Load", Key.L, OpenLoadDialog),
+        new("Play", Key.P, TogglePlay),
+        new(SkyItem, Key.K, ToggleSky),
+        new("Menu", Key.M, () => GetTree().ChangeSceneToFile("res://scenes/main_menu.tscn")),
+        new("Help", Key.H, () => _helpDialog.PopupCentered()),
+    };
+
+    // "Sky: Night" with K becomes "S(k)y: Night".
+    public static string MenuLabel(string text, Key key)
+    {
+        int index = text.IndexOf(key.ToString(), StringComparison.OrdinalIgnoreCase);
+        if (index < 0)
+            throw new ArgumentException($"'{text}' has no letter for {key}");
+        return $"{text[..index]}({text[index]}){text[(index + 1)..]}";
+    }
 
     public override void _Ready()
     {
+        _menu = BuildMenu();
         _agentScene = GD.Load<PackedScene>("res://scenes/agent.tscn");
 
         _sky = new Sprite2D();
@@ -106,6 +136,7 @@ public partial class Editor : Node2D
             return;
         var pan = Input.GetVector("move_left", "move_right", "ui_up", "ui_down");
         _camera.Position += pan * PanSpeed * (float)delta;
+        ClampCamera();
 
         var cell = MouseCell();
         _cursor.Visible = _level.InBounds(cell.X, cell.Y);
@@ -124,7 +155,22 @@ public partial class Editor : Node2D
             return;
         }
 
-        if (@event.IsActionPressed("editor_play"))
+        if (_saveDialog.Visible || _loadDialog.Visible || _helpDialog.Visible)
+            return;
+
+        if (@event is InputEventKey { Pressed: true, Echo: false, CtrlPressed: true, AltPressed: false, ShiftPressed: false, MetaPressed: false } shortcut)
+        {
+            var item = Array.Find(_menu, m => m.Key == shortcut.Keycode);
+            if (item != null)
+            {
+                item.Run();
+                GetViewport()?.SetInputAsHandled();
+                return;
+            }
+        }
+
+        // Exact match: Shift+Ctrl+P must not fall through to plain P.
+        if (@event.IsActionPressed("editor_play", false, true))
         {
             StartPlay();
             return;
@@ -154,7 +200,12 @@ public partial class Editor : Node2D
         }
         else if (@event is InputEventMouseMotion motion)
         {
-            if (motion.ButtonMask.HasFlag(MouseButtonMask.Left))
+            if (motion.ButtonMask.HasFlag(MouseButtonMask.Middle))
+            {
+                _camera.Position -= motion.Relative / _camera.Zoom;
+                ClampCamera();
+            }
+            else if (motion.ButtonMask.HasFlag(MouseButtonMask.Left))
                 PaintCell(MouseCell());
             else if (motion.ButtonMask.HasFlag(MouseButtonMask.Right))
                 EraseCell(MouseCell());
@@ -366,7 +417,8 @@ public partial class Editor : Node2D
     {
         LevelGrids.UpdateSky(_sky, _level);
         if (_skyButton != null)
-            _skyButton.Text = _level.Sky == "day" ? "Sky: Day" : "Sky: Night";
+            _skyButton.Text = MenuLabel(_level.Sky == "day" ? "Sky: Day" : "Sky: Night",
+                Array.Find(_menu, m => m.Name == SkyItem).Key);
         LevelGrids.Fill(_grid, _hiddenGrid, _level);
         RebuildMarkers();
         ApplyCameraLimits(_camera);
@@ -407,6 +459,59 @@ public partial class Editor : Node2D
         camera.LimitBottom = Mathf.Max(_level.Height * TileSize, 360);
     }
 
+    // Camera2D limits only clip the rendered view. Without clamping the
+    // position, panning past an edge piles up invisible overshoot that the
+    // user must pan back through before the view moves.
+    private void ClampCamera()
+    {
+        var half = GetViewportRect().Size / _camera.Zoom / 2;
+        _camera.Position = new Vector2(
+            ClampAxis(_camera.Position.X, _camera.LimitLeft, _camera.LimitRight, half.X),
+            ClampAxis(_camera.Position.Y, _camera.LimitTop, _camera.LimitBottom, half.Y));
+    }
+
+    private static float ClampAxis(float value, int min, int max, float half) =>
+        max - min < half * 2 ? min + half : Mathf.Clamp(value, min + half, max - half);
+
+    private void TogglePlay()
+    {
+        if (IsPlaying)
+            StopPlay();
+        else
+            StartPlay();
+    }
+
+    private void OpenSaveDialog()
+    {
+        _nameEdit.Text = _level.Name;
+        _descEdit.Text = _level.Description;
+        _saveDialog.PopupCentered();
+    }
+
+    private string HelpText()
+    {
+        var shortcuts = string.Join("\n", _menu.Select(m => $"  Ctrl+{m.Key}  {m.Name}"));
+        return "Mouse\n"
+            + "  Left click: paint\n"
+            + "  Right click: erase\n"
+            + "  Middle drag: pan the camera\n\n"
+            + "Keyboard\n"
+            + "  Arrows: pan the camera\n"
+            + "  P: play or stop\n"
+            + "  Esc: stop playing\n"
+            + "  Ctrl+Z / Ctrl+Y: undo / redo\n\n"
+            + "Menu shortcuts\n" + shortcuts + "\n\n"
+            + "Palette\n"
+            + "  Pick a category on the left, then a swatch.\n"
+            + "  The property row sets the brush color or number.\n\n"
+            + "Level rules\n"
+            + "  Exactly one agent start and at least one exit door.\n"
+            + "  The level is validated before play.\n"
+            + "  Leaving play restores the level.\n"
+            + "  Save takes a name and a description shown in the level briefing.\n"
+            + "  The minimap is top right.";
+    }
+
     private void BuildUi()
     {
         var ui = new CanvasLayer();
@@ -418,44 +523,19 @@ public partial class Editor : Node2D
         bar.SetAnchorsPreset(Control.LayoutPreset.TopWide);
         ui.AddChild(bar);
 
-        var newButton = new Button { Text = "New" };
-        newButton.Pressed += OnNewPressed;
-        bar.AddChild(newButton);
-
-        var saveButton = new Button { Text = "Save" };
-        saveButton.Pressed += () =>
+        foreach (var item in _menu)
         {
-            _nameEdit.Text = _level.Name;
-            _descEdit.Text = _level.Description;
-            _saveDialog.PopupCentered();
-        };
-        bar.AddChild(saveButton);
-
-        var loadButton = new Button { Text = "Load" };
-        loadButton.Pressed += OpenLoadDialog;
-        bar.AddChild(loadButton);
-
-        _playButton = new Button { Text = "Play (P)" };
-        _playButton.Pressed += () =>
-        {
-            if (IsPlaying)
-                StopPlay();
-            else
-                StartPlay();
-        };
-        bar.AddChild(_playButton);
-
-        _skyButton = new Button { Text = "Sky: Night" };
-        _skyButton.Pressed += ToggleSky;
-        bar.AddChild(_skyButton);
-
-        var menuButton = new Button { Text = "Menu" };
-        menuButton.Pressed += () => GetTree().ChangeSceneToFile("res://scenes/main_menu.tscn");
-        bar.AddChild(menuButton);
+            var run = item.Run;
+            var button = new Button { Text = MenuLabel(item.Name, item.Key) };
+            button.Pressed += () => run();
+            bar.AddChild(button);
+            if (item.Name == SkyItem)
+                _skyButton = button;
+        }
 
         _status = new Label
         {
-            Text = "Left click: paint, right click: erase, arrows: pan, P: play, Ctrl+Z/Y: undo/redo.",
+            Text = "Ctrl+H: help",
             SizeFlagsHorizontal = Control.SizeFlags.ExpandFill,
             ClipText = true,
         };
@@ -568,6 +648,10 @@ public partial class Editor : Node2D
         _loadDialog.AddChild(_levelList);
         _loadDialog.Confirmed += OnLoadConfirmed;
         ui.AddChild(_loadDialog);
+
+        _helpDialog = new AcceptDialog { Title = "Editor help", Theme = theme };
+        _helpDialog.AddChild(new Label { Text = HelpText() });
+        ui.AddChild(_helpDialog);
     }
 
     // One selectable brush in the palette: a tile (TileId >= 0) or an object.

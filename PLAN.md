@@ -332,6 +332,18 @@ Known simplifications (tuning constants, not README rules):
   background, mid-tone background, and a mirrored band for the other
   facing - the sprite-art equivalent of screenshot.tscn
 
+### Editor shortcuts, panning and help
+- Every top-bar button has a Ctrl+letter shortcut and shows its letter in
+  parentheses, for example "(N)ew". One MenuItem table in scripts/Editor.cs
+  drives the buttons, the shortcuts and the help text
+- Middle-mouse drag pans the camera. The camera position is clamped to the
+  level limits, so panning back from an edge moves the view at once instead
+  of first undoing an invisible overshoot
+- Ctrl+H (and the Help button) opens a help dialog with the mouse and
+  keyboard controls, the shortcuts, the palette and the README's level rules
+- Smoke test covers Ctrl+K, middle-drag panning without painting, Ctrl+P
+  versus Ctrl+Shift+P, and panning back from the clamped edge
+
 ## Milestone 6 - Steam prep (next)
 - Export presets for Windows and Linux
 - GodotSteam integration: achievements, cloud saves

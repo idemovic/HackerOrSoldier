@@ -18,6 +18,7 @@ public partial class SmokeTest : Node
         DataModelChecks();
         await EditorLoopChecks();
         await UndoRedoCheck();
+        await ShortcutAndPanCheck();
         await CorridorCheck();
         await DefaultLevelCheck();
         await WallTilesCheck();
@@ -145,6 +146,47 @@ public partial class SmokeTest : Node
         editor.Redo();
         Check(!editor.Level.Objects.Any(o => o.Type == ObjectDefs.Barrel), "a new edit clears the redo history");
     }
+
+    private async Task ShortcutAndPanCheck()
+    {
+        var editor = await FreshEditor();
+        Check(Editor.MenuLabel("Sky: Night", Key.K) == "S(k)y: Night", "menu label marks the shortcut letter");
+        editor.SetLevel(LevelData.NewDefault(80, 40));
+
+        editor._UnhandledInput(KeyEvent(Key.K, ctrl: true));
+        Check(editor.Level.Sky == "day", "Ctrl+K toggles the sky");
+
+        Pan(editor, -150);
+        var tiles = editor.Level.Tiles.ToArray();
+        int objects = editor.Level.Objects.Count;
+        var before = editor.CameraPosition;
+        Pan(editor, -50);
+        Check(Mathf.IsEqualApprox(editor.CameraPosition.X, before.X + 50), "middle drag pans the camera against the drag");
+        Check(editor.Level.Tiles.SequenceEqual(tiles) && editor.Level.Objects.Count == objects,
+            "middle drag does not paint");
+
+        editor._UnhandledInput(KeyEvent(Key.P, ctrl: true, shift: true));
+        Check(!editor.IsPlaying, "Ctrl+Shift+P does not start play");
+        editor._UnhandledInput(KeyEvent(Key.P, ctrl: true));
+        Check(editor.IsPlaying, "Ctrl+P starts play");
+        editor.StopPlay();
+
+        Pan(editor, 5000);
+        var pinned = editor.CameraPosition.X;
+        Pan(editor, -30);
+        Check(editor.CameraPosition.X > pinned, "panning back from the left edge moves the view at once");
+    }
+
+    private static InputEventKey KeyEvent(Key key, bool ctrl = false, bool shift = false) =>
+        new() { Keycode = key, Pressed = true, CtrlPressed = ctrl, ShiftPressed = shift };
+
+    // Positive dx drags the mouse right, which moves the camera left.
+    private static void Pan(Editor editor, float dx) =>
+        editor._UnhandledInput(new InputEventMouseMotion
+        {
+            ButtonMask = MouseButtonMask.Middle,
+            Relative = new Vector2(dx, 0),
+        });
 
     private async Task EditorLoopChecks()
     {
