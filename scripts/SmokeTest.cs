@@ -159,9 +159,9 @@ public partial class SmokeTest : Node
         Pan(editor, -150);
         var tiles = editor.Level.Tiles.ToArray();
         int objects = editor.Level.Objects.Count;
-        var before = editor.CameraPosition;
+        var before = editor.ViewCenter;
         Pan(editor, -50);
-        Check(Mathf.IsEqualApprox(editor.CameraPosition.X, before.X + 50), "middle drag pans the camera against the drag");
+        Check(Mathf.IsEqualApprox(editor.ViewCenter.X, before.X + 50), "middle drag pans the camera against the drag");
         Check(editor.Level.Tiles.SequenceEqual(tiles) && editor.Level.Objects.Count == objects,
             "middle drag does not paint");
 
@@ -172,13 +172,13 @@ public partial class SmokeTest : Node
         editor.StopPlay();
 
         Pan(editor, 5000);
-        var pinned = editor.CameraPosition.X;
+        var pinned = editor.ViewCenter.X;
         Pan(editor, -30);
-        Check(editor.CameraPosition.X > pinned, "panning back from the left edge moves the view at once");
+        Check(editor.ViewCenter.X > pinned, "panning back from the left edge moves the view at once");
     }
 
     private static InputEventKey KeyEvent(Key key, bool ctrl = false, bool shift = false) =>
-        new() { Keycode = key, Pressed = true, CtrlPressed = ctrl, ShiftPressed = shift };
+        new() { Keycode = key, PhysicalKeycode = key, Pressed = true, CtrlPressed = ctrl, ShiftPressed = shift };
 
     // Positive dx drags the mouse right, which moves the camera left.
     private static void Pan(Editor editor, float dx) =>

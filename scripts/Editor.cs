@@ -65,7 +65,15 @@ public partial class Editor : Node2D
     public PlaySession Session => _session;
     public Agent PlayerAgent => _session?.Agent;
     public TileMapLayer HiddenGrid => _hiddenGrid;   // for tests
-    public Vector2 CameraPosition => _camera.Position;   // for tests
+    // For tests: the center of what is on screen, after the camera limits.
+    public Vector2 ViewCenter
+    {
+        get
+        {
+            _camera.ForceUpdateScroll();
+            return _camera.GetScreenCenterPosition();
+        }
+    }
 
     // One row per top-bar button: the label letter, the Ctrl shortcut and the
     // action all come from here.
@@ -525,9 +533,8 @@ public partial class Editor : Node2D
 
         foreach (var item in _menu)
         {
-            var run = item.Run;
             var button = new Button { Text = MenuLabel(item.Name, item.Key) };
-            button.Pressed += () => run();
+            button.Pressed += item.Run;
             bar.AddChild(button);
             if (item.Name == SkyItem)
                 _skyButton = button;
