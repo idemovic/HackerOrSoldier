@@ -15,12 +15,6 @@ public partial class PlayCapture : Node
 
     public override void _Ready()
     {
-        using (var source = FileAccess.Open($"res://levels/{LevelFile}", FileAccess.ModeFlags.Read))
-        {
-            DirAccess.MakeDirRecursiveAbsolute(LevelStore.DirPath);
-            using var copy = FileAccess.Open($"{LevelStore.DirPath}/{LevelFile}", FileAccess.ModeFlags.Write);
-            copy.StoreString(source.GetAsText());
-        }
         _editor = GD.Load<PackedScene>("res://scenes/editor.tscn").Instantiate<Editor>();
         AddChild(_editor);
         _editor.SetLevel(LevelStore.Load(LevelFile));

@@ -90,7 +90,10 @@ public class LevelData
 
 public static class LevelStore
 {
-    public const string DirPath = "user://levels";
+    // Run from the project, levels live in the repo's levels/ folder, so
+    // they are committed and pushed like code and open on any checkout. An
+    // exported build cannot write its own files and keeps them per player.
+    public static readonly string DirPath = OS.HasFeature("template") ? "user://levels" : "res://levels";
 
     private static readonly JsonSerializerOptions JsonOptions = new()
     {

@@ -390,6 +390,16 @@ Known simplifications (tuning constants, not README rules):
   user://<level>_overview.png (run it without --headless, and pass only
   the file name after `--`)
 
+### Level format and storage
+- Level files carry `formatVersion` (LevelData.CurrentFormatVersion, now 1);
+  a file without it reads as 1 and a newer one is refused. A breaking
+  change bumps the version and converts old files in LevelStore.Load
+- The smoke test pins every tile number and object type name, and fails
+  when one is renumbered, renamed, removed, or added without a pin
+- Run from the project, LevelStore uses the repo's levels/ folder, so
+  levels are committed and pushed like code; exported builds keep
+  user://levels. The smoke test deletes the levels it saves
+
 ## Milestone 6 - Steam prep (next)
 - Export presets for Windows and Linux
 - GodotSteam integration: achievements, cloud saves

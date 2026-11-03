@@ -26,9 +26,7 @@ public partial class LevelOverview : Node
         var args = OS.GetCmdlineUserArgs();
         if (args.Length > 0)
             _levelFile = args[0];
-        using var file = FileAccess.Open($"res://levels/{_levelFile}", FileAccess.ModeFlags.Read);
-        var level = System.Text.Json.JsonSerializer.Deserialize<LevelData>(
-            file.GetAsText(), new System.Text.Json.JsonSerializerOptions { PropertyNameCaseInsensitive = true });
+        var level = LevelStore.Load(_levelFile);
 
         _editor = GD.Load<PackedScene>("res://scenes/editor.tscn").Instantiate<Editor>();
         AddChild(_editor);

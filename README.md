@@ -278,6 +278,8 @@ edit mode and play mode at any time.
 ### Saving
 - The level is saved with a name and description, which are shown in the level briefing
 - Saved levels can be reopened for editing
+- Run from the project, levels are saved in the repo's `levels/` folder; commit and push them to edit them on another machine. An exported build saves them in the player's own levels folder
+- Every level file carries a `formatVersion`; a file without one is version 1, and a file from a newer version than the game knows is refused
 
 ### Minimap
 To orient in a bigger level while editing, there should be top right minimap of the whole level.
