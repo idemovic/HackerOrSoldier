@@ -1248,11 +1248,11 @@ public partial class SmokeTest : Node
         float fellAt = agent.Position.X;
         await Frames(6);
         Check(Mathf.Abs(agent.Position.X - fellAt) < 1f, "the body stays where it fell");
-        Check(agent.AnimationFrame?.StartsWith("agent_die") == true && agent.AnimationFrame != AgentPoses.Dead.Key,
+        Check(agent.AnimationFrame?.StartsWith("agent_die") == true && agent.AnimationFrame != BodyPoses.Dead.Key,
             "the death sequence plays through its poses");
 
         await Frames(30);
-        Check(agent.AnimationFrame == AgentPoses.Dead.Key, "the death sequence holds the final pose");
+        Check(agent.AnimationFrame == BodyPoses.Dead.Key, "the death sequence holds the final pose");
         editor.Session.AgentHit();
         Check(editor.Session.Lives == 2, "a downed agent cannot lose a second life");
 
@@ -1274,7 +1274,7 @@ public partial class SmokeTest : Node
         Check(editor.StartPlay(), "enemy animation level starts");
         var fighter = editor.Session.Enemies[0];
         var walked = await SampleFrames(fighter, 60);
-        Check(walked.Contains(EnemyDefs.Fighter) && walked.Contains("fighter_walk"),
+        Check(walked.Count(f => f?.StartsWith("fighter_walk") == true) >= 6,
             "a patrolling fighter cycles its walk frames");
         editor.StopPlay();
 

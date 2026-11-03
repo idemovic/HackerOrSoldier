@@ -40,13 +40,14 @@ public readonly record struct Pose(
 // What a character is made of. The head is hand-drawn because a face does
 // not survive procedural drawing at this size; everything below the neck is
 // generated from the pose. HeadMap chars index HeadColors; '.' is empty and
-// the bottom row's '^' marks the neck pixel the head hangs from.
+// the bottom row's '^' marks the neck pixel the head hangs from. Without a
+// Shirt the jacket front stays plain.
 public sealed record Look(
-    Ramp Skin, Ramp Jacket, Ramp Legs, Ramp Shoes, Ramp Shirt, Ramp Tie,
+    Ramp Skin, Ramp Jacket, Ramp Legs, Ramp Shoes, Ramp? Shirt, Ramp? Tie,
     string[] HeadMap, System.Collections.Generic.Dictionary<char, Color> HeadColors);
 
-// Gun held in the near hand while shooting; Flash adds the muzzle burst.
-public enum Weapon { None, Pistol, PistolFlash }
+// Gun held in the near hand while shooting.
+public enum Weapon { None, Pistol, Rifle }
 
 // Rasterises a Pose with a Look into pixel art at native resolution: limbs
 // as shaded capsules, the torso as a capsule with the shirt and tie cut into
@@ -73,7 +74,7 @@ public static class CharacterRig
     private static readonly Ramp GunSteel = new("8a93a8", "4a5266", "23262f");
     private static readonly Ramp FlashFire = new("ffffff", "fff27a", "f28022");
 
-    public static Image Render(Pose pose, Look look, bool facingLeft, Weapon weapon = Weapon.None)
+    public static Image Render(Pose pose, Look look, bool facingLeft, Weapon weapon = Weapon.None, bool flash = false)
     {
         var parts = new Part[Width * Height];
         var headPixels = new Color[Width * Height];
@@ -83,12 +84,12 @@ public static class CharacterRig
         Vector2 shoulder = hip + up * (Spine - pose.Chest);
         Vector2 armRoot = shoulder - up * 1.5f;
 
-        DrawArm(parts, armRoot, pose.FarArm, Part.FarArm, Part.FarHand, Weapon.None);
+        DrawArm(parts, armRoot, pose.FarArm, Part.FarArm, Part.FarHand, Weapon.None, false);
         DrawLeg(parts, hip, pose.FarLeg, Part.FarLeg, Part.FarShoe);
         DrawLeg(parts, hip, pose.NearLeg, Part.NearLeg, Part.NearShoe);
-        DrawTorso(parts, hip, shoulder, up, Dir(90f - pose.Lean));
+        DrawTorso(parts, hip, shoulder, up, Dir(90f - pose.Lean), look.Shirt != null);
         DrawHead(parts, headPixels, shoulder + up * 0.5f, pose.Lean, look);
-        DrawArm(parts, armRoot, pose.NearArm, Part.NearArm, Part.NearHand, weapon);
+        DrawArm(parts, armRoot, pose.NearArm, Part.NearArm, Part.NearHand, weapon, flash);
 
         var img = Image.CreateEmpty(Width, Height, false, Image.Format.Rgba8);
         for (int y = 0; y < Height; y++)
@@ -128,8 +129,8 @@ public static class CharacterRig
         Part.NearLeg => look.Legs,
         Part.NearShoe => look.Shoes,
         Part.Torso or Part.NearArm => look.Jacket,
-        Part.Shirt => look.Shirt,
-        Part.Tie => look.Tie,
+        Part.Shirt => look.Shirt.Value,
+        Part.Tie => look.Tie ?? look.Shirt.Value,
         Part.NearHand => look.Skin,
         Part.Gun => GunSteel,
         Part.Flash => FlashFire,
@@ -190,7 +191,7 @@ public static class CharacterRig
         Capsule(parts, ankle + Dir(leg.End) * -0.5f, ankle + Dir(leg.End) * Foot, 1.05f, shoe);
     }
 
-    private static void DrawArm(Part[] parts, Vector2 shoulder, Limb arm, Part limb, Part hand, Weapon weapon)
+    private static void DrawArm(Part[] parts, Vector2 shoulder, Limb arm, Part limb, Part hand, Weapon weapon, bool flash)
     {
         Vector2 elbow = shoulder + Dir(arm.Upper) * UpperArm;
         Vector2 wrist = elbow + Dir(arm.Lower) * Forearm;
@@ -199,13 +200,17 @@ public static class CharacterRig
         Capsule(parts, wrist, wrist + Dir(arm.Lower) * 0.8f, 1.0f, hand);
         if (weapon == Weapon.None)
             return;
-        // The pistol extends the forearm: a slide along the aim line and a
-        // grip dropping from the hand.
-        Vector2 aim = Dir(arm.Lower);
-        Vector2 muzzle = wrist + aim * 4.5f;
-        Capsule(parts, wrist + aim * 0.5f, muzzle, 0.9f, Part.Gun);
-        Capsule(parts, wrist, wrist + Dir(arm.Lower - 90f) * 1.8f, 0.7f, Part.Gun);
-        if (weapon == Weapon.PistolFlash)
+        // The gun extends the forearm along the aim line with a grip (and on
+        // the rifle a magazine) dropping below it; the rifle's stock reaches
+        // back past the hand towards the shoulder.
+        bool rifle = weapon == Weapon.Rifle;
+        Vector2 aim = Dir(arm.Lower), below = Dir(arm.Lower - 90f);
+        Vector2 muzzle = wrist + aim * (rifle ? 8f : 4.5f);
+        Capsule(parts, wrist + aim * (rifle ? -4f : 0.5f), muzzle, 0.9f, Part.Gun);
+        Capsule(parts, wrist, wrist + below * 1.8f, 0.7f, Part.Gun);
+        if (rifle)
+            Capsule(parts, wrist + aim * 2.5f, wrist + aim * 2.5f + below * 2.2f, 0.7f, Part.Gun);
+        if (flash)
         {
             Capsule(parts, muzzle + aim * 1.5f, muzzle + aim * 4.5f, 1.4f, Part.Flash);
             Capsule(parts, muzzle + aim * 2.5f + Dir(arm.Lower + 90f) * 2f,
@@ -216,9 +221,11 @@ public static class CharacterRig
     // The torso is a capsule along the spine; the shirt and tie are the
     // pixels near its front edge in the upper chest, measured in spine
     // space so they lean with the body.
-    private static void DrawTorso(Part[] parts, Vector2 hip, Vector2 shoulder, Vector2 up, Vector2 front)
+    private static void DrawTorso(Part[] parts, Vector2 hip, Vector2 shoulder, Vector2 up, Vector2 front, bool shirt)
     {
         Capsule(parts, hip + up * 0.8f, shoulder - up * 1.2f, 3.5f, Part.Torso);
+        if (!shirt)
+            return;
         Vector2 down = -up;
         Vector2 neck = shoulder + down * 0.5f;
         ForEachPixel(neck - new Vector2(6, 6), neck + new Vector2(6, 10), (x, y, center) =>

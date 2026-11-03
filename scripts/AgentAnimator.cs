@@ -3,7 +3,7 @@ using Godot;
 
 namespace HackerOrSoldier;
 
-// Picks which agent frame shows from the movement state. AgentPoses holds
+// Picks which agent frame shows from the movement state. BodyPoses holds
 // the motion and CharacterRig draws it; this class only keeps the clocks.
 // Locomotion and shooting are separate layers: the gun pose replaces the
 // arms while the legs keep running, jumping or treading water under it.
@@ -11,14 +11,14 @@ public sealed class AgentAnimator
 {
     // Every distinct pose the animator can reach; the smoke test builds them
     // all so a broken pose fails the run.
-    public static readonly string[] AllFrames = AgentPoses.All().Select(f => f.Key).Distinct().ToArray();
+    public static readonly string[] AllFrames = BodyPoses.All(BodyPoses.Agent).Select(f => f.Key).Distinct().ToArray();
 
     private const float IdleFrameTime = 0.35f;   // one breath per 1.4s
     private const float SwimFrameTime = 0.1f;
     private const float FallFrameTime = 0.09f;   // arm windmill
     private const float LandFrameTime = 0.05f;
     private const float DieFrameTime = 0.055f;
-    private const float RunFrameStride = 6f;     // px travelled per run frame
+    private const float RunFrameStride = 7f;     // px travelled per run frame
     private const float FlashTime = 0.05f;
     private const float RecoilTime = 0.11f;
     private const float ShootPoseTime = 0.24f;
@@ -29,16 +29,16 @@ public sealed class AgentAnimator
     private const float WindmillSpeed = 160f;
     private const float MinAirTimeForLanding = 0.2f;
 
-    private static float LandTime => AgentPoses.FrameCounts[AgentClip.Land] * LandFrameTime;
+    private static float LandTime => BodyPoses.FrameCounts[BodyClip.Land] * LandFrameTime;
 
     private readonly Sprite2D _sprite;
-    private AgentClip _clip = AgentClip.Idle;
+    private BodyClip _clip = BodyClip.Idle;
     private float _phase;
     private float _shootTime;
     private float _airTime;
     private float _landTime;
     private bool _dying;
-    private AgentFrame? _frame;
+    private BodyFrame? _frame;
 
     // Pose currently on screen; the smoke test asserts against it.
     public string Frame => _frame?.Key;
@@ -59,7 +59,7 @@ public sealed class AgentAnimator
 
     public void Reset()
     {
-        _clip = AgentClip.Idle;
+        _clip = BodyClip.Idle;
         _phase = 0f;
         _shootTime = 0f;
         _airTime = 0f;
@@ -76,8 +76,8 @@ public sealed class AgentAnimator
         if (_dying)
         {
             _phase += dt;
-            int last = AgentPoses.FrameCounts[AgentClip.Die] - 1;
-            Show(new AgentFrame(AgentClip.Die, Mathf.Min((int)(_phase / DieFrameTime), last), Left: left));
+            int last = BodyPoses.FrameCounts[BodyClip.Die] - 1;
+            Show(new BodyFrame(BodyPoses.Agent, BodyClip.Die, Mathf.Min((int)(_phase / DieFrameTime), last), Left: left));
             return;
         }
 
@@ -92,22 +92,22 @@ public sealed class AgentAnimator
         }
         // The run advances on distance travelled so the feet never slide,
         // whatever the speed; the rest run on the clock.
-        _phase += clip == AgentClip.Run ? Mathf.Abs(velocity.X) * dt : dt;
+        _phase += clip == BodyClip.Run ? Mathf.Abs(velocity.X) * dt : dt;
 
-        int count = AgentPoses.FrameCounts[clip];
+        int count = BodyPoses.FrameCounts[clip];
         int index = clip switch
         {
-            AgentClip.Run => Cycle(RunFrameStride, count),
-            AgentClip.Idle => Cycle(IdleFrameTime, count),
-            AgentClip.Swim => Cycle(SwimFrameTime, count),
+            BodyClip.Run => Cycle(RunFrameStride, count),
+            BodyClip.Idle => Cycle(IdleFrameTime, count),
+            BodyClip.Swim => Cycle(SwimFrameTime, count),
             // Jump frames track vertical speed, so the tuck is timed by the
             // jump itself: take-off at full speed, the last frame at the apex.
-            AgentClip.Jump => Mathf.Clamp((int)((1f + velocity.Y / TakeOffSpeed) * count), 0, count - 1),
-            AgentClip.Fall => velocity.Y < WindmillSpeed ? 0 : 1 + (int)(_phase / FallFrameTime) % (count - 1),
-            AgentClip.Land => Mathf.Min((int)((LandTime - _landTime) / LandFrameTime), count - 1),
+            BodyClip.Jump => Mathf.Clamp((int)((1f + velocity.Y / TakeOffSpeed) * count), 0, count - 1),
+            BodyClip.Fall => velocity.Y < WindmillSpeed ? 0 : 1 + (int)(_phase / FallFrameTime) % (count - 1),
+            BodyClip.Land => Mathf.Min((int)((LandTime - _landTime) / LandFrameTime), count - 1),
             _ => 0,
         };
-        Show(new AgentFrame(clip, index, CurrentShot(), left));
+        Show(new BodyFrame(BodyPoses.Agent, clip, index, CurrentShot(), left));
     }
 
     private int Cycle(float step, int count)
@@ -126,15 +126,15 @@ public sealed class AgentAnimator
         _airTime = onFloor || submerged ? 0f : _airTime + dt;
     }
 
-    private AgentClip SelectClip(Vector2 velocity, bool onFloor, bool submerged)
+    private BodyClip SelectClip(Vector2 velocity, bool onFloor, bool submerged)
     {
         if (submerged)
-            return AgentClip.Swim;
+            return BodyClip.Swim;
         if (!onFloor)
-            return velocity.Y < 0f ? AgentClip.Jump : AgentClip.Fall;
+            return velocity.Y < 0f ? BodyClip.Jump : BodyClip.Fall;
         if (Mathf.Abs(velocity.X) > 1f)
-            return AgentClip.Run;
-        return _landTime > 0f ? AgentClip.Land : AgentClip.Idle;
+            return BodyClip.Run;
+        return _landTime > 0f ? BodyClip.Land : BodyClip.Idle;
     }
 
     private Shot CurrentShot()
@@ -145,11 +145,11 @@ public sealed class AgentAnimator
         return elapsed < FlashTime ? Shot.Fire : elapsed < RecoilTime ? Shot.Recoil : Shot.Aim;
     }
 
-    private void Show(AgentFrame frame)
+    private void Show(BodyFrame frame)
     {
         if (frame == _frame)
             return;
         _frame = frame;
-        _sprite.Texture = AgentPoses.Texture(frame);
+        _sprite.Texture = BodyPoses.Texture(frame);
     }
 }

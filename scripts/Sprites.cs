@@ -6,7 +6,7 @@ namespace HackerOrSoldier;
 // Runtime-generated pixel art for every object, in the README's aesthetic:
 // stark saturated VGA-style colors. Maps are authored at 16x16 and finished
 // at native 32x32 by PixelArt (EPX doubling, edge lighting, outline). The
-// agent is not a map: AgentPoses draws it from a skeleton. '.' is
+// agent is not a map: BodyPoses draws it from a skeleton. '.' is
 // transparent; 'X'/'x' are slots replaced by the door/key color variant.
 public static class Sprites
 {
@@ -47,7 +47,7 @@ public static class Sprites
         if (Cache.TryGetValue(cacheKey, out var cached))
             return cached;
         if (!Maps.TryGetValue(key, out var map))
-            return AgentPoses.Find(key) is AgentFrame frame ? AgentPoses.Texture(frame) : null;
+            return BodyPoses.Find(key) is BodyFrame frame ? BodyPoses.Texture(frame) : null;
         var slot = colorName != null ? ObjectDefs.KeyColor(colorName) : Colors.Magenta;
         var texture = ImageTexture.CreateFromImage(FromMap(key, map.Rows, map.Scale, slot));
         Cache[cacheKey] = texture;
@@ -121,202 +121,6 @@ public static class Sprites
 
     private static readonly Dictionary<string, SpriteMap> Maps = new()
     {
-        // Enemy animation set (see EnemyAnimator for the timing). Same
-        // profile treatment as the agent: everything faces right and flips
-        // with the walk direction, so an enemy visibly looks where it is
-        // heading. The five bipeds share one 16x16 skeleton and differ only
-        // by palette, which keeps the soldier degradation chain reading as
-        // the same trooper losing armour.
-        [EnemyDefs.Fighter] = new(new[]
-        {
-            "................",
-            ".....hhhhh......",
-            "....hhhhhhh.....",
-            "....hhssss......",
-            "....hhssks......",
-            "....hhsssss.....",
-            ".....hsss.......",
-            "....ooooooo.....",
-            "....ooooooo.....",
-            "....ooooooo.....",
-            "....oooooss.....",
-            "....oooooosss...",
-            "....kkdddd......",
-            "...kk....dd.....",
-            "..kk......dd....",
-            "..kkkk...kkkk...",
-        }),
-        ["fighter_walk"] = new(new[]
-        {
-            "................",
-            ".....hhhhh......",
-            "....hhhhhhh.....",
-            "....hhssss......",
-            "....hhssks......",
-            "....hhsssss.....",
-            ".....hsss.......",
-            "....ooooooo.....",
-            "....ooooooo.....",
-            "....ooooooo.....",
-            "...ssoooooo.....",
-            "..sssoooooo.....",
-            "....kdddd.......",
-            "....kdddd.......",
-            "....kdddd.......",
-            "...kkkkkkkk.....",
-        }),
-        [EnemyDefs.Soldier] = new(new[]
-        {
-            "................",
-            ".....EEEEE......",
-            "....EEEEEEE.....",
-            "....EEssss......",
-            "....EEssks......",
-            "....EEsssss.....",
-            ".....Esss.......",
-            "....eeeeeee.....",
-            "....eeeeedd.....",
-            "....eeeeeee.....",
-            "....eeeeeee.....",
-            "....eeeeeeees...",
-            "....EEeeee......",
-            "...EE....ee.....",
-            "..EE......ee....",
-            "..kkkk...kkkk...",
-        }),
-        ["soldier_walk"] = new(new[]
-        {
-            "................",
-            ".....EEEEE......",
-            "....EEEEEEE.....",
-            "....EEssss......",
-            "....EEssks......",
-            "....EEsssss.....",
-            ".....Esss.......",
-            "....eeeeeee.....",
-            "....eeeeedd.....",
-            "....eeeeeee.....",
-            "...eeeeeeee.....",
-            "..seeeeeeee.....",
-            "....Eeeee.......",
-            "....Eeeee.......",
-            "....Eeeee.......",
-            "...kkkkkkkk.....",
-        }),
-        ["soldier_fire"] = new(new[]
-        {
-            "................",
-            ".....EEEEE......",
-            "....EEEEEEE.....",
-            "....EEssss......",
-            "....EEssks......",
-            "....EEsssss.....",
-            ".....Esss.......",
-            "....eeeeeeeeesgo",
-            "....eeeeedd...gy",
-            "....eeeeeee.....",
-            "....eeeeeee.....",
-            "....eesseee.....",
-            "....EEeeee......",
-            "....EE..ee......",
-            "...EE....ee.....",
-            "..kkkk...kkkk...",
-        }),
-        [EnemyDefs.SuperSoldier] = new(new[]
-        {
-            "................",
-            ".....vvvvv......",
-            "....vvvvvvv.....",
-            "....vvvvvv......",
-            "....vvcccc......",
-            "....vvvvvvv.....",
-            ".....vvvv.......",
-            "....vvvvvvv.....",
-            "....vvvvvVV.....",
-            "....vvvvvvv.....",
-            "....vvvvvvv.....",
-            "....vvvvvvvvv...",
-            "....VVvvvv......",
-            "...VV....vv.....",
-            "..VV......vv....",
-            "..kkkk...kkkk...",
-        }),
-        ["super_soldier_walk"] = new(new[]
-        {
-            "................",
-            ".....vvvvv......",
-            "....vvvvvvv.....",
-            "....vvvvvv......",
-            "....vvcccc......",
-            "....vvvvvvv.....",
-            ".....vvvv.......",
-            "....vvvvvvv.....",
-            "....vvvvvVV.....",
-            "....vvvvvvv.....",
-            "...vvvvvvvv.....",
-            "..vvvvvvvvv.....",
-            "....Vvvvv.......",
-            "....Vvvvv.......",
-            "....Vvvvv.......",
-            "...kkkkkkkk.....",
-        }),
-        ["super_soldier_fire"] = new(new[]
-        {
-            "................",
-            ".....vvvvv......",
-            "....vvvvvvv.....",
-            "....vvvvvv......",
-            "....vvcccc......",
-            "....vvvvvvv.....",
-            ".....vvvv.......",
-            "....vvvvvvvvvvlo",
-            "....vvvvvVV...ly",
-            "....vvvvvvv.....",
-            "....vvvvvvv.....",
-            "....vvvvvvv.....",
-            "....VVvvvv......",
-            "....VV..vv......",
-            "...VV....vv.....",
-            "..kkkk...kkkk...",
-        }),
-        [EnemyDefs.UltimateSoldier] = new(new[]
-        {
-            "................",
-            ".....ppppp......",
-            "....ppppppp.....",
-            "....pppppp......",
-            "....ppmmmm......",
-            "....ppppppp.....",
-            ".....pppp.......",
-            "....ppppppp.....",
-            "....pppppmm.....",
-            "....ppppppp.....",
-            "....pppppPP.....",
-            "....ppppppPPP...",
-            "....PPpppp......",
-            "...PP....pp.....",
-            "..PP......pp....",
-            "..kkkk...kkkk...",
-        }),
-        ["ultimate_soldier_walk"] = new(new[]
-        {
-            "................",
-            ".....ppppp......",
-            "....ppppppp.....",
-            "....pppppp......",
-            "....ppmmmm......",
-            "....ppppppp.....",
-            ".....pppp.......",
-            "....ppppppp.....",
-            "....pppppmm.....",
-            "....ppppppp.....",
-            "...PPpppppp.....",
-            "..PPPpppppp.....",
-            "....Ppppp.......",
-            "....Ppppp.......",
-            "....Ppppp.......",
-            "...kkkkkkkk.....",
-        }),
         [EnemyDefs.Drone] = new(new[]
         {
             "................",
