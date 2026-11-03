@@ -25,7 +25,7 @@ public partial class Editor : Node2D
     private readonly List<LevelData> _redo = new();
     private bool _strokeOpen;
 
-    private Sprite2D _sky;
+    private SkyBackdrop _sky;
     private TileMapLayer _grid;
     private TileMapLayer _hiddenGrid;
     private Node2D _markers;
@@ -108,7 +108,7 @@ public partial class Editor : Node2D
         _menu = BuildMenu();
         _agentScene = GD.Load<PackedScene>("res://scenes/agent.tscn");
 
-        _sky = new Sprite2D();
+        _sky = new SkyBackdrop();
         AddChild(_sky);   // behind the grids: empty cells show the sky
 
         _grid = new TileMapLayer { TileSet = TileSetBuilder.Build() };
@@ -423,7 +423,7 @@ public partial class Editor : Node2D
 
     private void RedrawLevel()
     {
-        LevelGrids.UpdateSky(_sky, _level);
+        _sky.Apply(_level);
         if (_skyButton != null)
             _skyButton.Text = MenuLabel(_level.Sky == "day" ? "Sky: Day" : "Sky: Night",
                 Array.Find(_menu, m => m.Name == SkyItem).Key);

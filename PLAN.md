@@ -209,14 +209,19 @@ Known simplifications (tuning constants, not README rules):
 
 ### Outdoor sky
 - Cells with no tile are the outdoors: a per-level sky fills the whole
-  level rect behind the tile layers (repeating Sprite2D under the grids in
+  level rect behind the tile layers (SkyBackdrop under the grids in
   both the editor and the campaign scene). Painted background tiles cover
   the sky per cell, so they read as indoor walls in front of it
 - The sky is a level property ("night" or "day", default night), toggled
   with a toolbar button in the editor and saved in the level JSON; old
   levels without the field load as night
 - New "Day sky" paintable tile (blue with dithered cloud dashes and haze)
-  next to the night one; the sky itself reuses these tile textures
+  next to the night one
+- The sky is animated by a pixel-art canvas shader (SkyBackdrop): stars
+  step in one palette shade at a time, twinkle, step out and respawn
+  elsewhere; night wisps and two depths of day clouds drift right, swell
+  in through a Bayer dither and dissolve the same way. Every cycle length
+  divides Godot's 3600 s TIME rollover so the sky never pops when it wraps
 - Smoke test: default is night, the toggle flips to day, and the choice
   round-trips through save/load (negative-verified with a no-op toggle)
 
