@@ -424,7 +424,7 @@ public static class TileSetBuilder
         {
             int seed = 70 + slab;
             DrawBlock(img, new Rect2I(0, slab * 16, 32, 16), ConcreteRamp, seed, wear: 0.06f,
-                tint: (x, y) => Smooth(x, y, 8, seed) > 0.66f ? -0.5f : 0f);
+                tint: (x, y) => Smooth(x, y, 8, seed) > 0.74f ? -0.25f : 0f);
             foreach (int hx in new[] { 7, 23 })
             {
                 int hy = slab * 16 + 7;
@@ -433,8 +433,6 @@ public static class TileSetBuilder
                 img.SetPixel(hx + 1, hy + 2, ConcreteRamp[3]);
             }
         }
-        for (int i = 0; i < 9; i++)
-            Dot(img, 13 + i, 20 + (i + 1) / 3, ConcreteRamp[0]);
     }
 
     // Stacked bags in running bond: a soft cylinder shaded from a lit top
@@ -610,12 +608,15 @@ public static class TileSetBuilder
         for (int y = 0; y < TileSize; y++)
             for (int x = 0; x < TileSize; x++)
             {
-                float t = 1f + Facet(x, y) % 3 + 0.6f * (Smooth(x, y, 4, 133) - 0.5f);
+                // Background rock stays quiet: two close tones per facet and
+                // only some facet edges cracked, so it never competes with
+                // the playfield in front of it.
+                float t = 1.6f + 0.5f * (Facet(x, y) % 2) + 0.4f * (Smooth(x, y, 4, 133) - 0.5f);
                 Color c = Tone(RockRamp, t, x, y);
-                if (IsCrack(x, y) || Noise(x, y, 130) < 0.02f)
-                    c = RockRamp[0];
-                else if (IsCrack(x - 1, y - 1) || Noise(x - 1, y - 1, 130) < 0.02f)
-                    c = RockRamp[4];
+                if (IsCrack(x, y) && Smooth(x, y, 8, 134) > 0.55f || Noise(x, y, 130) < 0.01f)
+                    c = RockRamp[1];
+                else if (IsCrack(x - 1, y - 1) && Smooth(x - 1, y - 1, 8, 134) > 0.55f)
+                    c = RockRamp[3];
                 img.SetPixel(x, y, c);
             }
 
