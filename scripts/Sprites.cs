@@ -4,10 +4,10 @@ using Godot;
 namespace HackerOrSoldier;
 
 // Runtime-generated pixel art for every object, in the README's aesthetic:
-// stark saturated VGA-style colors, chunky pixels (16x16 maps upscaled 2x).
-// The agent is an original take on the classic pixel spy: black suit, white
-// shirt, red tie, shades. '.' is transparent; 'X'/'x' are slots replaced by
-// the door/key color variant.
+// stark saturated VGA-style colors. Maps are authored at 16x16 and finished
+// at native 32x32 by PixelArt (EPX doubling, edge lighting, outline). The
+// agent is not a map: AgentPoses draws it from a skeleton. '.' is
+// transparent; 'X'/'x' are slots replaced by the door/key color variant.
 public static class Sprites
 {
     private static readonly Dictionary<char, Color> Palette = new()
@@ -47,7 +47,7 @@ public static class Sprites
         if (Cache.TryGetValue(cacheKey, out var cached))
             return cached;
         if (!Maps.TryGetValue(key, out var map))
-            return null;
+            return AgentPoses.Find(key) is AgentFrame frame ? AgentPoses.Texture(frame) : null;
         var slot = colorName != null ? ObjectDefs.KeyColor(colorName) : Colors.Magenta;
         var texture = ImageTexture.CreateFromImage(FromMap(key, map.Rows, map.Scale, slot));
         Cache[cacheKey] = texture;
@@ -82,6 +82,8 @@ public static class Sprites
         if (Cache.TryGetValue(cacheKey, out var cached))
             return cached;
         var img = ForObject(type, colorName).GetImage();
+        int side = Mathf.Min(img.GetWidth(), img.GetHeight());
+        img = img.GetRegion(new Rect2I((img.GetWidth() - side) / 2, img.GetHeight() - side, side, side));
         img.Resize(16, 16, Image.Interpolation.Nearest);
         var texture = ImageTexture.CreateFromImage(img);
         Cache[cacheKey] = texture;
@@ -91,7 +93,7 @@ public static class Sprites
     private static Image FromMap(string key, string[] rows, int scale, Color slot)
     {
         int width = rows[0].Length;
-        var img = Image.CreateEmpty(width * scale, rows.Length * scale, false, Image.Format.Rgba8);
+        var img = Image.CreateEmpty(width, rows.Length, false, Image.Format.Rgba8);
         for (int y = 0; y < rows.Length; y++)
         {
             if (rows[y].Length != width)
@@ -109,321 +111,16 @@ public static class Sprites
                         ? c
                         : throw new System.Exception($"sprite '{key}' has unknown char '{ch}'"),
                 };
-                img.FillRect(new Rect2I(x * scale, y * scale, scale, scale), color);
+                img.SetPixel(x, y, color);
             }
         }
-        return img;
+        return PixelArt.Finish(img, upscale: scale == 2);
     }
 
     private record SpriteMap(string[] Rows, int Scale = 2);
 
     private static readonly Dictionary<string, SpriteMap> Maps = new()
     {
-        // Agent animation set (see AgentAnimator for the timing). Every pose
-        // is drawn in profile facing right - hair mass at the back, shades
-        // band and nose bump at the front, shoe toes pointing forward - so
-        // the agent visibly looks where it is heading once FlipH mirrors it
-        // for the other direction. The white collar and red tie stay on the
-        // same two rows in every frame so the suit never flickers.
-        // "agent" doubles as idle frame 0, so editor markers and palette
-        // icons keep showing the neutral standing pose.
-        ["agent"] = new(new[]
-        {
-            "................",
-            ".....hhhhh......",
-            "....hhhhhhh.....",
-            "....hhssss......",
-            "....hhkkkk......",
-            "....hhsssss.....",
-            ".....hsss.......",
-            "....kkkkkkk.....",
-            "....kkkkkww.....",
-            "....kkkkkrw.....",
-            "....kkddkkk.....",
-            "....kksskkk.....",
-            "....kdddd.......",
-            "....kdddd.......",
-            "....kdddd.......",
-            "...kkkkkkkk.....",
-        }),
-        // Idle frame 1: head and torso settle one pixel - a slow breath.
-        ["agent_breathe"] = new(new[]
-        {
-            "................",
-            "................",
-            ".....hhhhh......",
-            "....hhhhhhh.....",
-            "....hhssss......",
-            "....hhkkkk......",
-            "....hhsssss.....",
-            ".....hsss.......",
-            "....kkkkkkk.....",
-            "....kkkkkww.....",
-            "....kkkkkrw.....",
-            "....kkddkkk.....",
-            "....kksskkk.....",
-            "....kdddd.......",
-            "....kdddd.......",
-            "...kkkkkkkk.....",
-        }),
-        // Four-frame run. The head leans a pixel into the direction of
-        // travel, the near arm swings forward / neutral / back, and the near
-        // leg is dark grey against the black far leg so the two contact
-        // frames read as opposite strides. The pass frames sit a pixel
-        // higher, which gives the bob.
-        ["agent_run0"] = new(new[]
-        {
-            "................",
-            "......hhhhh.....",
-            ".....hhhhhhh....",
-            ".....hhssss.....",
-            ".....hhkkkk.....",
-            ".....hhsssss....",
-            "......hsss......",
-            "....kkkkkkk.....",
-            "....kkkkkww.....",
-            "....kkkkkrw.....",
-            "....kkkkkdd.....",
-            "....kkkkkkdds...",
-            "....kkdddd......",
-            "...kk....dd.....",
-            "..kk......dd....",
-            "..kkkk...kkkk...",
-        }),
-        ["agent_run1"] = new(new[]
-        {
-            "......hhhhh.....",
-            ".....hhhhhhh....",
-            ".....hhssss.....",
-            ".....hhkkkk.....",
-            ".....hhsssss....",
-            "......hsss......",
-            "....kkkkkkk.....",
-            "....kkkkkww.....",
-            "....kkkkkrw.....",
-            "....kkddkkk.....",
-            "....kksskkk.....",
-            "....kkkddd......",
-            "....kk..dd......",
-            "....kk..dd......",
-            "...kkkk..kkk....",
-            "................",
-        }),
-        ["agent_run2"] = new(new[]
-        {
-            "................",
-            "......hhhhh.....",
-            ".....hhhhhhh....",
-            ".....hhssss.....",
-            ".....hhkkkk.....",
-            ".....hhsssss....",
-            "......hsss......",
-            "....kkkkkkk.....",
-            "....kkkkkww.....",
-            "....kkkkkrw.....",
-            "...ddkkkkkk.....",
-            "..sddkkkkkk.....",
-            "....ddddkk......",
-            "...dd....kk.....",
-            "..dd......kk....",
-            "..kkkk...kkkk...",
-        }),
-        ["agent_run3"] = new(new[]
-        {
-            "......hhhhh.....",
-            ".....hhhhhhh....",
-            ".....hhssss.....",
-            ".....hhkkkk.....",
-            ".....hhsssss....",
-            "......hsss......",
-            "....kkkkkkk.....",
-            "....kkkkkww.....",
-            "....kkkkkrw.....",
-            "....kkddkkk.....",
-            "....kksskkk.....",
-            "....dddkkk......",
-            "....dd..kk......",
-            "....dd..kk......",
-            "...kkkk..kkk....",
-            "................",
-        }),
-        // Rising: lead arm thrown up and forward, trailing arm behind,
-        // both feet off the ground and split fore and aft.
-        ["agent_jump"] = new(new[]
-        {
-            "................",
-            "......hhhhh.....",
-            ".....hhhhhhh....",
-            ".....hhssss.....",
-            ".....hhkkkk.....",
-            ".....hhsssss..s.",
-            "......hsss...d..",
-            "....kkkkkkkdd...",
-            "....kkkkkww.....",
-            "...ddkkkkkrw....",
-            "..sddkkkkkk.....",
-            "....kkkkkkk.....",
-            "...kkkdddd......",
-            "..kk.....ddd....",
-            ".kkkk.....kkk...",
-            "................",
-        }),
-        // Falling: both arms flung out fore and aft, legs braced for the
-        // landing.
-        ["agent_fall"] = new(new[]
-        {
-            "................",
-            ".....hhhhh......",
-            "....hhhhhhh.....",
-            "....hhssss......",
-            "....hhkkkk......",
-            "....hhsssss.....",
-            ".....hsss.......",
-            "....kkkkkkk.....",
-            "....kkkkkww.....",
-            ".sddkkkkkrwdds..",
-            "....kkkkkkk.....",
-            "....kkkkkkk.....",
-            "....kkdddd......",
-            "...kk....dd.....",
-            "..kk......dd....",
-            ".kkkk....kkkk...",
-        }),
-        // Shooting: lead arm punched straight out with the pistol, feet
-        // braced. The muzzle flash burns off the barrel on the fire frame.
-        ["agent_aim"] = new(new[]
-        {
-            "................",
-            ".....hhhhh......",
-            "....hhhhhhh.....",
-            "....hhssss......",
-            "....hhkkkk......",
-            "....hhsssss.....",
-            ".....hsss.......",
-            "....kkkkkkkddsgg",
-            "....kkkkkww...g.",
-            "....kkkkkrw.....",
-            "....kkddkkk.....",
-            "....kksskkk.....",
-            "....kkdddd......",
-            "....kk..dd......",
-            "...kk....dd.....",
-            "..kkkk...kkkk...",
-        }),
-        ["agent_fire"] = new(new[]
-        {
-            "................",
-            ".....hhhhh......",
-            "....hhhhhhh.....",
-            "....hhssss......",
-            "....hhkkkk......",
-            "....hhsssss.....",
-            ".....hsss......y",
-            "....kkkkkkkddsgo",
-            "....kkkkkww...gy",
-            "....kkkkkrw.....",
-            "....kkddkkk.....",
-            "....kksskkk.....",
-            "....kkdddd......",
-            "....kk..dd......",
-            "...kk....dd.....",
-            "..kkkk...kkkk...",
-        }),
-        // Death, in four beats: struck, buckling, down on the backside, flat.
-        // This is the one set that lets the collar and tie leave their fixed
-        // rows - the body is on its way to the floor, so the whole silhouette
-        // has to travel down the frame. The head keeps its profile all the
-        // way, so the agent still reads as facing the way it was hit.
-        // Struck: chin snapped up, both arms flung wide, the whole body a row
-        // taller than it stands and clear of the floor - knocked off his feet.
-        ["agent_hit"] = new(new[]
-        {
-            "....hhhhh.......",
-            "...hhhhhhh......",
-            "...hhssss.......",
-            "...hhkkkk.......",
-            "..s.hsssss..s...",
-            "..d...hsss.d....",
-            "...ddkkkkkdd....",
-            "....kkkkkww.....",
-            "....kkkkkrw.....",
-            "....kkkkkkk.....",
-            "....kkkkkkk.....",
-            "....kkdddd......",
-            "...kk...dd......",
-            "..kk.....dd.....",
-            "..kkkk...kkkk...",
-            "................",
-        }),
-        // Buckling: the whole figure sinks two rows, knees give way, arms
-        // drop out to the sides.
-        ["agent_die0"] = new(new[]
-        {
-            "................",
-            "................",
-            "................",
-            "....hhhhh.......",
-            "...hhhhhhh......",
-            "...hhssss.......",
-            "...hhkkkk.......",
-            "...hhsssss......",
-            "....hsss........",
-            "...kkkkkkk......",
-            "...kkkkkww......",
-            "..skkkkkrw.s....",
-            "..dkkkkkkkkd....",
-            "...kkdddd.......",
-            "..kkk....dd.....",
-            ".kkkk....kkkk...",
-        }),
-        // Down: sat back on the floor, one arm still out behind, legs run
-        // along the ground in front instead of standing under the body.
-        ["agent_die1"] = new(new[]
-        {
-            "................",
-            "................",
-            "................",
-            "................",
-            "................",
-            "...hhhhh........",
-            "..hhhhhhh.......",
-            "..hhssss........",
-            "..hhkkkk........",
-            "..hhsssss.......",
-            "...hsss.........",
-            ".s.kkkkkkk......",
-            ".d.kkkkkww......",
-            "..dkkkkkrw......",
-            "...kkkkkkddddd..",
-            "...kkkkkddkkkk..",
-        }),
-        // Flat: the body lying along the floor line, head to the back, one
-        // arm still up. Held until the respawn.
-        ["agent_dead"] = new(new[]
-        {
-            "................",
-            "................",
-            "................",
-            "................",
-            "................",
-            "................",
-            "................",
-            "................",
-            "................",
-            "................",
-            "................",
-            "..........s.....",
-            ".........d......",
-            ".hhhkkkwkkkkk...",
-            ".hhhssskrkkkddd.",
-            "..hhkkkkkkkkkkk.",
-        }),
-        // Enemy animation set (see EnemyAnimator for the timing). Same
-        // profile treatment as the agent: everything faces right and flips
-        // with the walk direction, so an enemy visibly looks where it is
-        // heading. The five bipeds share one 16x16 skeleton and differ only
-        // by palette, which keeps the soldier degradation chain reading as
-        // the same trooper losing armour.
         // Enemy animation set (see EnemyAnimator for the timing). Same
         // profile treatment as the agent: everything faces right and flips
         // with the walk direction, so an enemy visibly looks where it is

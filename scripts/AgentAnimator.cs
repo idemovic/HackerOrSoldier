@@ -3,67 +3,52 @@ using Godot;
 
 namespace HackerOrSoldier;
 
-// Agent animation in the DOS platformer idiom: a handful of hand-authored
-// poses swapped on a coarse clock, no tweening and no in-between frames.
-// Sprites.cs holds the pixel maps, this class only decides which one shows.
+// Picks which agent frame shows from the movement state. AgentPoses holds
+// the motion and CharacterRig draws it; this class only keeps the clocks.
+// Locomotion and shooting are separate layers: the gun pose replaces the
+// arms while the legs keep running, jumping or treading water under it.
 public sealed class AgentAnimator
 {
-    // "agent" doubles as idle frame 0, so the editor marker and the palette
-    // icon keep showing the neutral standing pose.
-    private static readonly string[] IdleFrames = { "agent", "agent_breathe" };
-    private static readonly string[] RunFrames =
-        { "agent_run0", "agent_run1", "agent_run2", "agent_run3" };
-    private static readonly string[] JumpFrames = { "agent_jump" };
-    private static readonly string[] FallFrames = { "agent_fall" };
-    // The flash burns for one beat, then the aim pose holds for two.
-    private static readonly string[] ShootFrames = { "agent_fire", "agent_aim", "agent_aim" };
-    // Struck, buckling, down, flat. Plays once and stops on the last pose.
-    private static readonly string[] DeathFrames =
-        { "agent_hit", "agent_die0", "agent_die1", "agent_dead" };
+    // Every distinct pose the animator can reach; the smoke test builds them
+    // all so a broken pose fails the run.
+    public static readonly string[] AllFrames = AgentPoses.All().Select(f => f.Key).Distinct().ToArray();
 
-    // Every distinct frame the animator can reach; the smoke test builds them
-    // all so a malformed pixel map fails the run.
-    public static readonly string[] AllFrames = IdleFrames
-        .Concat(RunFrames).Concat(JumpFrames).Concat(FallFrames).Concat(ShootFrames)
-        .Concat(DeathFrames)
-        .Distinct().ToArray();
+    private const float IdleFrameTime = 0.35f;   // one breath per 1.4s
+    private const float SwimFrameTime = 0.1f;
+    private const float FallFrameTime = 0.09f;   // arm windmill
+    private const float LandFrameTime = 0.05f;
+    private const float DieFrameTime = 0.055f;
+    private const float RunFrameStride = 6f;     // px travelled per run frame
+    private const float FlashTime = 0.05f;
+    private const float RecoilTime = 0.11f;
+    private const float ShootPoseTime = 0.24f;
 
-    private const float IdleFrameTime = 0.7f;    // slow breath
-    private const float SwimFrameTime = 0.18f;   // lazy paddle
-    private const float ShootFrameTime = 0.08f;
-    private const float DeathFrameTime = 0.12f;  // the crumple, one beat per pose
-    private const float RunFrameStride = 18f;    // px travelled per run frame
+    // Speeds that bracket the jump and fall frames: take-off speed down to
+    // the apex, and how fast a fall has to be before the arms windmill.
+    private const float TakeOffSpeed = 450f;
+    private const float WindmillSpeed = 160f;
+    private const float MinAirTimeForLanding = 0.2f;
 
-    // The shoot pose holds for exactly one pass over its frames.
-    private const float ShootPoseTime = 3 * ShootFrameTime;
-
-    // How long the crumple takes; the last pose holds indefinitely after it,
-    // so PlaySession is free to keep the body down for longer.
-    private static readonly float DeathTime = DeathFrames.Length * DeathFrameTime;
-
-    private enum Pose { Idle, Run, Jump, Fall, Swim, Shoot }
+    private static float LandTime => AgentPoses.FrameCounts[AgentClip.Land] * LandFrameTime;
 
     private readonly Sprite2D _sprite;
-    private Pose _pose = Pose.Idle;
+    private AgentClip _clip = AgentClip.Idle;
     private float _phase;
     private float _shootTime;
+    private float _airTime;
+    private float _landTime;
     private bool _dying;
-    private string _frame;
+    private AgentFrame? _frame;
 
-    // Sprite key currently on screen; the smoke test asserts against it.
-    public string Frame => _frame;
+    // Pose currently on screen; the smoke test asserts against it.
+    public string Frame => _frame?.Key;
 
     public AgentAnimator(Sprite2D sprite) => _sprite = sprite;
 
-    // Restarts the pose from the flash frame, so holding fire keeps flashing.
-    public void Shoot()
-    {
-        _shootTime = ShootPoseTime;
-        _pose = Pose.Shoot;
-        _phase = 0f;
-    }
+    // Restarts the gun pose from the flash, so holding fire keeps flashing.
+    public void Shoot() => _shootTime = ShootPoseTime;
 
-    // Takes over from every other pose until Reset; the session decides when
+    // Takes over from every other clip until Reset; the session decides when
     // the body gets up again.
     public void Die()
     {
@@ -74,67 +59,97 @@ public sealed class AgentAnimator
 
     public void Reset()
     {
-        _pose = Pose.Idle;
+        _clip = AgentClip.Idle;
         _phase = 0f;
         _shootTime = 0f;
+        _airTime = 0f;
+        _landTime = 0f;
         _dying = false;
     }
 
     public void Update(float dt, Vector2 velocity, bool onFloor, bool submerged, int facing)
     {
-        _sprite.FlipH = facing < 0;
+        bool left = facing < 0;
 
-        // The death cycle runs once and stops on the last pose, rather than
-        // wrapping like every other cycle: the agent stays down.
+        // The death clip runs once and holds its last pose rather than
+        // wrapping: the agent stays down.
         if (_dying)
         {
-            _phase = Mathf.Min(_phase + dt, DeathTime - 0.5f * DeathFrameTime);
-            Show(DeathFrames[(int)(_phase / DeathFrameTime)]);
+            _phase += dt;
+            int last = AgentPoses.FrameCounts[AgentClip.Die] - 1;
+            Show(new AgentFrame(AgentClip.Die, Mathf.Min((int)(_phase / DieFrameTime), last), Left: left));
             return;
         }
 
         _shootTime = Mathf.Max(_shootTime - dt, 0f);
+        TrackLanding(dt, onFloor, submerged);
 
-        var pose = SelectPose(velocity, onFloor, submerged);
-        if (pose != _pose)
+        var clip = SelectClip(velocity, onFloor, submerged);
+        if (clip != _clip)
         {
-            _pose = pose;
+            _clip = clip;
             _phase = 0f;
         }
+        // The run advances on distance travelled so the feet never slide,
+        // whatever the speed; the rest run on the clock.
+        _phase += clip == AgentClip.Run ? Mathf.Abs(velocity.X) * dt : dt;
 
-        var (frames, step) = pose switch
+        int count = AgentPoses.FrameCounts[clip];
+        int index = clip switch
         {
-            Pose.Run => (RunFrames, RunFrameStride),
-            Pose.Swim => (RunFrames, SwimFrameTime),   // the run cycle reads as paddling
-            Pose.Jump => (JumpFrames, 1f),
-            Pose.Fall => (FallFrames, 1f),
-            Pose.Shoot => (ShootFrames, ShootFrameTime),
-            _ => (IdleFrames, IdleFrameTime),
+            AgentClip.Run => Cycle(RunFrameStride, count),
+            AgentClip.Idle => Cycle(IdleFrameTime, count),
+            AgentClip.Swim => Cycle(SwimFrameTime, count),
+            // Jump frames track vertical speed, so the tuck is timed by the
+            // jump itself: take-off at full speed, the last frame at the apex.
+            AgentClip.Jump => Mathf.Clamp((int)((1f + velocity.Y / TakeOffSpeed) * count), 0, count - 1),
+            AgentClip.Fall => velocity.Y < WindmillSpeed ? 0 : 1 + (int)(_phase / FallFrameTime) % (count - 1),
+            AgentClip.Land => Mathf.Min((int)((LandTime - _landTime) / LandFrameTime), count - 1),
+            _ => 0,
         };
-
-        // The run cycle advances on distance travelled so the feet never
-        // slide, whatever the speed; every other pose runs on the clock.
-        _phase += pose == Pose.Run ? Mathf.Abs(velocity.X) * dt : dt;
-        _phase %= step * frames.Length;   // keeps the phase precise over a long session
-        Show(frames[(int)(_phase / step)]);
+        Show(new AgentFrame(clip, index, CurrentShot(), left));
     }
 
-    private Pose SelectPose(Vector2 velocity, bool onFloor, bool submerged)
+    private int Cycle(float step, int count)
     {
-        if (_shootTime > 0f)
-            return Pose.Shoot;   // the shoot pose wins over locomotion, as in the DOS originals
+        _phase %= step * count;   // keeps the phase precise over a long session
+        return (int)(_phase / step);
+    }
+
+    // A landing from a real jump or fall plays the crouch-and-rise before
+    // idle takes over; running straight on skips it.
+    private void TrackLanding(float dt, bool onFloor, bool submerged)
+    {
+        _landTime = Mathf.Max(_landTime - dt, 0f);
+        if (onFloor && _airTime >= MinAirTimeForLanding)
+            _landTime = LandTime;
+        _airTime = onFloor || submerged ? 0f : _airTime + dt;
+    }
+
+    private AgentClip SelectClip(Vector2 velocity, bool onFloor, bool submerged)
+    {
         if (submerged)
-            return Pose.Swim;
+            return AgentClip.Swim;
         if (!onFloor)
-            return velocity.Y < 0f ? Pose.Jump : Pose.Fall;
-        return Mathf.Abs(velocity.X) > 1f ? Pose.Run : Pose.Idle;
+            return velocity.Y < 0f ? AgentClip.Jump : AgentClip.Fall;
+        if (Mathf.Abs(velocity.X) > 1f)
+            return AgentClip.Run;
+        return _landTime > 0f ? AgentClip.Land : AgentClip.Idle;
     }
 
-    private void Show(string key)
+    private Shot CurrentShot()
     {
-        if (key == _frame)
+        if (_shootTime <= 0f)
+            return Shot.None;
+        float elapsed = ShootPoseTime - _shootTime;
+        return elapsed < FlashTime ? Shot.Fire : elapsed < RecoilTime ? Shot.Recoil : Shot.Aim;
+    }
+
+    private void Show(AgentFrame frame)
+    {
+        if (frame == _frame)
             return;
-        _frame = key;
-        _sprite.Texture = Sprites.Get(key);
+        _frame = frame;
+        _sprite.Texture = AgentPoses.Texture(frame);
     }
 }

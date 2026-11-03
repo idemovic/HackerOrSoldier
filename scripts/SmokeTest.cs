@@ -1162,6 +1162,10 @@ public partial class SmokeTest : Node
     // 40x40 default level.
     // The agent animator picks a pose from the movement state alone, so the
     // whole state machine is reachable by driving the normal inputs.
+    // Idle with no gun overlay: the breathing cycle and nothing else.
+    private static bool IsIdleFrame(string frame) =>
+        frame == "agent" || System.Text.RegularExpressions.Regex.IsMatch(frame ?? "", @"^agent_idle\d+$");
+
     private async Task AgentAnimationCheck()
     {
         var editor = await FreshEditor();
@@ -1169,7 +1173,7 @@ public partial class SmokeTest : Node
         var agent = editor.PlayerAgent;
 
         await Frames(4);
-        Check(agent.AnimationFrame is "agent" or "agent_breathe", "standing still shows an idle frame");
+        Check(IsIdleFrame(agent.AnimationFrame), "standing still shows an idle frame");
 
         Input.ActionPress("move_right");
         await Frames(10);
@@ -1183,9 +1187,9 @@ public partial class SmokeTest : Node
         Input.ActionPress("jump");
         await Frames(2);
         Input.ActionRelease("jump");
-        Check(agent.AnimationFrame == "agent_jump", "rising shows the jump pose");
+        Check(agent.AnimationFrame?.StartsWith("agent_jump") == true, "rising shows the jump pose");
         await Frames(30);
-        Check(agent.AnimationFrame == "agent_fall", "falling shows the fall pose");
+        Check(agent.AnimationFrame?.StartsWith("agent_fall") == true, "falling shows the fall pose");
 
         await Frames(40);   // land before shooting
 
@@ -1200,11 +1204,11 @@ public partial class SmokeTest : Node
             seen[i] = agent.AnimationFrame;
         }
         Input.ActionRelease("shoot");
-        int flash = System.Array.IndexOf(seen, "agent_fire");
-        int aim = System.Array.IndexOf(seen, "agent_aim");
+        int flash = System.Array.FindIndex(seen, f => f?.EndsWith("_fire") == true);
+        int aim = System.Array.FindIndex(seen, f => f?.EndsWith("_aim") == true);
         Check(flash >= 0, "firing flashes the muzzle");
         Check(aim > flash, "the aim pose holds after the flash");
-        Check(seen[^1] is "agent" or "agent_breathe", "the agent returns to idle after shooting");
+        Check(IsIdleFrame(seen[^1]), "the agent returns to idle after shooting");
 
         // An empty magazine must not play the shoot pose.
         while (editor.Session.Ammo > 0)
@@ -1218,7 +1222,7 @@ public partial class SmokeTest : Node
         Input.ActionPress("shoot");
         await Frames(1);
         Input.ActionRelease("shoot");
-        Check(agent.AnimationFrame is "agent" or "agent_breathe", "shooting with no ammo stays idle");
+        Check(IsIdleFrame(agent.AnimationFrame), "shooting with no ammo stays idle");
         editor.StopPlay();
     }
 
@@ -1244,17 +1248,17 @@ public partial class SmokeTest : Node
         float fellAt = agent.Position.X;
         await Frames(6);
         Check(Mathf.Abs(agent.Position.X - fellAt) < 1f, "the body stays where it fell");
-        Check(agent.AnimationFrame is "agent_hit" or "agent_die0" or "agent_die1",
+        Check(agent.AnimationFrame?.StartsWith("agent_die") == true && agent.AnimationFrame != AgentPoses.Dead.Key,
             "the death sequence plays through its poses");
 
         await Frames(30);
-        Check(agent.AnimationFrame == "agent_dead", "the death sequence holds the final pose");
+        Check(agent.AnimationFrame == AgentPoses.Dead.Key, "the death sequence holds the final pose");
         editor.Session.AgentHit();
         Check(editor.Session.Lives == 2, "a downed agent cannot lose a second life");
 
         await Frames(60);
         Check(!agent.IsDead && agent.Position.X < 6 * 32, "the respawn follows the death sequence");
-        Check(agent.AnimationFrame is "agent" or "agent_breathe", "the respawned agent is back on its feet");
+        Check(IsIdleFrame(agent.AnimationFrame), "the respawned agent is back on its feet");
         Check(!editor.Session.GetChildren().OfType<DeathEffect>().Any(),
             "the screen effect clears with the respawn");
         editor.StopPlay();
