@@ -13,6 +13,7 @@ import argparse
 import heapq
 import json
 import math
+import re
 import struct
 import sys
 import zlib
@@ -161,7 +162,6 @@ class World:
                 if t == HIDDEN:
                     self.dyn[(x, y)] = ("goggles", True)
                 elif t == DWALL:
-                    self.dyn[(x, y)] = ("wall:%d,%d" % (x, y), False)
                     self.dwalls.add((x, y))
                 elif t in SOLID_TILES:
                     self.solid.add((x, y))
@@ -173,6 +173,27 @@ class World:
                     self.electric[(x, y)] = None
 
         markers = {}
+        # A connected destructible wall is one token, named after its first
+        # cell: per-cell tokens multiply the soldier's inventories past what
+        # the search can finish. Shooting through it costs one shot per cell
+        # of the wall in the agent's row, since the agent is one tile tall.
+        self.wall_group = {}     # cell -> (token, cells in the wall)
+        for cell in sorted(self.dwalls, key=lambda c: (c[1], c[0])):
+            if cell in self.wall_group:
+                continue
+            group, todo = set(), [cell]
+            while todo:
+                c = todo.pop()
+                if c in group:
+                    continue
+                group.add(c)
+                todo.extend(n for n in ((c[0] + 1, c[1]), (c[0] - 1, c[1]), (c[0], c[1] + 1), (c[0], c[1] - 1))
+                            if n in self.dwalls)
+            entry = ("wall:%d,%d" % cell, frozenset(group))
+            for c in group:
+                self.wall_group[c] = entry
+                self.dyn[c] = (entry[0], False)
+
         capsules = defaultdict(list)
         for obj in self.objects:
             typ, x, y = obj["type"], obj["x"], obj["y"]
@@ -646,6 +667,7 @@ class World:
 # ---- search -----------------------------------------------------------------
 
 ACTION_TIME = 0.5
+FUSE_TIME = 5.0                 # Dynamite.cs: the stick explodes 5 s after it is placed
 
 
 def center(cell):
@@ -681,7 +703,7 @@ def actions_at(world, node, inv, mode, forbid):
         if cell[1] != y or token in inv or ("switch", cell) in forbid:
             continue
         if row_clear(world, y, x, cell[0], inv):
-            acts.append((frozenset([token]), ("switch", cell, number)))
+            acts.append((frozenset([token]), ("switch", cell, number), ACTION_TIME))
     if mode != "soldier":
         return acts
     for d in (-1, 1):
@@ -689,16 +711,18 @@ def actions_at(world, node, inv, mode, forbid):
         while 0 <= cx < world.width:
             c = (cx, y)
             if world.is_solid(c, inv):
-                if c in world.dwalls and ("wall", c) not in forbid:
-                    acts.append((frozenset(["wall:%d,%d" % c]), ("wall", c)))
+                if c in world.wall_group and ("wall", c) not in forbid:
+                    token, group = world.wall_group[c]
+                    shots = sum(1 for g in group if g[1] == y)
+                    acts.append((frozenset([token]), ("wall", c), ACTION_TIME * shots))
                 break
             cx += d
     if "dynamite" in inv and ("blast", (x, y)) not in forbid:
         px, py = world.node_pos(node)
         hit = sorted(c for c in world.dwalls
-                     if "wall:%d,%d" % c not in inv and math.dist(center(c), (px, py)) <= EXPLOSION_RADIUS)
+                     if world.wall_group[c][0] not in inv and math.dist(center(c), (px, py)) <= EXPLOSION_RADIUS)
         if hit:
-            acts.append((frozenset("wall:%d,%d" % c for c in hit), ("blast", (x, y), hit)))
+            acts.append((frozenset(world.wall_group[c][0] for c in hit), ("blast", (x, y), hit), FUSE_TIME))
     return acts
 
 
@@ -773,8 +797,8 @@ def search(world, mode, forbid=frozenset()):
                     inv2 = inv2 | {token}
                     events.append(ev)
             push((dest, inv2), t + ticks / 60, ("move", trace, events))
-        for tokens, ev in actions_at(world, node, inv, mode, forbid):
-            push((node, inv | tokens), t + ACTION_TIME, ("action", [world.node_cell(node)], [ev]))
+        for tokens, ev, cost in actions_at(world, node, inv, mode, forbid):
+            push((node, inv | tokens), t + cost, ("action", [world.node_cell(node)], [ev]))
     reached = {world.node_cell(n) for n in seen}
     if goal is None:
         return Route(mode, False, reached=reached)
@@ -1016,10 +1040,9 @@ def render(world, routes, path, scale=8):
             continue
         label_cells = {}
         for i, (t, text, key) in enumerate(route.events, 1):
-            where = text[text.rfind("("):].rstrip()
+            where = tuple(int(v) for v in re.search(r"\((\d+),(\d+)\)", text).groups())
             label_cells.setdefault(where, []).append(str(i))
-        for where, labels in label_cells.items():
-            x, y = (int(v) for v in where.strip("()").split(","))
+        for (x, y), labels in label_cells.items():
             s = labels[0]
             w = 4 * len(s) * 2
             px = x * S + S // 2 - w // 2
