@@ -12,6 +12,11 @@ namespace HackerOrSoldier;
 [Flags]
 public enum ShadowMask { None = 0, Above = 1, Left = 2, Below = 4 }
 
+// Which sides of a pipe cell join a neighbouring pipe. Each combination is
+// one pre-baked tile in the atlas.
+[Flags]
+public enum PipeLinks { None = 0, Up = 1, Right = 2, Down = 4, Left = 8 }
+
 // Builds the TileSet at runtime: pixel-art 32x32 tiles in the README
 // aesthetic (VGA-style saturated colors, ordered dithering, light from the
 // top left), with a collision square on solid tiles. No binary assets.
@@ -33,17 +38,30 @@ public static class TileSetBuilder
     private const int LavaFrames = 3;
     private const int SpikeFrames = 8;
     private static readonly Vector2I WaterCoords = new(0, 2);
+    // Water under water: same row, after the surface frames.
+    private static readonly Vector2I DeepWaterCoords = new(WaterFrames, 2);
     private static readonly Vector2I LavaCoords = new(0, 3);
     private static readonly Vector2I SpikesCoords = new(0, 4);
     private const int ShadowRow = 5;
     private const int ShadowMasks = 8;
-    private const int AtlasRows = 6;
+    // Electric floor joins: column = (left neighbour is electric ? 1 : 0) |
+    // (right ? 2 : 0). Join 0, a lone tile, is the defs-row tile.
+    private const int ElectricJoinRow = 6;
+    private const int ElectricJoins = 4;
+    private static Vector2I ElectricJoinCoords(int join) => new(join, ElectricJoinRow);
+    // Pipe walls: column = the PipeLinks mask of the cell.
+    private const int PipeRow = 7;
+    private const int PipeVariants = 16;
+    // The circuit board: a Span x Span block of tiles, picked per cell.
+    private const int CircuitRow = 8;
+    private const int AtlasRows = CircuitRow + CircuitBoard.Span;
 
     // Custom data layer: every atlas tile carries the level tile id it
     // draws, so a grid cell reads back without inverting GridCoordsFor.
     public const string TileIdData = "tile_id";
 
     private static readonly Dictionary<int, ImageTexture> IconCache = new();
+    private static readonly Dictionary<int, ImageTexture> TextureCache = new();
 
     // Tone ramps, darkest first: shaded edge, dark partner, body, lit edge,
     // glint. Tone() dithers between neighbours, so a fractional index mixes
@@ -93,13 +111,31 @@ public static class TileSetBuilder
     public static Vector2I GridCoordsFor(int tileId, Vector2I cell) => tileId switch
     {
         TileDefs.BackgroundSky => NightSkyCoordsFor(cell),
+        TileDefs.BackgroundCircuit => CircuitCoordsFor(cell),
         TileDefs.Water => WaterCoords,
         TileDefs.Lava => LavaCoords,
         TileDefs.Spikes => SpikesCoords,
         _ => AtlasCoordsFor(tileId),
     };
 
+    // Only the top cell of a water column draws the surface; the cells
+    // under it continue the body without foam.
+    public static Vector2I WaterCoordsFor(bool waterAbove) => waterAbove ? DeepWaterCoords : WaterCoords;
+
     public static Vector2I ShadowCoordsFor(ShadowMask mask) => new((int)mask, ShadowRow);
+
+    public static Vector2I PipeCoordsFor(PipeLinks links) => new((int)links, PipeRow);
+
+    public static Vector2I CircuitCoordsFor(Vector2I cell) => new(
+        Mathf.PosMod(cell.X, CircuitBoard.Span), CircuitRow + Mathf.PosMod(cell.Y, CircuitBoard.Span));
+
+    // An electric floor cell joined to its electric neighbours: one arc runs
+    // through a whole run, with electrodes only at its two ends.
+    public static Vector2I ElectricFloorCoordsFor(bool joinLeft, bool joinRight)
+    {
+        int join = (joinLeft ? 1 : 0) | (joinRight ? 2 : 0);
+        return join == 0 ? AtlasCoordsFor(TileDefs.ElectricFloor) : ElectricJoinCoords(join);
+    }
 
     public static Image AtlasImage()
     {
@@ -113,13 +149,28 @@ public static class TileSetBuilder
         for (int v = 1; v < SkyVariants; v++)
             Put(BuildNightSkyImage(v), v - 1, 1);
         for (int f = 0; f < WaterFrames; f++)
-            Put(BuildWaterImage(f), f, WaterCoords.Y);
+        {
+            Put(BuildWaterImage(f, surface: true), WaterCoords.X + f, WaterCoords.Y);
+            Put(BuildWaterImage(f, surface: false), DeepWaterCoords.X + f, DeepWaterCoords.Y);
+        }
         for (int f = 0; f < LavaFrames; f++)
             Put(BuildLavaImage(f), f, LavaCoords.Y);
         for (int f = 0; f < SpikeFrames; f++)
             Put(BuildSpikesImage(f), f, SpikesCoords.Y);
         for (int m = 1; m < ShadowMasks; m++)
             Put(BuildShadowImage((ShadowMask)m), m, ShadowRow);
+        for (int join = 1; join < ElectricJoins; join++)
+        {
+            var tile = Image.CreateEmpty(TileSize, TileSize, false, Image.Format.Rgba8);
+            DrawElectricFloor(tile, joinLeft: (join & 1) != 0, joinRight: (join & 2) != 0);
+            var at = ElectricJoinCoords(join);
+            Put(tile, at.X, at.Y);
+        }
+        for (int l = 0; l < PipeVariants; l++)
+            Put(BuildPipeImage((PipeLinks)l), l, PipeRow);
+        for (int y = 0; y < CircuitBoard.Span; y++)
+            for (int x = 0; x < CircuitBoard.Span; x++)
+                Put(CircuitBoard.Tile(x, y), x, CircuitRow + y);
         return image;
     }
 
@@ -157,22 +208,32 @@ public static class TileSetBuilder
 
         float half = TileSize / 2f;
         var square = new Vector2[] { new(-half, -half), new(half, -half), new(half, half), new(-half, half) };
+        void Solid(TileData data)
+        {
+            data.AddCollisionPolygon(0);
+            data.SetCollisionPolygonPoints(0, 0, square);
+        }
         for (int i = 0; i < defs.Length; i++)
         {
             var data = Create(new Vector2I(i, 0), defs[i].Id);
             if (defs[i].Solid)
-            {
-                data.AddCollisionPolygon(0);
-                data.SetCollisionPolygonPoints(0, 0, square);
-            }
+                Solid(data);
         }
         for (int v = 1; v < SkyVariants; v++)
             Create(new Vector2I(v - 1, 1), TileDefs.BackgroundSky);
         Animated(WaterCoords, TileDefs.Water, WaterFrames, 0.25f);
+        Animated(DeepWaterCoords, TileDefs.Water, WaterFrames, 0.25f);
         Animated(LavaCoords, TileDefs.Lava, LavaFrames, 0.3f);
         Animated(SpikesCoords, TileDefs.Spikes, SpikeFrames, 0.2f);
         for (int m = 1; m < ShadowMasks; m++)
             Create(ShadowCoordsFor((ShadowMask)m), TileDefs.Empty);
+        for (int join = 1; join < ElectricJoins; join++)
+            Solid(Create(ElectricJoinCoords(join), TileDefs.ElectricFloor));
+        for (int l = 0; l < PipeVariants; l++)
+            Solid(Create(PipeCoordsFor((PipeLinks)l), TileDefs.PipeWall));
+        for (int y = 0; y < CircuitBoard.Span; y++)
+            for (int x = 0; x < CircuitBoard.Span; x++)
+                Create(new Vector2I(x, CircuitRow + y), TileDefs.BackgroundCircuit);
         return tileSet;
     }
 
@@ -185,6 +246,16 @@ public static class TileSetBuilder
         img.Resize(16, 16, Image.Interpolation.Nearest);
         var texture = ImageTexture.CreateFromImage(img);
         IconCache[tileId] = texture;
+        return texture;
+    }
+
+    // Full-size tile art, for the editor's brush preview.
+    public static ImageTexture TileTexture(int tileId)
+    {
+        if (TextureCache.TryGetValue(tileId, out var cached))
+            return cached;
+        var texture = ImageTexture.CreateFromImage(BuildTileImage(tileId));
+        TextureCache[tileId] = texture;
         return texture;
     }
 
@@ -204,10 +275,10 @@ public static class TileSetBuilder
                 DrawAlarmFloor(img);
                 break;
             case TileDefs.ElectricFloor:
-                DrawElectricFloor(img);
+                DrawElectricFloor(img, joinLeft: false, joinRight: false);
                 break;
             case TileDefs.Water:
-                return BuildWaterImage(0);
+                return BuildWaterImage(0, surface: true);
             case TileDefs.Lava:
                 return BuildLavaImage(0);
             case TileDefs.Spikes:
@@ -243,14 +314,12 @@ public static class TileSetBuilder
                 DrawContainer(img);
                 break;
             case TileDefs.PipeWall:
-                DrawPipes(img);
-                break;
+                return BuildPipeImage(PipeLinks.Left | PipeLinks.Right);
             case TileDefs.BackgroundBrick:
                 DrawBricks(img, DimBrickRamp, new Color("0a0b0f"), seed: 4, wear: 0.03f);
                 break;
             case TileDefs.BackgroundCircuit:
-                DrawCircuit(img);
-                break;
+                return CircuitBoard.Tile(0, 0);
             case TileDefs.BackgroundHangar:
                 DrawHangar(img);
                 break;
@@ -308,18 +377,42 @@ public static class TileSetBuilder
             DrawRivet(img, rx, ry, SteelRamp);
     }
 
-    // A dark steel plate with two copper electrodes and a lightning arc
-    // between them: a pale core, a yellow glow and cyan sparks.
-    private static void DrawElectricFloor(Image img)
+    // Arc height per column, periodic in the tile: a jagged bolt whose last
+    // column steps into the first, so joined tiles draw one unbroken arc.
+    private static readonly int[] BoltOffset =
     {
-        DrawBlock(img, new Rect2I(0, 0, TileSize, TileSize), PlateRamp, 40, wear: 0.06f);
-        DrawBlock(img, new Rect2I(2, 9, 3, 14), CopperRamp, 41, wear: 0f);
-        DrawBlock(img, new Rect2I(27, 9, 3, 14), CopperRamp, 42, wear: 0f);
+        0, -1, -2, -3, -2, -1, 0, 1, 2, 1, 0, -1, -1, -2, -3, -2,
+        -1, 0, 1, 2, 3, 2, 1, 0, -1, -2, -1, 0, 1, 2, 1, 1,
+    };
+
+    // A dark steel plate carrying a lightning arc: a pale core, a yellow glow
+    // and cyan sparks. A side joined to another electric floor has no bevel
+    // and no electrode, so the plate and arc run straight on into it; an
+    // open side ends in a copper electrode.
+    private static void DrawElectricFloor(Image img, bool joinLeft, bool joinRight)
+    {
+        for (int y = 0; y < TileSize; y++)
+            for (int x = 0; x < TileSize; x++)
+            {
+                bool lit = y == 0 || x == 0 && !joinLeft;
+                bool shaded = y == TileSize - 1 || x == TileSize - 1 && !joinRight;
+                Color c = lit && shaded ? PlateRamp[1]
+                    : lit ? PlateRamp[3]
+                    : shaded ? PlateRamp[0]
+                    : Noise(x, y, 40) < 0.024f ? PlateRamp[0]
+                    : Tone(PlateRamp, 2.4f - 1.3f * y / (TileSize - 1), x, y);
+                img.SetPixel(x, y, c);
+            }
         foreach (var (rx, ry) in new[] { (12, 2), (18, 2), (12, 28), (18, 28) })
             DrawRivet(img, rx, ry, PlateRamp);
-        for (int x = 5; x < 27; x++)
+        if (!joinLeft)
+            DrawBlock(img, new Rect2I(2, 9, 3, 14), CopperRamp, 41, wear: 0f);
+        if (!joinRight)
+            DrawBlock(img, new Rect2I(27, 9, 3, 14), CopperRamp, 42, wear: 0f);
+        int x0 = joinLeft ? 0 : 5, x1 = joinRight ? TileSize : 27;
+        for (int x = x0; x < x1; x++)
         {
-            int yc = 15 + (x / 3 % 2 == 0 ? -2 : 2) + (x % 3 == 1 ? 1 : 0);
+            int yc = 15 + BoltOffset[x];
             var haze = Threshold(x, yc) < 0.5f ? HazardRamp[0] : PlateRamp[2];
             Dot(img, x, yc - 2, haze);
             Dot(img, x, yc + 2, haze);
@@ -328,7 +421,7 @@ public static class TileSetBuilder
             Dot(img, x, yc, new Color("fff7c0"));
         }
         for (int y = 6; y < 26; y++)
-            for (int x = 5; x < 27; x++)
+            for (int x = x0; x < x1; x++)
                 if (Noise(x, y, 43) < 0.025f)
                     img.SetPixel(x, y, TealRamp[4]);
     }
@@ -483,80 +576,112 @@ public static class TileSetBuilder
         }
     }
 
-    // Four horizontal pipes per tile, each a cylinder lit along its top,
-    // with raised couplings staggered pipe to pipe.
-    private static void DrawPipes(Image img)
+    // Pipe geometry, in pixels across the tile: the tube's half width around
+    // the tile centre, the flanges standing proud of it, and the junction box.
+    private const float PipeCenter = 16f;
+    private const float PipeRadius = 7f;
+    private const float FlangeRadius = 9f;
+    private const int BoxLo = 6, BoxSize = 20;
+    private const int Far = 1000;   // a run that carries on into the neighbour
+    private static readonly Vector3 PipeLight = new Vector3(-0.45f, -0.6f, 0.66f).Normalized();
+
+    // One thick pipe per tile that runs on into every neighbouring pipe:
+    // straight through a line (capped where a run ends), a curved elbow at a
+    // bend, a riveted junction box at a tee or cross. Each linked side ends
+    // in half a flange, so two tiles meet in one whole coupling at their
+    // seam. The pipe casts a short shadow down-right onto a dark backplate.
+    private static Image BuildPipeImage(PipeLinks links)
     {
+        bool up = links.HasFlag(PipeLinks.Up), right = links.HasFlag(PipeLinks.Right);
+        bool down = links.HasFlag(PipeLinks.Down), left = links.HasFlag(PipeLinks.Left);
+        bool upright = up || down, across = left || right;
+        bool box = System.Numerics.BitOperations.PopCount((uint)links) >= 3;
+        bool elbow = !box && upright && across;
+        bool vertical = upright && !across;   // a lone pipe lies flat
+
+        // Flanges as spans along the run they cut across: half of one at each
+        // linked edge (the other half belongs to the neighbour), a cap at each
+        // open end of a straight run.
+        var flanges = new List<(bool Vertical, int From, int To)>();
+        if (left) flanges.Add((false, -2, 1));
+        if (right) flanges.Add((false, 30, 33));
+        if (up) flanges.Add((true, -2, 1));
+        if (down) flanges.Add((true, 30, 33));
+        if (!box && !elbow)
+        {
+            if (vertical ? !up : !left) flanges.Add((vertical, 3, 5));
+            if (vertical ? !down : !right) flanges.Add((vertical, 26, 28));
+        }
+
+        // The pipe colour at a pixel, or null for backplate. Pixels just
+        // outside the tile resolve too, so shadows cross the seam.
+        Color? Pipe(int x, int y)
+        {
+            foreach (var (v, from, to) in flanges)
+            {
+                int along = v ? y : x, through = v ? x : y;
+                float u = (through + 0.5f - PipeCenter) / FlangeRadius;
+                if (along >= from && along <= to && Mathf.Abs(u) <= 1f)
+                {
+                    float edge = along == from ? 0.8f : along == to ? -1.2f : 0f;
+                    return Tone(SteelRamp, Lit(u, v ? Vector2.Right : Vector2.Down) * 4.6f - 0.3f + edge, x, y);
+                }
+            }
+            if (box && x >= BoxLo && x < BoxLo + BoxSize && y >= BoxLo && y < BoxLo + BoxSize)
+                return SteelRamp[2];   // drawn over by the box itself
+            if (elbow)
+            {
+                // A quarter bend around the corner the two linked sides share.
+                var offset = new Vector2(x + 0.5f - (right ? TileSize : 0), y + 0.5f - (down ? TileSize : 0));
+                float r = offset.Length();
+                return Mathf.Abs(r - PipeCenter) < PipeRadius
+                    ? Tube((r - PipeCenter) / PipeRadius, offset / r, x, y)
+                    : null;
+            }
+            bool horizontalRun = box ? (left && x < PipeCenter || right && x >= PipeCenter)
+                : !vertical && x >= (left ? -Far : 3) && x <= (right ? Far : 28);
+            bool verticalRun = box ? (up && y < PipeCenter || down && y >= PipeCenter)
+                : vertical && y >= (up ? -Far : 3) && y <= (down ? Far : 28);
+            float uy = (y + 0.5f - PipeCenter) / PipeRadius, ux = (x + 0.5f - PipeCenter) / PipeRadius;
+            if (horizontalRun && Mathf.Abs(uy) < 1f)
+                return Tube(uy, Vector2.Down, x, y);
+            if (verticalRun && Mathf.Abs(ux) < 1f)
+                return Tube(ux, Vector2.Right, x, y);
+            return null;
+        }
+
+        var img = Image.CreateEmpty(TileSize, TileSize, false, Image.Format.Rgba8);
         for (int y = 0; y < TileSize; y++)
             for (int x = 0; x < TileSize; x++)
             {
-                int ly = y % 8, pipe = y / 8;
-                int lx = (x + pipe * 8) % 16;
-                Color c;
-                if (lx < 4)
-                {
-                    if (ly == 0)
-                        c = TealRamp[3];
-                    else if (ly == 7)
-                        c = TealRamp[0];
-                    else if (lx == 0)
-                        c = TealRamp[4];
-                    else if (lx == 3)
-                        c = TealRamp[1];
-                    else
-                        c = Tone(TealRamp, 3.4f - ly * 0.35f, x, y);
-                }
-                else
-                {
-                    float t = ly switch { 0 => 0f, 1 => 4f, 2 => 3f, 3 => 2.3f, 4 => 2f, 5 => 1.5f, 6 => 1f, _ => 0f };
-                    if (ly > 2 && Noise(x, y, 100 + pipe) < 0.04f)
-                        t -= 1f;
-                    c = Tone(TealRamp, t, x, y);
-                }
-                img.SetPixel(x, y, c);
+                bool shadow = Pipe(x - 1, y - 1) != null || Pipe(x - 2, y - 2) != null;
+                img.SetPixel(x, y, Pipe(x, y)
+                    ?? (shadow ? PlateRamp[0] : Tone(PlateRamp, 1.4f + 0.8f * (Smooth(x, y, 8, 104) - 0.5f), x, y)));
             }
-    }
-
-    // A circuit board: traces with a shadow side, solder pads at the
-    // junctions, two chips with pins, and a pair of LEDs.
-    private static void DrawCircuit(Image img)
-    {
-        var board = new Color("0f1a14");
-        var boardDark = new Color("0a120d");
-        var trace = new Color("1f4a2c");
-        var pad = new Color("2a5f38");
-        for (int y = 0; y < TileSize; y++)
-            for (int x = 0; x < TileSize; x++)
-            {
-                bool onTrace = IsTrace(x, y);
-                Color c = onTrace ? trace
-                    : IsTrace(x - 1, y) || IsTrace(x, y - 1) ? boardDark
-                    : Noise(x, y, 110) < 0.05f ? new Color("16261c") : board;
-                if (y % 8 == 2 && x % 8 == 5)
-                    c = pad;
-                img.SetPixel(x, y, c);
-            }
-        foreach (var (cx, cy) in new[] { (9, 9), (19, 19) })
+        if (box)
         {
-            img.FillRect(new Rect2I(cx, cy, 6, 4), new Color("0a0c0a"));
-            img.FillRect(new Rect2I(cx, cy, 6, 1), new Color("2a2c33"));
-            for (int px = cx; px < cx + 6; px += 2)
-            {
-                img.SetPixel(px, cy - 1, StoneRamp[1]);
-                img.SetPixel(px, cy + 4, StoneRamp[1]);
-            }
+            DrawBlock(img, new Rect2I(BoxLo, BoxLo, BoxSize, BoxSize), SteelRamp, 105, wear: 0.03f);
+            int near = BoxLo + 2, far = BoxLo + BoxSize - 5;
+            foreach (var (rx, ry) in new[] { (near, near), (far, near), (near, far), (far, far) })
+                DrawRivet(img, rx, ry, SteelRamp);
         }
-        foreach (var (lx, ly) in new[] { (3, 27), (27, 3) })
+        return img;
+
+        // A tube pixel: u runs -1..1 across the tube along `across`, and the
+        // surface normal bends with it, so the light from the top left lands
+        // on the upper or left flank whichever way the pipe runs.
+        static Color Tube(float u, Vector2 across, int x, int y)
         {
-            img.FillRect(new Rect2I(lx, ly, 2, 2), new Color("2a8f3a"));
-            img.SetPixel(lx, ly, new Color("5fd36a"));
+            float t = Lit(u, across) * 4.8f - 0.4f;
+            if (u > -0.3f && Noise(x, y, 100) < 0.04f)
+                t -= 1f;
+            return Tone(TealRamp, t, x, y);
         }
 
-        static bool IsTrace(int x, int y)
+        static float Lit(float u, Vector2 across)
         {
-            x = Wrap(x);
-            y = Wrap(y);
-            return y % 8 == 2 && (x + 4) % 16 < 10 || x % 8 == 5 && (y + 6) % 16 < 12;
+            var normal = new Vector3(across.X * u, across.Y * u, Mathf.Sqrt(Mathf.Max(0f, 1f - u * u)));
+            return Mathf.Max(0f, normal.Dot(PipeLight));
         }
     }
 
@@ -746,27 +871,34 @@ public static class TileSetBuilder
 
     // Water frame: a foam line crawls along the surface, ripples drift one
     // pixel per frame, the body dithers darker with depth and glints wink.
-    private static Image BuildWaterImage(int frame)
+    // A deep frame has no surface and holds the tone the surface tile ends
+    // on, so a column of water reads as one body under one wave.
+    private const float SurfaceTone = 2.6f, DeepTone = 0.6f;
+
+    private static Image BuildWaterImage(int frame, bool surface)
     {
         var img = Image.CreateEmpty(TileSize, TileSize, false, Image.Format.Rgba8);
         for (int y = 0; y < TileSize; y++)
             for (int x = 0; x < TileSize; x++)
             {
                 Color c;
-                if (y == 0)
+                if (surface && y == 0)
                     c = (x + frame) % 4 < 2 ? WaterRamp[5] : WaterRamp[4];
-                else if (y == 1)
+                else if (surface && y == 1)
                     c = (x + y + frame / 2) % 2 == 0 ? WaterRamp[4] : WaterRamp[3];
-                else if (y == 2)
+                else if (surface && y == 2)
                     c = WaterRamp[3];
                 else
                 {
-                    c = Tone(WaterRamp, 2.6f - (y - 3) / 14f, x, y);
+                    float depth = surface
+                        ? SurfaceTone - (y - 3) * (SurfaceTone - DeepTone) / (TileSize - 4)
+                        : DeepTone;
+                    c = Tone(WaterRamp, depth, x, y);
                     if (y % 8 == 5 && (x + frame + y / 8 * 3) % 8 < 3)
                         c = WaterRamp[3];
                     else if (y % 8 == 6 && (x + frame + y / 8 * 3) % 8 < 3)
                         c = WaterRamp[0];
-                    else if (y < 14 && Noise(x, y, 150 + frame) < 0.012f)
+                    else if (surface && y < 14 && Noise(x, y, 150 + frame) < 0.012f)
                         c = WaterRamp[5];
                 }
                 img.SetPixel(x, y, c);

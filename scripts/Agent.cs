@@ -149,7 +149,7 @@ public partial class Agent : CharacterBody2D
         // Kill plane below the level bounds.
         if (Position.Y > Session.LevelBottom + 2f * Tile)
         {
-            Session.AgentHit();
+            Session.AgentFell();
             return;
         }
 

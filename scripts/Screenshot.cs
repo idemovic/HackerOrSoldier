@@ -78,9 +78,9 @@ public partial class Screenshot : Node
         editor.SetBrushTile(TileDefs.Container);
         editor.PaintCell(new Vector2I(7, 33));
         editor.PaintCell(new Vector2I(8, 33));
-        editor.SetBrushTile(TileDefs.PipeWall);
-        editor.PaintCell(new Vector2I(10, 33));
-        editor.PaintCell(new Vector2I(11, 33));
+        editor.SetBrushTile(TileDefs.PipeWall);   // a run with an elbow, a tee and capped ends
+        foreach (var (px, py) in new[] { (10, 32), (10, 33), (11, 33), (12, 33), (13, 33), (12, 32) })
+            editor.PaintCell(new Vector2I(px, py));
         editor.SetBrushTile(TileDefs.BackgroundBrick);
         editor.PaintCell(new Vector2I(15, 31));
         editor.PaintCell(new Vector2I(16, 31));

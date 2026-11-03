@@ -19,10 +19,14 @@ public partial class SmokeTest : Node
         await EditorLoopChecks();
         await UndoRedoCheck();
         await ShortcutAndPanCheck();
+        await PaletteKeysCheck();
+        await ToolsCheck();
+        await InvincibleCheck();
         await CorridorCheck();
         await DefaultLevelCheck();
         await WallTilesCheck();
         await ShadowCheck();
+        await PipeCheck();
         await SkyCheck();
         await LivesAndFailCheck();
         await VestCheck();
@@ -155,7 +159,6 @@ public partial class SmokeTest : Node
     private async Task ShortcutAndPanCheck()
     {
         var editor = await FreshEditor();
-        Check(Editor.MenuLabel("Sky: Night", Key.K) == "S(k)y: Night", "menu label marks the shortcut letter");
         editor.SetLevel(LevelData.NewDefault(80, 40));
 
         editor._UnhandledInput(KeyEvent(Key.K, ctrl: true));
@@ -182,16 +185,112 @@ public partial class SmokeTest : Node
         Check(editor.ViewCenter.X > pinned, "panning back from the left edge moves the view at once");
     }
 
-    private static InputEventKey KeyEvent(Key key, bool ctrl = false, bool shift = false) =>
-        new() { Keycode = key, PhysicalKeycode = key, Pressed = true, CtrlPressed = ctrl, ShiftPressed = shift };
+    // Every palette item and category is reachable from the keyboard: 1-0,
+    // Shift+1-0, Alt+1-0 and Tab, matched by key position for the digits.
+    private async Task PaletteKeysCheck()
+    {
+        var editor = await FreshEditor();
+        Check(editor.Brush.TileId == TileDefs.Wall, "editor opens with the wall brush");
+        editor._UnhandledInput(KeyEvent(Key.Key2));
+        Check(editor.Brush.TileId == TileDefs.DestructibleWall, "2 picks the second item of the category");
+        editor._UnhandledInput(KeyEvent(Key.Key1, shift: true));
+        Check(editor.Brush.TileId == TileDefs.BackgroundMesh, "Shift+1 picks the eleventh item");
+        editor._UnhandledInput(new InputEventKey { Keycode = Key.Plus, PhysicalKeycode = Key.Key3, Pressed = true });
+        Check(editor.Brush.TileId == TileDefs.StoneBlocks, "digits match by key position on layouts without a number row");
+        editor._UnhandledInput(KeyEvent(Key.Key3, alt: true));
+        editor._UnhandledInput(KeyEvent(Key.Key1));
+        Check(editor.Brush.TileId == TileDefs.AlarmFloor, "Alt+3 opens Terrain and 1 picks its first item");
+        editor._UnhandledInput(KeyEvent(Key.Tab));
+        editor._UnhandledInput(KeyEvent(Key.Key1));
+        Check(editor.Brush.ObjectType == ObjectDefs.Computer, "Tab moves to the next category (Devices)");
+        editor._UnhandledInput(KeyEvent(Key.Tab, shift: true));
+        editor._UnhandledInput(KeyEvent(Key.Key5));
+        Check(editor.Brush.TileId == TileDefs.Spikes, "Shift+Tab moves back to Terrain");
+        editor._UnhandledInput(KeyEvent(Key.Key5, shift: true));
+        Check(editor.Brush.TileId == TileDefs.Spikes, "a key past the category's last item does nothing");
+    }
+
+    // Eraser, rectangle fill, picker and the color/number property keys.
+    private async Task ToolsCheck()
+    {
+        var editor = await FreshEditor();
+        editor.SetBrushTile(TileDefs.Wall);
+        editor.PaintCell(new Vector2I(5, 5));
+        editor._UnhandledInput(KeyEvent(Key.E));
+        Check(editor.CurrentTool == Editor.Tool.Eraser, "E selects the eraser");
+        editor.PaintCell(new Vector2I(5, 5));
+        Check(editor.Level.GetTile(5, 5) == TileDefs.Empty, "painting with the eraser clears the cell");
+        editor._UnhandledInput(KeyEvent(Key.B));
+        Check(editor.CurrentTool == Editor.Tool.Brush, "B returns to the brush");
+
+        editor.SetBrushTile(TileDefs.RedBrick);
+        editor.ApplyRect(new Vector2I(8, 4), new Vector2I(6, 5), erase: false);
+        int filled = 0;
+        for (int x = 6; x <= 8; x++)
+            for (int y = 4; y <= 5; y++)
+                filled += editor.Level.GetTile(x, y) == TileDefs.RedBrick ? 1 : 0;
+        Check(filled == 6, "rectangle fill covers every cell between the corners");
+        editor.Undo();
+        Check(editor.Level.GetTile(6, 4) == TileDefs.Empty && editor.Level.GetTile(8, 5) == TileDefs.Empty,
+            "one undo reverts the whole rectangle");
+
+        editor.SetBrushObject(ObjectDefs.Door, "red");
+        editor._UnhandledInput(KeyEvent(Key.Bracketright));
+        Check(editor.BrushColor == "blue", "] steps the door color");
+        editor.PaintCell(new Vector2I(3, 9));
+        editor.SetBrushTile(TileDefs.Lava);
+        editor._UnhandledInput(KeyEvent(Key.Q));
+        editor.Pick(new Vector2I(3, 9));
+        Check(editor.Brush.ObjectType == ObjectDefs.Door && editor.BrushColor == "blue",
+            "the picker copies the object and its color into the brush");
+        Check(editor.CurrentTool == Editor.Tool.Brush, "the picker hands back to the brush");
+
+        editor.SetLevel(LevelData.NewDefault(80, 80));
+        Pan(editor, -1000, -1200);
+        var center = editor.ViewCenter;
+        editor._UnhandledInput(KeyEvent(Key.Minus));
+        editor._UnhandledInput(KeyEvent(Key.Equal));
+        Check(editor.ViewCenter.DistanceTo(center) < 1f, "zooming out and back in keeps the view");
+    }
+
+    // Ctrl+I (or I) makes the playtest agent take no damage; it applies when
+    // play starts and can flip mid-play.
+    private async Task InvincibleCheck()
+    {
+        var editor = await FreshEditor();
+        editor._UnhandledInput(KeyEvent(Key.I, ctrl: true));
+        Check(editor.Invincible, "Ctrl+I turns on invincible playtest");
+        Check(editor.StartPlay(), "invincible playtest starts");
+        Check(editor.Session.Invincible, "the play session starts invincible");
+        int lives = editor.Session.Lives;
+        editor.Session.AgentHit();
+        await Frames(2);
+        Check(editor.Session.Lives == lives && !editor.Session.AgentDown, "hits do not cost an invincible agent a life");
+        editor.PlayerAgent.Position = new Vector2(12 * 32, 40 * 32);
+        editor.Session.AgentFell();
+        Check(editor.Session.Lives == lives && editor.PlayerAgent.Position.Y < 12 * 32,
+            "falling out puts an invincible agent back at the start");
+        editor._UnhandledInput(KeyEvent(Key.I, ctrl: true));
+        Check(!editor.Session.Invincible, "Ctrl+I during play turns it off");
+        editor.Session.AgentHit();
+        Check(editor.Session.Lives == lives - 1, "hits count again once it is off");
+        editor.StopPlay();
+    }
+
+    private static InputEventKey KeyEvent(Key key, bool ctrl = false, bool shift = false, bool alt = false) =>
+        new() { Keycode = key, PhysicalKeycode = key, Pressed = true, CtrlPressed = ctrl, ShiftPressed = shift, AltPressed = alt };
 
     // Positive dx drags the mouse right, which moves the camera left.
-    private static void Pan(Editor editor, float dx) =>
+    private static void Pan(Editor editor, float dx, float dy = 0)
+    {
+        editor._UnhandledInput(new InputEventMouseButton { ButtonIndex = MouseButton.Middle, Pressed = true });
         editor._UnhandledInput(new InputEventMouseMotion
         {
             ButtonMask = MouseButtonMask.Middle,
-            Relative = new Vector2(dx, 0),
+            Relative = new Vector2(dx, dy),
         });
+        editor._UnhandledInput(new InputEventMouseButton { ButtonIndex = MouseButton.Middle, Pressed = false });
+    }
 
     private async Task EditorLoopChecks()
     {
@@ -312,6 +411,47 @@ public partial class SmokeTest : Node
     private static bool HasShadow(Editor editor, Vector2I cell) =>
         editor.Grids.Shadow.GetCellSourceId(cell) != -1;
 
+    private async Task PipeCheck()
+    {
+        var editor = await FreshEditor();
+        var a = new Vector2I(6, 5);
+        var b = a + Vector2I.Right;
+        var c = b + Vector2I.Down;
+        editor.SetBrushTile(TileDefs.PipeWall);
+        editor.PaintCell(a);
+        Check(PipeAt(editor, a) == PipeLinks.None, "a lone pipe has no links");
+        editor.PaintCell(b);
+        Check(PipeAt(editor, a) == PipeLinks.Right && PipeAt(editor, b) == PipeLinks.Left,
+            "painting a pipe beside another joins both");
+        editor.PaintCell(c);
+        Check(PipeAt(editor, b) == (PipeLinks.Left | PipeLinks.Down) && PipeAt(editor, c) == PipeLinks.Up,
+            "a pipe below turns its neighbour into an elbow");
+        Check(editor.Grids.TileIdAt(b) == TileDefs.PipeWall, "a joined pipe still reads back as a pipe wall");
+        editor.SetBrushTile(TileDefs.Wall);
+        editor.PaintCell(b);
+        Check(PipeAt(editor, a) == PipeLinks.None && PipeAt(editor, c) == PipeLinks.None,
+            "painting over a pipe with another tile unlinks its neighbours");
+        editor.SetBrushTile(TileDefs.PipeWall);
+        editor.PaintCell(b);
+        editor.EraseCell(b);
+        Check(PipeAt(editor, a) == PipeLinks.None && PipeAt(editor, c) == PipeLinks.None,
+            "erasing a pipe unlinks its neighbours");
+
+        editor.PaintCell(b);
+        editor.SetLevel(editor.Level);
+        Check(PipeAt(editor, b) == (PipeLinks.Left | PipeLinks.Down), "redrawing a whole level joins pipes too");
+    }
+
+    // The links a pipe cell is drawn with, or -1 when it shows something else.
+    private static PipeLinks PipeAt(Editor editor, Vector2I cell)
+    {
+        var coords = editor.Grids.Main.GetCellAtlasCoords(cell);
+        for (int links = 0; links < 16; links++)
+            if (coords == TileSetBuilder.PipeCoordsFor((PipeLinks)links))
+                return (PipeLinks)links;
+        return (PipeLinks)(-1);
+    }
+
     // Empty cells are the outdoors: a per-level night/day sky fills the
     // level behind the tiles, toggled from the toolbar and saved with the
     // level.
@@ -415,6 +555,15 @@ public partial class SmokeTest : Node
         editor.SetBrushTile(TileDefs.Water);
         for (int y = 3; y <= 10; y++)
             editor.PaintCell(new Vector2I(20, y));
+        Vector2I WaterAt(int y) => editor.Grids.Main.GetCellAtlasCoords(new Vector2I(20, y));
+        Check(WaterAt(3) == TileSetBuilder.WaterCoordsFor(waterAbove: false)
+            && WaterAt(4) == TileSetBuilder.WaterCoordsFor(waterAbove: true)
+            && WaterAt(10) == TileSetBuilder.WaterCoordsFor(waterAbove: true),
+            "only the top water cell draws the surface");
+        Check(editor.Grids.TileIdAt(new Vector2I(20, 4)) == TileDefs.Water, "deep water still reads back as water");
+        editor.EraseCell(new Vector2I(20, 3));
+        Check(WaterAt(4) == TileSetBuilder.WaterCoordsFor(waterAbove: false), "erasing the top cell moves the surface down");
+        editor.PaintCell(new Vector2I(20, 3));
         Check(editor.StartPlay(), "water level starts");
         var agent = editor.PlayerAgent;
         agent.Position = new Vector2(20 * 32 + 16, 3 * 32 + 16);

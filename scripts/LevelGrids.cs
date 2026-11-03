@@ -23,6 +23,9 @@ public sealed class LevelGrids
     {
         Place(cell, tileId);
         RefreshShadowsAround(cell);
+        RefreshElectricJoinsAround(cell);
+        RefreshPipesAround(cell);
+        RefreshWaterAround(cell);
     }
 
     public void EraseCell(Vector2I cell)
@@ -30,6 +33,9 @@ public sealed class LevelGrids
         Main.EraseCell(cell);
         Hidden.EraseCell(cell);
         RefreshShadowsAround(cell);
+        RefreshElectricJoinsAround(cell);
+        RefreshPipesAround(cell);
+        RefreshWaterAround(cell);
     }
 
     public void Fill(LevelData level)
@@ -46,7 +52,12 @@ public sealed class LevelGrids
             }
         for (int y = 0; y < level.Height; y++)
             for (int x = 0; x < level.Width; x++)
+            {
                 RefreshShadow(new Vector2I(x, y));
+                RefreshElectricJoin(new Vector2I(x, y));
+                RefreshPipe(new Vector2I(x, y));
+                RefreshWater(new Vector2I(x, y));
+            }
     }
 
     public int TileIdAt(Vector2I cell) =>
@@ -85,5 +96,67 @@ public sealed class LevelGrids
             Shadow.EraseCell(cell);
         else
             Shadow.SetCell(cell, TileSetBuilder.SourceId, TileSetBuilder.ShadowCoordsFor(mask));
+    }
+
+    private void RefreshElectricJoinsAround(Vector2I cell)
+    {
+        RefreshElectricJoin(cell + Vector2I.Left);
+        RefreshElectricJoin(cell);
+        RefreshElectricJoin(cell + Vector2I.Right);
+    }
+
+    // A run of electric floor draws as one plate with one arc: each cell
+    // picks the tile that joins the electric floor beside it.
+    private void RefreshElectricJoin(Vector2I cell)
+    {
+        if (TileIdAt(cell) != TileDefs.ElectricFloor)
+            return;
+        bool left = TileIdAt(cell + Vector2I.Left) == TileDefs.ElectricFloor;
+        bool right = TileIdAt(cell + Vector2I.Right) == TileDefs.ElectricFloor;
+        Main.SetCell(cell, TileSetBuilder.SourceId, TileSetBuilder.ElectricFloorCoordsFor(left, right));
+    }
+
+    private static readonly (Vector2I Offset, PipeLinks Link)[] PipeSides =
+    {
+        (Vector2I.Up, PipeLinks.Up),
+        (Vector2I.Right, PipeLinks.Right),
+        (Vector2I.Down, PipeLinks.Down),
+        (Vector2I.Left, PipeLinks.Left),
+    };
+
+    private void RefreshPipesAround(Vector2I cell)
+    {
+        RefreshPipe(cell);
+        foreach (var (offset, _) in PipeSides)
+            RefreshPipe(cell + offset);
+    }
+
+    // A pipe wall joins every pipe wall beside it, so painting or erasing a
+    // cell redraws the pipes around it.
+    private void RefreshPipe(Vector2I cell)
+    {
+        if (TileIdAt(cell) != TileDefs.PipeWall)
+            return;
+        var links = PipeLinks.None;
+        foreach (var (offset, link) in PipeSides)
+            if (TileIdAt(cell + offset) == TileDefs.PipeWall)
+                links |= link;
+        Main.SetCell(cell, TileSetBuilder.SourceId, TileSetBuilder.PipeCoordsFor(links));
+    }
+
+    private void RefreshWaterAround(Vector2I cell)
+    {
+        RefreshWater(cell);
+        RefreshWater(cell + Vector2I.Down);
+    }
+
+    // Only the top cell of a water column draws the wave; water with water
+    // above it draws the body alone.
+    private void RefreshWater(Vector2I cell)
+    {
+        if (TileIdAt(cell) != TileDefs.Water)
+            return;
+        bool waterAbove = TileIdAt(cell + Vector2I.Up) == TileDefs.Water;
+        Main.SetCell(cell, TileSetBuilder.SourceId, TileSetBuilder.WaterCoordsFor(waterAbove));
     }
 }

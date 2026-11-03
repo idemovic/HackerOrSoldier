@@ -627,9 +627,21 @@ public partial class PlaySession : Node2D
             _disguiseTime = ItemDuration;
     }
 
+    // Editor playtest toggle: hits do nothing and falling out of the level
+    // puts the agent back at the start.
+    public bool Invincible { get; set; }
+
+    public void AgentFell()
+    {
+        if (Invincible)
+            Agent.ResetForRespawn(_startPosition);
+        else
+            AgentHit();
+    }
+
     public void AgentHit()
     {
-        if (_ended || _agentDown)   // one hit per death; the body is immune
+        if (_ended || _agentDown || Invincible)   // one hit per death; the body is immune
             return;
         if (HasVest)
         {
