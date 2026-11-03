@@ -18,6 +18,12 @@ public class LevelData
     public const int DefaultWidth = 80;
     public const int DefaultHeight = 80;
 
+    // Bump CurrentFormatVersion when a change would misread older files,
+    // and convert those files in LevelStore.Load. Files saved before the
+    // field existed have none and read as version 1.
+    public const int CurrentFormatVersion = 1;
+
+    public int FormatVersion { get; set; } = 1;
     public string Name { get; set; } = "";
     public string Description { get; set; } = "";
     // Cells with no tile are the outdoors; the sky ("night" or "day")
@@ -40,6 +46,7 @@ public class LevelData
 
     public LevelData Clone() => new()
     {
+        FormatVersion = FormatVersion,
         Name = Name,
         Description = Description,
         Sky = Sky,
@@ -68,7 +75,10 @@ public class LevelData
 
     public static LevelData NewDefault(int width = DefaultWidth, int height = DefaultHeight)
     {
-        var level = new LevelData { Width = width, Height = height, Tiles = new int[width * height] };
+        var level = new LevelData
+        {
+            FormatVersion = CurrentFormatVersion, Width = width, Height = height, Tiles = new int[width * height],
+        };
         int wall = TileDefs.All[0].Id;
         for (int x = 0; x < level.Width; x++)
             level.SetTile(x, level.Height - 1, wall);
@@ -90,6 +100,7 @@ public static class LevelStore
 
     public static void Save(LevelData level)
     {
+        level.FormatVersion = LevelData.CurrentFormatVersion;
         DirAccess.MakeDirRecursiveAbsolute(DirPath);
         using var file = FileAccess.Open($"{DirPath}/{FileNameFor(level.Name)}", FileAccess.ModeFlags.Write);
         file.StoreString(JsonSerializer.Serialize(level, JsonOptions));
@@ -102,6 +113,9 @@ public static class LevelStore
             return null;
         var level = JsonSerializer.Deserialize<LevelData>(file.GetAsText(), JsonOptions);
         if (level?.Tiles == null || level.Tiles.Length != level.Width * level.Height)
+            return null;
+        // A file from a newer build may mean something this one would misread.
+        if (level.FormatVersion > LevelData.CurrentFormatVersion)
             return null;
         level.Objects ??= new List<LevelObject>();
         return level;

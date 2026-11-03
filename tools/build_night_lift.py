@@ -286,6 +286,7 @@ def build():
     checkpoints()
     dressing()
     return {
+        "formatVersion": 1,
         "name": "Operation Night Lift",
         "description": (
             "Helix Corp keeps its prototype codes in the tower's server vault. "
