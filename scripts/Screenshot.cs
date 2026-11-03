@@ -1,9 +1,8 @@
+using System.Collections.Generic;
 using Godot;
 
 namespace HackerOrSoldier;
 
-// Temporary helper: renders the editor for a few frames, saves a screenshot
-// to user://editor_ui.png and quits. Not part of the game.
 public partial class Screenshot : Node
 {
     private int _frames;
@@ -94,7 +93,41 @@ public partial class Screenshot : Node
         editor.SetBrushTile(TileDefs.BackgroundSky);
         editor.PaintCell(new Vector2I(18, 33));
         editor.PaintCell(new Vector2I(19, 33));
+
+        editor.SetBrushTile(TileDefs.Wall);
+        for (int y = 32; y <= 35; y++)
+            editor.PaintCell(new Vector2I(3, y));
+        for (int x = 3; x <= 9; x++)
+            editor.PaintCell(new Vector2I(x, 32));
+        editor.SetBrushTile(TileDefs.BackgroundBrick);
+        for (int x = 4; x <= 18; x++)
+            for (int y = 32; y <= 37; y++)
+                if (editor.Level.GetTile(x, y) == TileDefs.Empty)
+                    editor.PaintCell(new Vector2I(x, y));
         editor.ToggleSky();   // show the day sky behind the showcase
+
+        SaveTileSheet();
+    }
+
+    private static void SaveTileSheet()
+    {
+        const int PerRow = 8, Scale = 4, Size = TileSetBuilder.TileSize, Pitch = Size + 2;
+        var atlas = TileSetBuilder.AtlasImage();
+        var tiles = new List<Rect2I>();
+        for (int row = 0; row < atlas.GetHeight() / Size; row++)
+            for (int col = 0; col < atlas.GetWidth() / Size; col++)
+            {
+                var rect = new Rect2I(col * Size, row * Size, Size, Size);
+                if (!atlas.GetRegion(rect).IsInvisible())
+                    tiles.Add(rect);
+            }
+        int rows = (tiles.Count + PerRow - 1) / PerRow;
+        var sheet = Image.CreateEmpty(PerRow * Pitch, rows * Pitch, false, Image.Format.Rgba8);
+        sheet.Fill(new Color("6a6a72"));
+        for (int i = 0; i < tiles.Count; i++)
+            sheet.BlendRect(atlas, tiles[i], new Vector2I(i % PerRow * Pitch + 1, i / PerRow * Pitch + 1));
+        sheet.Resize(sheet.GetWidth() * Scale, sheet.GetHeight() * Scale, Image.Interpolation.Nearest);
+        sheet.SavePng("user://tiles_sheet.png");
     }
 
     public override void _Process(double delta)

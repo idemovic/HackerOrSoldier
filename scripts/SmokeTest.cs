@@ -22,6 +22,7 @@ public partial class SmokeTest : Node
         await CorridorCheck();
         await DefaultLevelCheck();
         await WallTilesCheck();
+        await ShadowCheck();
         await SkyCheck();
         await LivesAndFailCheck();
         await VestCheck();
@@ -266,6 +267,47 @@ public partial class SmokeTest : Node
         editor.StopPlay();
     }
 
+    private async Task ShadowCheck()
+    {
+        var editor = await FreshEditor();
+        var wall = new Vector2I(6, 5);
+        var beneath = new Vector2I(6, 6);
+        editor.SetBrushTile(TileDefs.BackgroundBrick);
+        editor.PaintCell(beneath);
+        Check(!HasShadow(editor, beneath), "scenery with no solid neighbour gets no shade");
+        editor.SetBrushTile(TileDefs.DestructibleWall);
+        editor.PaintCell(wall);
+        Check(HasShadow(editor, beneath), "painting a solid tile shades the scenery beneath it");
+        Check(!HasShadow(editor, wall), "the solid tile itself gets no shade");
+        Check(editor.Level.GetTile(beneath.X, beneath.Y) == TileDefs.BackgroundBrick,
+            "the shade is not written into the level");
+        editor.EraseCell(wall);
+        Check(!HasShadow(editor, beneath), "erasing the solid tile removes the shade");
+
+        editor.SetBrushTile(TileDefs.Water);
+        editor.PaintCell(new Vector2I(8, 6));
+        editor.SetBrushTile(TileDefs.Wall);
+        editor.PaintCell(new Vector2I(8, 5));
+        Check(!HasShadow(editor, new Vector2I(8, 6)), "water under a ceiling gets no shade");
+
+        editor.SetBrushTile(TileDefs.BackgroundBrick);
+        editor.PaintCell(new Vector2I(10, 6));
+        editor.SetBrushTile(TileDefs.HiddenPlatform);
+        editor.PaintCell(new Vector2I(10, 5));
+        Check(!HasShadow(editor, new Vector2I(10, 6)), "a hidden platform casts no shade that would reveal it");
+
+        editor.SetBrushTile(TileDefs.DestructibleWall);
+        editor.PaintCell(wall);
+        Check(editor.StartPlay(), "shadow level starts");
+        editor.Session.DestroyTile(wall);
+        Check(!HasShadow(editor, beneath), "a wall destroyed in play stops shading");
+        editor.StopPlay();
+        Check(HasShadow(editor, beneath), "stopping play restores the wall's shade");
+    }
+
+    private static bool HasShadow(Editor editor, Vector2I cell) =>
+        editor.Grids.Shadow.GetCellSourceId(cell) != -1;
+
     // Empty cells are the outdoors: a per-level night/day sky fills the
     // level behind the tiles, toggled from the toolbar and saved with the
     // level.
@@ -455,7 +497,7 @@ public partial class SmokeTest : Node
         Check(editor.PlayerAgent.Position.X > 9 * 32, "a hidden platform does not block the agent");
         editor.StopPlay();
         await Frames(2);
-        Check(editor.HiddenGrid.Modulate.A > 0.1f, "hidden platforms show again in the editor after play");
+        Check(editor.Grids.Hidden.Modulate.A > 0.1f, "hidden platforms show again in the editor after play");
 
         editor.SetBrushObject(ObjectDefs.InfraGoggles);
         editor.PaintCell(new Vector2I(3, 10));

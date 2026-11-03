@@ -72,6 +72,11 @@ public static class TileDefs
                 return def;
         return null;
     }
+
+    public static bool CastsShadow(int id) => Get(id) is { Solid: true };
+
+    public static bool ReceivesShadow(int id) =>
+        id is not (Empty or Water or Lava or BackgroundSky or BackgroundSkyDay) && Get(id) is { Solid: false };
 }
 
 public static class ObjectDefs

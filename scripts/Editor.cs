@@ -26,8 +26,7 @@ public partial class Editor : Node2D
     private bool _strokeOpen;
 
     private SkyBackdrop _sky;
-    private TileMapLayer _grid;
-    private TileMapLayer _hiddenGrid;
+    private LevelGrids _grids;
     private Node2D _markers;
     private ColorRect _cursor;
     private Camera2D _camera;
@@ -64,7 +63,7 @@ public partial class Editor : Node2D
     public bool IsPlaying => _session != null;
     public PlaySession Session => _session;
     public Agent PlayerAgent => _session?.Agent;
-    public TileMapLayer HiddenGrid => _hiddenGrid;   // for tests
+    public LevelGrids Grids => _grids;   // for tests
     // For tests: the center of what is on screen, after the camera limits.
     public Vector2 ViewCenter
     {
@@ -111,11 +110,8 @@ public partial class Editor : Node2D
         _sky = new SkyBackdrop();
         AddChild(_sky);   // behind the grids: empty cells show the sky
 
-        _grid = new TileMapLayer { TileSet = TileSetBuilder.Build() };
-        AddChild(_grid);
-
-        _hiddenGrid = new TileMapLayer { TileSet = _grid.TileSet, Modulate = HiddenEditTint };
-        AddChild(_hiddenGrid);
+        _grids = new LevelGrids(this);
+        _grids.Hidden.Modulate = HiddenEditTint;
 
         _markers = new Node2D();
         AddChild(_markers);
@@ -278,7 +274,7 @@ public partial class Editor : Node2D
                     return;
                 RecordStroke();
                 _level.SetTile(cell.X, cell.Y, _brushTile);
-                SetGridCell(cell, _brushTile);
+                _grids.SetCell(cell, _brushTile);
                 break;
             case BrushKind.Object:
                 PlaceObject(cell, _brushObject);
@@ -297,14 +293,10 @@ public partial class Editor : Node2D
             return;
         RecordStroke();
         _level.SetTile(cell.X, cell.Y, TileDefs.Empty);
-        _grid.EraseCell(cell);
-        _hiddenGrid.EraseCell(cell);
+        _grids.EraseCell(cell);
         if (_level.Objects.RemoveAll(o => o.X == cell.X && o.Y == cell.Y) > 0)
             RebuildMarkers();
     }
-
-    private void SetGridCell(Vector2I cell, int tileId) =>
-        LevelGrids.SetCell(_grid, _hiddenGrid, cell, tileId);
 
     public bool StartPlay()
     {
@@ -316,7 +308,7 @@ public partial class Editor : Node2D
         }
 
         _session = new PlaySession();
-        _session.Setup(_level, _grid, _hiddenGrid, _agentScene);
+        _session.Setup(_level, _grids, _agentScene);
         _session.Completed += () => Callable.From(() => EndPlay("Level complete!")).CallDeferred();
         _session.Failed += () => Callable.From(() => EndPlay("Out of lives.")).CallDeferred();
         AddChild(_session);
@@ -339,9 +331,9 @@ public partial class Editor : Node2D
         _session.SetPhysicsProcess(false);
         _session.QueueFree();
         _session = null;
-        _hiddenGrid.Modulate = HiddenEditTint;
-        _hiddenGrid.CollisionEnabled = true;
-        _grid.Modulate = Colors.White;   // clears the alarm tint
+        _grids.Hidden.Modulate = HiddenEditTint;
+        _grids.Hidden.CollisionEnabled = true;
+        _grids.Main.Modulate = Colors.White;   // clears the alarm tint
         RedrawLevel();   // restores walls destroyed during play
         _markers.Visible = true;
         _minimap.Visible = true;
@@ -357,7 +349,7 @@ public partial class Editor : Node2D
         _status.Text = message;
     }
 
-    private Vector2I MouseCell() => _grid.LocalToMap(_grid.ToLocal(GetGlobalMousePosition()));
+    private Vector2I MouseCell() => _grids.Main.LocalToMap(_grids.Main.ToLocal(GetGlobalMousePosition()));
 
     // Snapshots the level before a change. Cell edits go through
     // RecordStroke, which records once per mouse stroke.
@@ -427,7 +419,7 @@ public partial class Editor : Node2D
         if (_skyButton != null)
             _skyButton.Text = MenuLabel(_level.Sky == "day" ? "Sky: Day" : "Sky: Night",
                 Array.Find(_menu, m => m.Name == SkyItem).Key);
-        LevelGrids.Fill(_grid, _hiddenGrid, _level);
+        _grids.Fill(_level);
         RebuildMarkers();
         ApplyCameraLimits(_camera);
         _minimap.Setup(_level, _camera);

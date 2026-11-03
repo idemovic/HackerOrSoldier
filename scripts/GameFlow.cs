@@ -10,8 +10,7 @@ namespace HackerOrSoldier;
 public partial class GameFlow : Node2D
 {
     private SkyBackdrop _sky;
-    private TileMapLayer _grid;
-    private TileMapLayer _hiddenGrid;
+    private LevelGrids _grids;
     private PackedScene _agentScene;
     private PlaySession _session;
     private RunState _run;
@@ -33,10 +32,8 @@ public partial class GameFlow : Node2D
         _agentScene = GD.Load<PackedScene>("res://scenes/agent.tscn");
         _sky = new SkyBackdrop();
         AddChild(_sky);   // behind the grids: empty cells show the sky
-        _grid = new TileMapLayer { TileSet = TileSetBuilder.Build() };
-        AddChild(_grid);
-        _hiddenGrid = new TileMapLayer { TileSet = _grid.TileSet, Modulate = new Color(1, 1, 1, 0) };
-        AddChild(_hiddenGrid);
+        _grids = new LevelGrids(this);
+        _grids.Hidden.Modulate = new Color(1, 1, 1, 0);
 
         _theme = new Theme { DefaultFontSize = 10 };
         _ui = new CanvasLayer();
@@ -104,10 +101,10 @@ public partial class GameFlow : Node2D
         ClearPanel();
         _panel.Visible = false;
         _sky.Apply(_level);
-        LevelGrids.Fill(_grid, _hiddenGrid, _level);
+        _grids.Fill(_level);
 
         _session = new PlaySession { ProcessMode = ProcessModeEnum.Pausable };
-        _session.Setup(_level, _grid, _hiddenGrid, _agentScene, _run);
+        _session.Setup(_level, _grids, _agentScene, _run);
         _session.Completed += () => Callable.From(OnLevelCompleted).CallDeferred();
         _session.Failed += () => Callable.From(OnLevelFailed).CallDeferred();
         AddChild(_session);
@@ -235,8 +232,8 @@ public partial class GameFlow : Node2D
             return;
         _session.QueueFree();
         _session = null;
-        _grid.Modulate = Colors.White;
-        _hiddenGrid.Modulate = new Color(1, 1, 1, 0);
+        _grids.Main.Modulate = Colors.White;
+        _grids.Hidden.Modulate = new Color(1, 1, 1, 0);
     }
 
     private void ClearPanel()
