@@ -900,7 +900,8 @@ TILE_COLORS = {
     SPEAR: (150, 40, 60), HIDDEN: (90, 170, 190),
 }
 OBJECT_COLORS = {
-    "agent_start": (255, 60, 150), "exit_door": (60, 240, 100), "computer": (60, 220, 220),
+    "agent_start": (255, 60, 150), "exit_door": (60, 240, 100), "checkpoint": (64, 174, 78),
+    "computer": (60, 220, 220),
     "switch": (200, 120, 220), "teleport": (140, 90, 240), "barrel": (160, 110, 60),
     "security_door": (255, 160, 40), "closet": (120, 90, 60), "camera": (170, 170, 190),
     "flame_trap": (240, 130, 40), "electric_door": (230, 230, 100), "rocket_launcher": (150, 80, 80),

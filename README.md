@@ -42,6 +42,11 @@ The player swims up toward the surface. As long as they are submerged, their ver
 ## Level
 The main objective of the level is to get to the exit door, which ends the level and transitions to the statistics screen. No level object can't be destroyed, unless it's stated that it's destroyable.
 
+### Checkpoints
+- A checkpoint is a flag post, red until the agent touches it and green while it is the respawn point
+- Losing a life respawns the agent at the last checkpoint touched, or at the agent start before any; only the latest flag stays green
+- Level state stays as it was: opened doors stay open, hacked computers stay hacked, picked items stay picked
+
 ### Terrain
 Terrain is used to create the level, the rooms. It consists of:
 - Doors

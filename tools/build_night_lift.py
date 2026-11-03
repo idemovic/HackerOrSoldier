@@ -242,6 +242,13 @@ def roof():
     put("letter_t", 6, 5)
 
 
+def checkpoints():
+    # One flag where each floor's two routes have rejoined in the shaft, the
+    # lowest standing cell both routes cross, so a death costs one floor.
+    for x, y in [(72, 71), (6, 55), (72, 27)]:
+        put("checkpoint", x, y)
+
+
 def dressing():
     for x, y in [(4, 67), (30, 69), (55, 69), (25, 74), (52, 74), (73, 60),
                  (40, 53), (60, 53), (20, 43), (50, 43), (4, 40), (20, 23),
@@ -276,6 +283,7 @@ def build():
     vault()
     east_shaft_high()
     roof()
+    checkpoints()
     dressing()
     return {
         "name": "Operation Night Lift",

@@ -132,6 +132,26 @@ public static class Sprites
 
     private record SpriteMap(string[] Rows, int Scale = 2);
 
+    private static SpriteMap Flag(char fill, char shade) => new(System.Array.ConvertAll(new[]
+    {
+        "................",
+        "....gl..........",
+        "....glFFFFFFF...",
+        "....glFFFFFFFS..",
+        "....glFFFFFFFS..",
+        "....glFFFFFFS...",
+        "....glSSSSSS....",
+        "....gl..........",
+        "....gl..........",
+        "....gl..........",
+        "....gl..........",
+        "....gl..........",
+        "....gl..........",
+        "....gl..........",
+        "...dggld........",
+        "..dddddddd......",
+    }, row => row.Replace('F', fill).Replace('S', shade)));
+
     private static readonly Dictionary<string, SpriteMap> Maps = new()
     {
         [EnemyDefs.Drone] = new(new[]
@@ -457,6 +477,9 @@ public static class Sprites
             "...EEEEEEEEE....",
             "................",
         }),
+        // Red until the agent touches it, green while it is the respawn point.
+        [ObjectDefs.Checkpoint] = Flag('r', 'R'),
+        ["checkpoint_lit"] = Flag('e', 'E'),
         [ObjectDefs.Door] = new(new[]
         {
             "................",

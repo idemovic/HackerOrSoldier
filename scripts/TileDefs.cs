@@ -83,6 +83,7 @@ public static class ObjectDefs
 {
     public const string AgentStart = "agent_start";
     public const string ExitDoor = "exit_door";
+    public const string Checkpoint = "checkpoint";
     public const string Door = "door";
     public const string DoorKey = "door_key";
     public const string HealthKit = "health_kit";
@@ -116,6 +117,7 @@ public static class ObjectDefs
     {
         new(AgentStart, "Agent start", new Color(1f, 0.16f, 0.43f)),
         new(ExitDoor, "Exit door", new Color(0.2f, 0.9f, 0.4f)),
+        new(Checkpoint, "Checkpoint", new Color(0.25f, 0.68f, 0.31f)),
         new(Door, "Door", new Color(0.9f, 0.2f, 0.2f)),
         new(DoorKey, "Door key", new Color(0.9f, 0.2f, 0.2f)),
         new(HealthKit, "Health kit", new Color(0.95f, 0.95f, 0.95f)),

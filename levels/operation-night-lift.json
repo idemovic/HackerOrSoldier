@@ -6892,6 +6892,24 @@
       "properties": {}
     },
     {
+      "type": "checkpoint",
+      "x": 72,
+      "y": 71,
+      "properties": {}
+    },
+    {
+      "type": "checkpoint",
+      "x": 6,
+      "y": 55,
+      "properties": {}
+    },
+    {
+      "type": "checkpoint",
+      "x": 72,
+      "y": 27,
+      "properties": {}
+    },
+    {
       "type": "light",
       "x": 4,
       "y": 67,

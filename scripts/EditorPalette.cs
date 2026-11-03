@@ -123,7 +123,7 @@ public static class EditorPalette
 
         var categories = new[]
         {
-            Category("Mission", new[] { Obj(ObjectDefs.AgentStart), Obj(ObjectDefs.ExitDoor) }),
+            Category("Mission", new[] { Obj(ObjectDefs.AgentStart), Obj(ObjectDefs.Checkpoint), Obj(ObjectDefs.ExitDoor) }),
             Category("Walls", walls),
             Category("Terrain", terrain, Array.FindIndex(terrain, e => e.TileId == TileDefs.Spikes)),
             Category("Devices", new[]
