@@ -27,8 +27,6 @@ public static class TileSetBuilder
     private static readonly Vector2I SpikesCoords = new(0, 4);
 
     private static readonly Dictionary<int, ImageTexture> IconCache = new();
-    private static readonly Dictionary<int, ImageTexture> TextureCache = new();
-    private static ImageTexture _nightSkySheet;
 
     public static Vector2I AtlasCoordsFor(int tileId)
     {
@@ -115,22 +113,6 @@ public static class TileSetBuilder
         return tileSet;
     }
 
-    // 4x4 sheet of night-sky variants for the outdoors backdrop, so its
-    // repeat period is 4 tiles instead of 1.
-    public static ImageTexture NightSkySheet()
-    {
-        if (_nightSkySheet != null)
-            return _nightSkySheet;
-        const int Cells = 4;
-        var img = Image.CreateEmpty(TileSize * Cells, TileSize * Cells, false, Image.Format.Rgba8);
-        for (int cy = 0; cy < Cells; cy++)
-            for (int cx = 0; cx < Cells; cx++)
-                img.BlitRect(BuildNightSkyImage(SkyVariantFor(new Vector2I(cx, cy))),
-                    new Rect2I(0, 0, TileSize, TileSize), new Vector2I(cx * TileSize, cy * TileSize));
-        _nightSkySheet = ImageTexture.CreateFromImage(img);
-        return _nightSkySheet;
-    }
-
     // Water frame: the waves crawl sideways one pixel per frame and the
     // surface dither shimmers on the half beat.
     private static Image BuildWaterImage(int frame)
@@ -201,16 +183,6 @@ public static class TileSetBuilder
         for (int i = 0; i < stars; i++)
             img.SetPixel((int)(Next() % TileSize), (int)(Next() % TileSize), new Color("9a9aa5"));
         return img;
-    }
-
-    // Full-size single tile texture (the level sky).
-    public static ImageTexture TileTexture(int tileId)
-    {
-        if (TextureCache.TryGetValue(tileId, out var cached))
-            return cached;
-        var texture = ImageTexture.CreateFromImage(BuildTileImage(tileId));
-        TextureCache[tileId] = texture;
-        return texture;
     }
 
     // Small version for palette buttons.
