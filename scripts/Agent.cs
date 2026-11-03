@@ -175,7 +175,7 @@ public partial class Agent : CharacterBody2D
             for (int x = minX; x <= maxX; x++)
             {
                 int id = Session.TileAt(x, below);
-                if (id == TileDefs.ElectricFloor && !Session.ElectricFloorsOff)
+                if (id == TileDefs.ElectricFloor && !Session.IsFloorOff(new Vector2I(x, below)))
                     onElectric = true;
                 else if (id == TileDefs.AlarmFloor)
                     Session.TriggerAlarm();   // README: alarm floor triggers on step

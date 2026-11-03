@@ -503,7 +503,9 @@ public partial class Editor : Node2D
             + "Menu shortcuts\n" + shortcuts + "\n\n"
             + "Palette\n"
             + "  Pick a category on the left, then a swatch.\n"
-            + "  The property row sets the brush color or number.\n\n"
+            + "  The property row sets the brush color or number (1-8).\n"
+            + "  A Floor circuit marker on an electric floor tile wires that\n"
+            + "  whole connected floor region to its circuit number.\n\n"
             + "Level rules\n"
             + "  Exactly one agent start and at least one exit door.\n"
             + "  The level is validated before play.\n"
@@ -694,6 +696,7 @@ public partial class Editor : Node2D
             ("Devices", new[]
             {
                 Obj(ObjectDefs.Computer), Obj(ObjectDefs.Switch), Obj(ObjectDefs.Laser),
+                Obj(ObjectDefs.SecurityDoor), Obj(ObjectDefs.FloorCircuit),
                 Obj(ObjectDefs.Camera), Obj(ObjectDefs.RocketLauncher), Obj(ObjectDefs.Closet),
             }),
             ("Movables", new[] { Obj(ObjectDefs.Barrel) }),

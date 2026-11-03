@@ -666,6 +666,46 @@ public static class Sprites
             "................",
             "................",
         }),
+        // The red lamp marks a closed door; the circuit number is a label.
+        [ObjectDefs.SecurityDoor] = new(new[]
+        {
+            "................",
+            "...VVVVVVVVV....",
+            "...VvvvvvvvV....",
+            "...VvvrrvvvV....",
+            "...VvvrrvvvV....",
+            "...VvvvvvvvV....",
+            "...VVVVVVVVV....",
+            "...VvvvvvvvV....",
+            "...VvvvvvvvV....",
+            "...VvvvvvvvV....",
+            "...VvvvvvvvV....",
+            "...VvvvvvvvV....",
+            "...VvvvvvvvV....",
+            "...VvvvvvvvV....",
+            "...VVVVVVVVV....",
+            "................",
+        }),
+        // Editor-only marker: a bolt on the electric floor tile it names.
+        [ObjectDefs.FloorCircuit] = new(new[]
+        {
+            "................",
+            "................",
+            "................",
+            ".......yy.......",
+            "......yy........",
+            ".....yy.........",
+            "....yyyyyy......",
+            "........yy......",
+            ".......yy.......",
+            "......yy........",
+            ".....y..........",
+            "................",
+            "................",
+            "................",
+            "................",
+            "................",
+        }),
         [ObjectDefs.Camera] = new(new[]
         {
             "................",

@@ -15,8 +15,8 @@ public class LevelObject
 
 public class LevelData
 {
-    public const int DefaultWidth = 40;
-    public const int DefaultHeight = 40;
+    public const int DefaultWidth = 80;
+    public const int DefaultHeight = 80;
 
     public string Name { get; set; } = "";
     public string Description { get; set; } = "";

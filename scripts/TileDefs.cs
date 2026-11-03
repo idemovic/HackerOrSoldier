@@ -94,6 +94,8 @@ public static class ObjectDefs
     public const string UsbKey = "usb_key";
     public const string Switch = "switch";
     public const string Laser = "laser";
+    public const string SecurityDoor = "security_door";
+    public const string FloorCircuit = "floor_circuit";
     public const string Camera = "camera";
     public const string Closet = "closet";
     public const string Barrel = "barrel";
@@ -125,6 +127,8 @@ public static class ObjectDefs
         new(UsbKey, "USB key", new Color(0.85f, 0.75f, 0.25f)),
         new(Switch, "Switch", new Color(0.75f, 0.55f, 0.75f)),
         new(Laser, "Laser beam", new Color(0.95f, 0.30f, 0.30f)),
+        new(SecurityDoor, "Security door", new Color(0.55f, 0.62f, 0.75f)),
+        new(FloorCircuit, "Floor circuit", new Color(0.90f, 0.85f, 0.20f)),
         new(Camera, "Security camera", new Color(0.65f, 0.65f, 0.72f)),
         new(Closet, "Closet", new Color(0.50f, 0.33f, 0.18f)),
         new(Barrel, "Barrel", new Color(0.62f, 0.44f, 0.24f)),
@@ -155,12 +159,13 @@ public static class ObjectDefs
 
     public static bool HasColorProperty(string type) => type is Door or DoorKey;
 
-    // Circuits: a computer or switch with number N turns off lasers with
-    // number N; USB keys hack the computer with the matching number.
-    public static readonly string[] Numbers = { "1", "2", "3", "4" };
+    // Circuits: a computer or switch with number N turns off the lasers,
+    // security doors and floor circuits with number N; USB keys hack the
+    // computer with the matching number. Teleports pair by number too.
+    public static readonly string[] Numbers = { "1", "2", "3", "4", "5", "6", "7", "8" };
 
     public static bool HasNumberProperty(string type) =>
-        type is Computer or UsbKey or Switch or Laser or Teleport;
+        type is Computer or UsbKey or Switch or Laser or Teleport or SecurityDoor or FloorCircuit;
 
     public static bool IsPickup(string type) =>
         type is DoorKey or HealthKit or AmmoPack or Vest or Briefcase or InfraGoggles or UsbKey

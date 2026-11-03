@@ -156,8 +156,8 @@ public partial class Enemy : CharacterBody2D
 
     private bool SeesAgent()
     {
-        if (Session.Agent.IsHiding)
-            return false;   // README: the agent hides in closets
+        if (Session.Agent.IsHiding || Session.DisguiseActive)
+            return false;   // README: closets hide the agent; the briefcase disguise fools enemies
         var to = Session.Agent.Position - Position;
         switch (Def.LoS)
         {

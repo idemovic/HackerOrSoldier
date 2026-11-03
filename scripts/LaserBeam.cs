@@ -3,18 +3,18 @@ using Godot;
 namespace HackerOrSoldier;
 
 // A vertical beam from the emitter up to the first solid tile above it.
-// Contact damages like the electric floor: a life after 3 seconds of
-// touching (README: "takes a life every 3 seconds"). Turning off the
-// beam's circuit (computer hack or switch) disables it.
+// Touching an active beam costs a life at once; the cooldown only matters
+// when the vest absorbs the hit and the agent stays in the beam. Turning off
+// the beam's circuit (computer hack or switch) disables it.
 public partial class LaserBeam : Node2D
 {
-    private const float DamageInterval = 3f;
+    private const float HitCooldown = 1f;
 
     public PlaySession Session { get; set; }
     public string Number { get; set; } = "1";
 
     private float _topY;
-    private float _contactTime;
+    private float _cooldown;
     private ColorRect _beam;
 
     public override void _Ready()
@@ -45,6 +45,7 @@ public partial class LaserBeam : Node2D
 
     public override void _PhysicsProcess(double delta)
     {
+        _cooldown -= (float)delta;
         bool active = !Session.IsCircuitOff(Number);
         _beam.Visible = active;
         if (!active)
@@ -55,16 +56,9 @@ public partial class LaserBeam : Node2D
             && Mathf.Abs(agent.Position.X - Position.X) < 17
             && agent.Position.Y + 15 > _topY
             && agent.Position.Y - 15 < Position.Y + 10;
-        if (!touching)
-        {
-            _contactTime = 0;
+        if (!touching || _cooldown > 0)
             return;
-        }
-        _contactTime += (float)delta;
-        if (_contactTime >= DamageInterval)
-        {
-            _contactTime = 0;
-            Session.AgentHit();
-        }
+        _cooldown = HitCooldown;
+        Session.AgentHit();
     }
 }

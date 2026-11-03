@@ -88,7 +88,7 @@ Fulfill strictly decorative / visual aspect of the game.
 #### Killing terrain
 - Water floor - allows slower movement horizontally, contains electric eels
 - Spike trap - cyclically (10s) raises a spike, which takes a life 
-- Electric floor - takes a life every 3 seconds
+- Electric floor - takes a life every 3 seconds; a connected region marked with a floor circuit number switches off when that circuit goes off, unmarked floors stay live
 - Spear - stationary spear, instantly kills the agent
 - Electric door - cyclically (10s) engages an electric field that takes a life
 - Lava floor - instantly kills the agent
@@ -106,11 +106,13 @@ twice as quickly.
 The agent can hide in the closet on activate action, e.g. in case of an alarm.
 
 ### Machines / Devices
-- Computer - can be hacked via USB key with same number, switches off laser beam / floor
+- Computer - can be hacked via USB key with same number, switches off the laser beams, security doors and floor circuits with that number (8 circuits)
 - Security camera - triggers the alarm
-- Laser beam - a beam between two ends, takes a life every 3 seconds
+- Laser beam - a beam between two ends, takes a life the moment the agent touches it (then a 1 second cooldown before it can hit again)
 - Rocket launcher - launches rockets
-- Switch - switches off laser beam / floor on hit
+- Switch - switches off the laser beams, security doors and floor circuits with its number on hit
+- Security door - a solid door wired to a circuit number; opens for good when the circuit goes off, colored keys do not open it
+- Floor circuit - editor-only marker with a number, placed on an electric floor tile; it assigns that tile's connected electric floor region to the circuit
 
 ### Movables
 In the rooms the agent may find barrels that can be moved (properly emphasized) in both directions to make a way to originally inaccessible places.
@@ -151,7 +153,7 @@ The following items available across levels activate automatically:
 - Bulletproof vest - saves 1 life, then is destroyed
 
 These items activate manually:
-- Briefcase (disguise), when used, agent looks like a soldier for 30 seconds, and can't be detected by cameras
+- Briefcase (disguise), when used, agent looks like a soldier for 30 seconds, and can't be detected by cameras or spotted by enemies (walking into one still hurts)
 - Infra goggles - changes visual to infra red and reveals hidden platforms, when activated they are active for 30 seconds
 
 Items can't be destroyed nor shot.
@@ -261,7 +263,7 @@ edit mode and play mode at any time.
   - Computer / USB key - number (matching pairs)
   - Teleport - capsules are placed as a joined pair
   - Elevator / moving platform - movement range (start and end tile)
-  - Switch / Computer - the laser beam / floor it switches off
+  - Switch / Computer / Laser beam / Security door / Floor circuit - number 1-8, the circuit they share
 - Every level must contain exactly one agent start position and at least one exit door
 
 ### Play mode

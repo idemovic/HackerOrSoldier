@@ -44,9 +44,13 @@ public partial class SmokeTest : Node
         await ExplosionCheck();
         await ComputerHackCheck();
         await LaserDamageCheck();
+        await CircuitSevenCheck();
+        await SecurityDoorCheck();
+        await FloorCircuitCheck();
         await SwitchCheck();
         await CameraAlarmCheck();
         await DisguiseCheck();
+        await EnemyDisguiseCheck();
         await ClosetCheck();
         await BarrelCheck();
         await CollectibleCheck();
@@ -227,15 +231,15 @@ public partial class SmokeTest : Node
         editor.StopPlay();
     }
 
-    // The default level is 40x40 with the floor and agent start at the
+    // The default level is 80x80 with the floor and agent start at the
     // bottom; the agent spawns and stands there.
     private async Task DefaultLevelCheck()
     {
         var editor = await FreshEditor(legacySize: false);
-        Check(editor.Level.Width == 40 && editor.Level.Height == 40, "default level is 40x40");
-        Check(editor.StartPlay(), "default 40x40 level starts");
+        Check(editor.Level.Width == 80 && editor.Level.Height == 80, "default level is 80x80");
+        Check(editor.StartPlay(), "default 80x80 level starts");
         var agent = editor.PlayerAgent;
-        Check(agent != null && agent.Position.Y > 37 * 32,
+        Check(agent != null && agent.Position.Y > 77 * 32,
             "agent starts near the bottom of the tall level");
         float startY = agent?.Position.Y ?? 0;
         await Frames(20);
@@ -701,7 +705,7 @@ public partial class SmokeTest : Node
         editor.StopPlay();
     }
 
-    // Standing in an active laser beam costs a life after 3 seconds.
+    // Touching an active laser beam costs a life at once, not after a delay.
     private async Task LaserDamageCheck()
     {
         var editor = await FreshEditor();
@@ -711,9 +715,130 @@ public partial class SmokeTest : Node
         Input.ActionPress("move_right");
         await Frames(25);
         Input.ActionRelease("move_right");
-        await Frames(200);
-        Check(editor.Session.Lives == 2, "laser beam takes a life after 3 seconds of contact");
+        await Frames(5);
+        Check(editor.Session.Lives == 2, "laser beam takes a life the moment it is touched");
         editor.StopPlay();
+    }
+
+    // Circuit numbers go up to 8: a USB key 7 hacks computer 7 and the
+    // laser 7 beyond it goes dark, while circuit 8 stays on.
+    private async Task CircuitSevenCheck()
+    {
+        Check(ObjectDefs.Numbers.Length == 8 && ObjectDefs.Numbers.Contains("7") && ObjectDefs.Numbers.Contains("8"),
+            "the editor offers circuit numbers 1 to 8");
+        var editor = await FreshEditor();
+        editor.SetBrushObject(ObjectDefs.UsbKey, number: "7");
+        editor.PaintCell(new Vector2I(5, 10));
+        editor.SetBrushObject(ObjectDefs.Computer, number: "7");
+        editor.PaintCell(new Vector2I(8, 10));
+        editor.SetBrushObject(ObjectDefs.Laser, number: "7");
+        editor.PaintCell(new Vector2I(12, 10));
+        Check(editor.StartPlay(), "circuit 7 level starts");
+        Input.ActionPress("move_right");
+        await Frames(120);
+        Input.ActionRelease("move_right");
+        Check(editor.Session.IsCircuitOff("7"), "usb key 7 hacks computer 7");
+        Check(!editor.Session.IsCircuitOff("8"), "circuit 8 stays on");
+        Check(editor.Session.Lives == 3 && editor.PlayerAgent.Position.X > 13 * 32,
+            "agent passes the switched-off laser 7 unharmed");
+        editor.StopPlay();
+    }
+
+    // A security door is solid while its circuit is on, and opens for good
+    // when the circuit goes off by hacking its computer or shooting a switch.
+    private async Task SecurityDoorCheck()
+    {
+        var editor = await FreshEditor();
+        PaintDoorColumn(editor, 8, "5");
+        Check(editor.StartPlay(), "security door level starts");
+        Input.ActionPress("move_right");
+        await Frames(100);
+        Input.ActionRelease("move_right");
+        Check(editor.PlayerAgent.Position.X < 8 * 32, "a closed security door blocks the agent");
+        Check(!OpenDoor(editor), "the security door stays closed while its circuit is on");
+        editor.StopPlay();
+
+        editor = await FreshEditor();
+        PaintDoorColumn(editor, 8, "5");
+        editor.SetBrushObject(ObjectDefs.UsbKey, number: "5");
+        editor.PaintCell(new Vector2I(3, 10));
+        editor.SetBrushObject(ObjectDefs.Computer, number: "5");
+        editor.PaintCell(new Vector2I(5, 10));
+        Check(editor.StartPlay(), "security door hack level starts");
+        Input.ActionPress("move_right");
+        await Frames(150);
+        Input.ActionRelease("move_right");
+        Check(OpenDoor(editor), "hacking its computer opens the security door");
+        Check(editor.PlayerAgent.Position.X > 10 * 32, "the agent walks through the opened security door");
+        editor.StopPlay();
+
+        editor = await FreshEditor();
+        PaintDoorColumn(editor, 8, "6");
+        editor.SetBrushObject(ObjectDefs.Switch, number: "6");
+        editor.PaintCell(new Vector2I(4, 10));
+        Check(editor.StartPlay(), "security door switch level starts");
+        Input.ActionPress("shoot");
+        await Frames(2);
+        Input.ActionRelease("shoot");
+        Input.ActionPress("move_right");
+        await Frames(100);
+        Input.ActionRelease("move_right");
+        Check(OpenDoor(editor), "shooting a switch of its number opens the security door");
+        Check(editor.PlayerAgent.Position.X > 10 * 32, "the agent walks through after the switch");
+        editor.StopPlay();
+    }
+
+    // Four tiles tall so the agent cannot jump over it.
+    private static void PaintDoorColumn(Editor editor, int x, string number)
+    {
+        editor.SetBrushObject(ObjectDefs.SecurityDoor, number: number);
+        for (int y = 7; y <= 10; y++)
+            editor.PaintCell(new Vector2I(x, y));
+    }
+
+    private static bool OpenDoor(Editor editor)
+    {
+        var doors = editor.Session.GetChildren().OfType<SecurityDoor>().ToList();
+        return doors.Count > 0 && doors.All(d => d.IsOpen);
+    }
+
+    // Electric floor regions marked 1 and 2 plus an unmarked one: hacking
+    // circuit 1 turns off only region 1.
+    private async Task FloorCircuitCheck()
+    {
+        var editor = await FreshEditor();
+        editor.SetBrushTile(TileDefs.ElectricFloor);
+        foreach (int x in new[] { 2, 3, 6, 7, 10, 11 })
+            editor.PaintCell(new Vector2I(x, 11));
+        editor.SetBrushObject(ObjectDefs.FloorCircuit, number: "1");
+        editor.PaintCell(new Vector2I(3, 11));
+        editor.SetBrushObject(ObjectDefs.FloorCircuit, number: "2");
+        editor.PaintCell(new Vector2I(6, 11));
+        editor.SetBrushObject(ObjectDefs.UsbKey, number: "1");
+        editor.PaintCell(new Vector2I(3, 10));
+        editor.SetBrushObject(ObjectDefs.Computer, number: "1");
+        editor.PaintCell(new Vector2I(4, 10));
+        Check(editor.StartPlay(), "floor circuit level starts");
+        var session = editor.Session;
+        Input.ActionPress("move_right");
+        await Frames(35);
+        Input.ActionRelease("move_right");
+        Check(session.IsCircuitOff("1") && !session.IsCircuitOff("2"), "hacking computer 1 turns off only circuit 1");
+
+        await StandOn(editor, 2);
+        Check(session.Lives == 3, "the electric floor region marked 1 is off after the hack");
+        await StandOn(editor, 6);
+        Check(session.Lives == 2, "the electric floor region marked 2 still hurts");
+        await Frames(100);   // the death sequence finishes and the agent respawns
+        await StandOn(editor, 10);
+        Check(session.Lives == 1, "an unmarked electric floor region still hurts");
+        editor.StopPlay();
+    }
+
+    private async Task StandOn(Editor editor, int cellX)
+    {
+        editor.PlayerAgent.Position = new Vector2(cellX * 32 + 16, 10 * 32 + 16);
+        await Frames(200);
     }
 
     // Shooting a switch turns off its circuit, which also disables
@@ -722,6 +847,8 @@ public partial class SmokeTest : Node
     {
         var editor = await FreshEditor();
         editor.SetBrushTile(TileDefs.ElectricFloor);
+        editor.PaintCell(new Vector2I(2, 11));
+        editor.SetBrushObject(ObjectDefs.FloorCircuit, number: "1");
         editor.PaintCell(new Vector2I(2, 11));
         editor.SetBrushObject(ObjectDefs.Switch, number: "1");
         editor.PaintCell(new Vector2I(8, 10));
@@ -766,6 +893,45 @@ public partial class SmokeTest : Node
         await Frames(10);
         Check(editor.Session.DisguiseActive, "activate turns on the briefcase disguise");
         Check(!editor.Session.AlarmActive, "disguised agent is not detected by the camera");
+        editor.StopPlay();
+    }
+
+    // A disguised agent is not spotted: the soldier across a pit holds fire
+    // for the whole 30s, then shoots once the disguise ends.
+    private async Task EnemyDisguiseCheck()
+    {
+        var editor = await FreshEditor();
+        editor.SetBrushEraser();
+        foreach (int x in new[] { 5, 6, 10, 11, 12, 13, 14, 15 })
+            editor.PaintCell(new Vector2I(x, 11));
+        editor.SetBrushObject(ObjectDefs.Briefcase);
+        editor.PaintCell(new Vector2I(3, 10));
+        editor.SetBrushObject(EnemyDefs.Soldier);
+        editor.PaintCell(new Vector2I(8, 10));
+        Check(editor.StartPlay(), "enemy disguise level starts");
+        var session = editor.Session;
+        Input.ActionPress("move_right");
+        await Frames(12);
+        Input.ActionPress("activate");
+        await Frames(2);
+        Input.ActionRelease("activate");
+        Input.ActionRelease("move_right");
+        Check(session.DisguiseActive, "disguise is active before the soldier can fire");
+
+        bool fired = false;
+        while (session.DisguiseActive && !fired)
+        {
+            await Frames(1);
+            fired = session.GetChildren().OfType<EnemyBullet>().Any();
+        }
+        Check(!fired && session.Lives == 3, "a soldier with the agent in its row does not fire while disguised");
+
+        for (int i = 0; i < 600 && !fired; i++)
+        {
+            await Frames(1);
+            fired = session.GetChildren().OfType<EnemyBullet>().Any();
+        }
+        Check(fired, "the soldier fires once the disguise ends");
         editor.StopPlay();
     }
 

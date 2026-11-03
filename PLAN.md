@@ -36,7 +36,7 @@ Placeholder colored rects stand in for art until the systems are done.
   start but keeps level state (opened doors stay open, picked items stay
   picked); losing all lives returns to edit mode
 - Killing terrain: lava and spear instant kill, spikes raised during the last
-  2s of each 10s cycle, electric floor takes a life after each 3s of contact,
+  2s of each 10s cycle, electric floor takes a life after each 3s of contact (per-region circuits, see milestone 4),
   kill plane below the level bounds
 - Water: half horizontal speed, capped sink/swim speed while submerged, full
   jump velocity when jumping from the top water tile (surface line)
@@ -55,9 +55,8 @@ Placeholder colored rects stand in for art until the systems are done.
   cycle, electric floor timing, goggles activation)
 
 Known simplifications (revisit with milestone 3):
-- Bullets pass through locked doors (they only collide with tiles so far)
-- Briefcase disguise is a timer + HUD entry only until enemies and cameras
-  exist
+- Bullets pass through locked doors and security doors (they only collide with tiles so far)
+- (Resolved: the briefcase disguise now defeats cameras and enemy spotting.)
 - Alarm floor is a plain solid tile until the alarm system lands
 
 ### Milestone 3 - enemies
@@ -92,7 +91,7 @@ Known simplifications (tuning constants, not README rules):
   the milestone 5 settings screen
 
 ### Milestone 4 - hacking path
-- Circuits: computers, switches and lasers carry a number property (1-4),
+- Circuits: computers, switches, lasers, security doors and floor circuits carry a number property (1-8),
   chosen from a second property row in the palette; markers and computers
   show their number
 - USB keys are numbered pickups; walking up to a computer while carrying the
@@ -100,14 +99,23 @@ Known simplifications (tuning constants, not README rules):
   proximity) and turns off its circuit
 - Switches turn off their circuit when shot (README: "on hit"), trading a
   gunshot alarm for the hack
-- Laser beams run from the emitter up to the first solid tile; contact costs
-  a life after 3 seconds (same rule as the electric floor); turning off the
-  circuit disables the beam
-- Turning off any circuit also disables all electric floor tiles (README says
-  computers/switches switch off "laser beam / floor"; per-tile floor linking
-  would need tile properties, so floor disabling is global for now)
+- Laser beams run from the emitter up to the first solid tile; touching an
+  active beam costs a life at once, then a 1s cooldown before it can hit again
+  (only visible with the vest); turning off the circuit disables the beam
+- Security door (`security_door`): solid 1-tile door on a circuit number;
+  opens for good (collision off, faint frame left) when the circuit turns off.
+  Colored keys do not open it; enemies treat it as a wall (layer 1) and bullets
+  pass through it like they do the colored door
+- Floor circuits: an editor-only `floor_circuit` marker with a number on an
+  electric floor tile claims that tile's 4-connected electric floor region.
+  PlaySession maps cell -> circuit at session start; when the circuit turns
+  off only that region goes dark. Floor with no marker stays live forever,
+  and a marker off the floor does nothing. Replaces the old "first hack
+  disables every electric floor" rule
 - Security cameras raise the alarm while they see the agent (8 tiles,
-  blocked by solid tiles); an active briefcase disguise or hiding defeats them
+  blocked by solid tiles); an active briefcase disguise or hiding defeats them.
+  Enemies share the rule: SeesAgent returns false while disguised or hiding,
+  so they do not chase, fire or drop dynamite; contact damage still applies
 - Closets: activate (C) next to a closet hides the agent (immobile,
   invisible to enemies, cameras, bullets and contact damage); C again leaves.
   Priority for C: leave closet, hide in closet, then use held items
@@ -115,7 +123,9 @@ Known simplifications (tuning constants, not README rules):
   on, treated as walls by enemies
 - Smoke test covers hack-by-number, wrong-number stays locked, laser damage
   and pass-through when off, switch shooting, floor disabling, camera alarm,
-  disguise, closet hiding and leaving, barrel pushing
+  disguise, closet hiding and leaving, barrel pushing; milestone 6 mechanics
+  add circuit 7, instant laser hit, security door, per-region floors and
+  enemies ignoring the disguise
 
 ### Milestone 5 - meta layer
 - Main menu (scenes/main_menu.tscn, now the main scene): New game (with the
@@ -225,8 +235,8 @@ Known simplifications (tuning constants, not README rules):
 - Smoke test: default is night, the toggle flips to day, and the choice
   round-trips through save/load (negative-verified with a no-op toggle)
 
-### Level size 40x40
-- Default level size raised from 40x12 to 40x40 tiles; the editor camera
+### Level size 80x80
+- Default level size raised from 40x12 to 40x40, then to 80x80 tiles; the editor camera
   starts at the bottom-left corner where the default floor and agent start
   are, and pans in both axes within the level bounds
 - Camera limits, kill plane, minimap and play camera all derive from the
@@ -234,7 +244,7 @@ Known simplifications (tuning constants, not README rules):
   keep their own size and still load and play
 - Editor gained SetLevel (used by the load dialog and the smoke test); the
   smoke test runs its scenarios on an injected 40x12 level so their
-  hand-tuned coordinates stay valid, and a new check covers the 40x40
+  hand-tuned coordinates stay valid, and a new check covers the 80x80
   default (dimensions, spawn at the bottom, standing on the floor)
 
 ### Editor palette rework
@@ -360,9 +370,9 @@ Known simplifications (tuning constants, not README rules):
 - Visual layer (VGA palette + dithering shader, real sprites, 32x32 tile art):
   after milestone 2 or 3. Placeholder rects iterate faster, and the retro
   aesthetic is an asset swap plus one shader, not a structural decision.
-- Level size is fixed at 40x40 tiles (raised from 40x12); the format stores
+- Level size is fixed at 80x80 tiles (raised from 40x12 and 40x40); the format stores
   width/height, so per-level resizing is a later editor feature, not a
-  format change. Old 40x12 levels still load and play.
+  format change. Old smaller levels still load and play.
 - Elevator / moving platform movement-range property (start and end tile per
   the README editor section): the current fixed 4-tile obstacle-limited range
   works without new UI; add the range picker when the property row grows up.

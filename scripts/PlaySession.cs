@@ -49,7 +49,6 @@ public partial class PlaySession : Node2D
     public bool RobotsOff => Time % RobotCycle >= RobotCycle - RobotOffTime;
     public bool AlarmActive => _alarmTime > 0;
     public bool DisguiseActive => _disguiseTime > 0;
-    public bool ElectricFloorsOff { get; private set; }
     public bool AgentDown => _agentDown;
     public float DropChance { get; set; } = 0.3f;   // README: some enemies "sometimes" drop an ammo pack
     public System.Collections.Generic.IReadOnlyList<Enemy> Enemies => _enemies;
@@ -77,6 +76,10 @@ public partial class PlaySession : Node2D
     private bool _teleportLock;
     private readonly HashSet<string> _usbKeys = new();
     private readonly HashSet<string> _circuitsOff = new();
+    private readonly List<SecurityDoor> _securityDoors = new();
+    // Electric floor cell -> circuit number, from each floor_circuit marker's
+    // connected region. Cells absent here are live forever.
+    private readonly Dictionary<Vector2I, string> _floorCircuits = new();
     private float _alarmTime;
     private float _gogglesTime;
     private float _disguiseTime;
@@ -150,6 +153,13 @@ public partial class PlaySession : Node2D
                     _computers.Add(computer);
                     AddChild(computer);
                     break;
+                case ObjectDefs.SecurityDoor:
+                    var securityDoor = new SecurityDoor { Position = pos, Number = NumberOf(obj) };
+                    _securityDoors.Add(securityDoor);
+                    AddChild(securityDoor);
+                    break;
+                case ObjectDefs.FloorCircuit:
+                    break;   // editor-only marker, read by MapFloorCircuits
                 case ObjectDefs.Switch:
                     var wallSwitch = new WallSwitch { Position = pos, Number = NumberOf(obj) };
                     _switches.Add(wallSwitch);
@@ -215,6 +225,8 @@ public partial class PlaySession : Node2D
                     break;
             }
         }
+
+        MapFloorCircuits();
 
         _spikes = new Node2D { Visible = false };
         AddChild(_spikes);
@@ -441,26 +453,54 @@ public partial class PlaySession : Node2D
 
     public bool IsCircuitOff(string number) => _circuitsOff.Contains(number);
 
+    public bool IsFloorOff(Vector2I cell) =>
+        _floorCircuits.TryGetValue(cell, out var number) && IsCircuitOff(number);
+
     // README: computers and switches switch off "laser beam / floor". Lasers
-    // are matched per circuit number; electric floors have no per-tile
-    // properties yet, so the first hack disables all of them.
+    // and security doors match by circuit number; an electric floor goes off
+    // only when its own region's circuit does.
     public void TurnOffCircuit(string number)
     {
-        _circuitsOff.Add(number);
-        if (ElectricFloorsOff)
+        if (!_circuitsOff.Add(number))
             return;
-        ElectricFloorsOff = true;
+        foreach (var door in _securityDoors)
+            if (door.Number == number)
+                door.Open();
         int tile = TileSetBuilder.TileSize;
-        for (int y = 0; y < _level.Height; y++)
-            for (int x = 0; x < _level.Width; x++)
-                if (_level.GetTile(x, y) == TileDefs.ElectricFloor)
-                    AddChild(new ColorRect
-                    {
-                        Position = new Vector2(x * tile, y * tile),
-                        Size = new Vector2(tile, tile),
-                        Color = new Color(0.1f, 0.1f, 0.15f, 0.55f),
-                        MouseFilter = Control.MouseFilterEnum.Ignore,
-                    });
+        foreach (var (cell, circuit) in _floorCircuits)
+            if (circuit == number)
+                AddChild(new ColorRect
+                {
+                    Position = new Vector2(cell.X * tile, cell.Y * tile),
+                    Size = new Vector2(tile, tile),
+                    Color = new Color(0.1f, 0.1f, 0.15f, 0.55f),
+                    MouseFilter = Control.MouseFilterEnum.Ignore,
+                });
+    }
+
+    // Flood-fills the 4-connected electric floor region under each marker.
+    // A marker off the floor maps nothing, and a cell already claimed by an
+    // earlier marker keeps that marker's circuit.
+    private void MapFloorCircuits()
+    {
+        foreach (var marker in _level.Objects)
+        {
+            if (marker.Type != ObjectDefs.FloorCircuit)
+                continue;
+            string number = NumberOf(marker);
+            var pending = new Stack<Vector2I>();
+            pending.Push(new Vector2I(marker.X, marker.Y));
+            while (pending.Count > 0)
+            {
+                var cell = pending.Pop();
+                if (_level.GetTile(cell.X, cell.Y) != TileDefs.ElectricFloor || !_floorCircuits.TryAdd(cell, number))
+                    continue;
+                pending.Push(cell + Vector2I.Left);
+                pending.Push(cell + Vector2I.Right);
+                pending.Push(cell + Vector2I.Up);
+                pending.Push(cell + Vector2I.Down);
+            }
+        }
     }
 
     // The activate action, by priority: leave a closet, hide in a nearby
