@@ -88,6 +88,19 @@ public static class Sprites
         return texture;
     }
 
+    // A sprite cropped to its drawn pixels, so object art centred in a 16x16
+    // cell can sit in a HUD row at the same pixel size as the hearts.
+    public static ImageTexture Trimmed(string key)
+    {
+        string cacheKey = $"trimmed:{key}";
+        if (Cache.TryGetValue(cacheKey, out var cached))
+            return cached;
+        var img = Get(key).GetImage();
+        var texture = ImageTexture.CreateFromImage(img.GetRegion(img.GetUsedRect()));
+        Cache[cacheKey] = texture;
+        return texture;
+    }
+
     private static Image FromMap(string key, string[] rows, int scale, Color slot)
     {
         int width = rows[0].Length;
@@ -1344,6 +1357,26 @@ public static class Sprites
             "................",
             "................",
         }),
+        // The starting weapon has no pickup; this is only its HUD icon.
+        ["pistol"] = new(new[]
+        {
+            "................",
+            "................",
+            "................",
+            "................",
+            "................",
+            "................",
+            "...vvvvvvvvvvv..",
+            "...VVVVVVVVVVV..",
+            "...VVVV.k.......",
+            "...VVV..........",
+            "...VVV..........",
+            "...VVV..........",
+            "................",
+            "................",
+            "................",
+            "................",
+        }),
         [ObjectDefs.WeaponChainsaw] = new(new[]
         {
             "................",
@@ -1885,6 +1918,18 @@ public static class Sprites
             "..rrrR..",
             "...rR...",
             "........",
+        }),
+        // HUD score counter.
+        ["score"] = new(new[]
+        {
+            "...y....",
+            "..yyy...",
+            "yyyyyyy.",
+            ".yyyyy..",
+            "..yyy...",
+            ".yyoyy..",
+            ".yo.oy..",
+            "yo...oy.",
         }),
         ["bullet"] = new(new[]
         {
