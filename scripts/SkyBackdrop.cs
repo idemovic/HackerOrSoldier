@@ -19,11 +19,14 @@ public partial class SkyBackdrop : Node2D
         Material = _material;
     }
 
-    public void Apply(LevelData level)
+    public void Apply(LevelData level) =>
+        Apply(new Vector2(level.Width, level.Height) * TileSetBuilder.TileSize, level.Sky == "day");
+
+    public void Apply(Vector2 size, bool day)
     {
-        _size = new Vector2(level.Width, level.Height) * TileSetBuilder.TileSize;
-        _material.SetShaderParameter("is_day", level.Sky == "day");
-        _material.SetShaderParameter("level_height", _size.Y);
+        _size = size;
+        _material.SetShaderParameter("is_day", day);
+        _material.SetShaderParameter("level_height", size.Y);
         QueueRedraw();
     }
 

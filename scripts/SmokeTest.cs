@@ -1539,6 +1539,12 @@ public partial class SmokeTest : Node
         AddChild(game);
         await ToSignal(GetTree(), SceneTree.SignalName.ProcessFrame);
         Check(IsInstanceValid(game), "game scene builds");
+        await Frames(3);   // the containers settle their layout
+        var panel = game.FindChildren("*", nameof(PanelContainer), true, false).OfType<PanelContainer>().FirstOrDefault();
+        var screen = GetViewport().GetVisibleRect();
+        var box = panel?.GetGlobalRect() ?? default;
+        Check(panel != null && screen.Encloses(box), "the campaign panel fits on screen");
+        Check(panel != null && box.GetCenter().DistanceTo(screen.GetCenter()) < 2, "the campaign panel is centered");
         game.QueueFree();
         await ToSignal(GetTree(), SceneTree.SignalName.ProcessFrame);
     }

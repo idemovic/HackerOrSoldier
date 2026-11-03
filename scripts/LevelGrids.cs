@@ -38,11 +38,16 @@ public sealed class LevelGrids
         RefreshWaterAround(cell);
     }
 
-    public void Fill(LevelData level)
+    public void Clear()
     {
         Main.Clear();
         Hidden.Clear();
         Shadow.Clear();
+    }
+
+    public void Fill(LevelData level)
+    {
+        Clear();
         for (int y = 0; y < level.Height; y++)
             for (int x = 0; x < level.Width; x++)
             {

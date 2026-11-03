@@ -35,13 +35,22 @@ public partial class GameFlow : Node2D
         _grids = new LevelGrids(this);
         _grids.Hidden.Modulate = new Color(1, 1, 1, 0);
 
-        _theme = new Theme { DefaultFontSize = 10 };
+        _theme = EditorTheme.Build();
+        _theme.DefaultFontSize = 10;
+        var panelBox = (StyleBox)_theme.GetStylebox("panel", "PanelContainer").Duplicate();
+        panelBox.SetContentMarginAll(10);
+        _theme.SetStylebox("panel", "PanelContainer", panelBox);
         _ui = new CanvasLayer();
         AddChild(_ui);
+        // The center container fits the panel to each screen's content and
+        // keeps it centered; the fixed width makes long text wrap instead of
+        // pushing the panel off screen.
+        var center = new CenterContainer { MouseFilter = Control.MouseFilterEnum.Ignore };
+        center.SetAnchorsPreset(Control.LayoutPreset.FullRect);
+        _ui.AddChild(center);
         _panel = new PanelContainer { Theme = _theme };
-        _panel.SetAnchorsPreset(Control.LayoutPreset.Center);
-        _ui.AddChild(_panel);
-        _panelBox = new VBoxContainer { CustomMinimumSize = new Vector2(280, 0) };
+        center.AddChild(_panel);
+        _panelBox = new VBoxContainer { CustomMinimumSize = new Vector2(360, 0) };
         _panel.AddChild(_panelBox);
 
         _files = LevelStore.ListFiles().OrderBy(f => f).ToArray();
@@ -226,28 +235,39 @@ public partial class GameFlow : Node2D
 
     private void GoToMenu() => GetTree().ChangeSceneToFile("res://scenes/main_menu.tscn");
 
+    // Menu screens sit on the night sky alone, filling the screen, not on
+    // the corner of the level just left.
     private void ClearSession()
     {
-        if (_session == null)
-            return;
-        _session.QueueFree();
-        _session = null;
+        if (_session != null)
+        {
+            _session.QueueFree();
+            _session = null;
+        }
+        _grids.Clear();
         _grids.Main.Modulate = Colors.White;
         _grids.Hidden.Modulate = new Color(1, 1, 1, 0);
+        _sky.Apply(GetViewportRect().Size, day: false);
     }
 
     private void ClearPanel()
     {
         foreach (var child in _panelBox.GetChildren())
+        {
+            _panelBox.RemoveChild(child);
             child.QueueFree();
+        }
         _panel.Visible = true;
     }
 
     private void AddPanelLabel(string text, int fontSize = 0)
     {
-        var label = new Label { Text = text };
+        var label = new Label { Text = text, AutowrapMode = TextServer.AutowrapMode.WordSmart };
         if (fontSize > 0)
-            label.Theme = new Theme { DefaultFontSize = fontSize };
+        {
+            label.ThemeTypeVariation = EditorTheme.Heading;
+            label.AddThemeFontSizeOverride("font_size", fontSize);
+        }
         _panelBox.AddChild(label);
     }
 
