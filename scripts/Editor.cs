@@ -690,7 +690,7 @@ public partial class Editor : Node2D
 
         return new[]
         {
-            ("Mission", new[] { Obj(ObjectDefs.AgentStart), Obj(ObjectDefs.ExitDoor) }),
+            ("Mission", new[] { Obj(ObjectDefs.AgentStart), Obj(ObjectDefs.Checkpoint), Obj(ObjectDefs.ExitDoor) }),
             ("Walls", walls),
             ("Terrain", terrain),
             ("Devices", new[]

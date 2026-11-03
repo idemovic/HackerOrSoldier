@@ -6,8 +6,9 @@ namespace HackerOrSoldier;
 // Owns one play-through: the agent, lives, ammo, inventory, the hazard clock,
 // the HUD and every node spawned from the level objects. Returning to edit
 // mode frees the whole session, which restores the level to its pre-play
-// state. Losing a life respawns at the agent start but keeps level state
-// (opened doors stay open, picked items stay picked).
+// state. Losing a life respawns at the last checkpoint touched, or the agent
+// start before any, and keeps level state (opened doors stay open, picked
+// items stay picked).
 public partial class PlaySession : Node2D
 {
     [Signal]
@@ -83,7 +84,8 @@ public partial class PlaySession : Node2D
     private float _alarmTime;
     private float _gogglesTime;
     private float _disguiseTime;
-    private Vector2 _startPosition;
+    private Vector2 _respawnPoint;
+    private Checkpoint _checkpoint;   // the lit one, null until the first is touched
     private Camera2D _camera;
     private Node2D _spikes;
     private HBoxContainer _hearts;
@@ -122,7 +124,7 @@ public partial class PlaySession : Node2D
             switch (obj.Type)
             {
                 case ObjectDefs.AgentStart:
-                    _startPosition = pos;
+                    _respawnPoint = pos;
                     Agent = _agentScene.Instantiate<Agent>();
                     Agent.Position = pos;
                     Agent.Session = this;
@@ -142,6 +144,11 @@ public partial class PlaySession : Node2D
                     var exit = new ExitDoor { Position = pos };
                     exit.Reached += () => End(SignalName.Completed);
                     AddChild(exit);
+                    break;
+                case ObjectDefs.Checkpoint:
+                    var checkpoint = new Checkpoint { Position = pos };
+                    checkpoint.Reached += OnCheckpoint;
+                    AddChild(checkpoint);
                     break;
                 case ObjectDefs.Door:
                     var door = new LockedDoor { Position = pos, ColorName = ColorOf(obj) };
@@ -637,7 +644,7 @@ public partial class PlaySession : Node2D
             // hit is not a death, so it costs the agent its ground, not the
             // whole death sequence.
             HasVest = false;
-            Agent.ResetForRespawn(_startPosition);
+            Agent.ResetForRespawn(_respawnPoint);
             return;
         }
 
@@ -652,6 +659,17 @@ public partial class PlaySession : Node2D
         AddChild(_death);
     }
 
+    private void OnCheckpoint(Checkpoint checkpoint)
+    {
+        if (checkpoint == _checkpoint || _agentDown)
+            return;
+        if (_checkpoint != null)
+            _checkpoint.Lit = false;
+        _checkpoint = checkpoint;
+        checkpoint.Lit = true;
+        _respawnPoint = checkpoint.Position;
+    }
+
     private void FinishDeath()
     {
         _agentDown = false;
@@ -663,7 +681,7 @@ public partial class PlaySession : Node2D
             End(SignalName.Failed);
             return;
         }
-        Agent.ResetForRespawn(_startPosition);
+        Agent.ResetForRespawn(_respawnPoint);
     }
 
     private void End(StringName signal)

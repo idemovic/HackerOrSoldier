@@ -379,6 +379,13 @@ Known simplifications (tuning constants, not README rules):
 - Checker approximations: a connected destructible wall opens as a whole
   once shot, at one shot per wall cell in the agent's row; the electric
   door and flame trap are drawn but not modeled
+- Checkpoints: a `checkpoint` object (Mission palette) is a flag post the
+  agent lights by touching it; a lost life, or the vest absorbing a hit,
+  respawns there instead of at the agent start. Night Lift has one in each
+  shaft, at the lowest standing cell both routes cross, so a death costs
+  one floor. The smoke test runs past two flags into a pit, checks only the
+  second is lit and that the agent respawns on it (negative-verified with
+  the respawn assignment removed)
 - scenes/level_overview.tscn renders a whole level to
   user://<level>_overview.png (run it without --headless, and pass only
   the file name after `--`)

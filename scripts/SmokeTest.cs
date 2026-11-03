@@ -27,6 +27,7 @@ public partial class SmokeTest : Node
         await LivesAndFailCheck();
         await VestCheck();
         await KillPlaneCheck();
+        await CheckpointCheck();
         await ItemCourseCheck();
         await WaterCheck();
         await SpikeCheck();
@@ -371,6 +372,34 @@ public partial class SmokeTest : Node
         Check(editor.IsPlaying && editor.Session.Lives == 2, "falling below the level costs one life");
         Check(editor.PlayerAgent != null && editor.PlayerAgent.Position.X < 6 * 32,
             "agent respawned at the start");
+        editor.StopPlay();
+    }
+
+    // Running past two checkpoints into the pit lights only the second and
+    // respawns the agent there, not at the start.
+    private async Task CheckpointCheck()
+    {
+        var editor = await FreshEditor();
+        editor.SetBrushObject(ObjectDefs.Checkpoint);
+        editor.PaintCell(new Vector2I(3, 10));
+        editor.PaintCell(new Vector2I(5, 10));
+        editor.SetBrushEraser();
+        for (int x = 6; x <= 9; x++)
+            editor.PaintCell(new Vector2I(x, 11));
+        Check(editor.StartPlay(), "checkpoint level starts");
+        Input.ActionPress("move_right");
+        await Frames(40);
+        Input.ActionRelease("move_right");
+        await Frames(140);
+        var flags = new List<Checkpoint>();
+        foreach (var child in editor.Session.GetChildren())
+            if (child is Checkpoint flag)
+                flags.Add(flag);
+        flags.Sort((a, b) => a.Position.X.CompareTo(b.Position.X));
+        Check(flags.Count == 2 && !flags[0].Lit && flags[1].Lit, "only the last checkpoint touched is lit");
+        Check(editor.IsPlaying && editor.Session.Lives == 2, "the fall past the checkpoints costs one life");
+        Check(editor.PlayerAgent != null && Mathf.Abs(editor.PlayerAgent.Position.X - (5 * 32 + 16)) < 4,
+            "agent respawned at the last checkpoint");
         editor.StopPlay();
     }
 
