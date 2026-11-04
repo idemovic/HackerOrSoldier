@@ -102,20 +102,52 @@ public static class LevelStore
         PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
     };
 
-    public static void Save(LevelData level)
+    public static string Serialize(LevelData level)
     {
         level.FormatVersion = LevelData.CurrentFormatVersion;
-        DirAccess.MakeDirRecursiveAbsolute(DirPath);
-        using var file = FileAccess.Open($"{DirPath}/{FileNameFor(level.Name)}", FileAccess.ModeFlags.Write);
-        file.StoreString(JsonSerializer.Serialize(level, JsonOptions));
+        return JsonSerializer.Serialize(level, JsonOptions);
+    }
+
+    // Writes beside the target and renames over it, so a crash mid-write
+    // leaves the old file intact instead of a truncated one.
+    public static void WriteAtomic(string godotPath, string text)
+    {
+        string path = ProjectSettings.GlobalizePath(godotPath);
+        System.IO.Directory.CreateDirectory(System.IO.Path.GetDirectoryName(path));
+        System.IO.File.WriteAllText(path + ".tmp", text);
+        System.IO.File.Move(path + ".tmp", path, overwrite: true);
+    }
+
+    // The previous version of each level is kept in user://backups, one per level.
+    public static bool Save(LevelData level)
+    {
+        string fileName = FileNameFor(level.Name);
+        string target = $"{DirPath}/{fileName}";
+        try
+        {
+            string json = Serialize(level);
+            string existing = ProjectSettings.GlobalizePath(target);
+            if (System.IO.File.Exists(existing))
+                WriteAtomic($"user://backups/{fileName}", System.IO.File.ReadAllText(existing));
+            WriteAtomic(target, json);
+            return true;
+        }
+        catch (System.Exception e) when (e is System.IO.IOException or System.UnauthorizedAccessException)
+        {
+            GD.PushError($"Saving {target} failed: {e.Message}");
+            return false;
+        }
     }
 
     public static LevelData Load(string fileName)
     {
         using var file = FileAccess.Open($"{DirPath}/{fileName}", FileAccess.ModeFlags.Read);
-        if (file == null)
-            return null;
-        var level = JsonSerializer.Deserialize<LevelData>(file.GetAsText(), JsonOptions);
+        return file == null ? null : Parse(file.GetAsText());
+    }
+
+    public static LevelData Parse(string json)
+    {
+        var level = JsonSerializer.Deserialize<LevelData>(json, JsonOptions);
         if (level?.Tiles == null || level.Tiles.Length != level.Width * level.Height)
             return null;
         // A file from a newer build may mean something this one would misread.

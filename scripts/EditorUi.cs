@@ -344,6 +344,11 @@ public partial class Editor
         _loadDialog.Confirmed += OnLoadConfirmed;
         ui.AddChild(_loadDialog);
 
+        _restoreDialog = new ConfirmationDialog { Title = "Restore autosave", OkButtonText = "Restore", Theme = _theme };
+        _restoreDialog.Confirmed += OnRestoreConfirmed;
+        _restoreDialog.Canceled += () => _autosaves.MarkHandled(_pendingRestore.FileName);
+        ui.AddChild(_restoreDialog);
+
         _helpDialog = new AcceptDialog { Title = "Editor shortcuts", Theme = _theme };
         _helpDialog.AddChild(BuildHelp());
         ui.AddChild(_helpDialog);

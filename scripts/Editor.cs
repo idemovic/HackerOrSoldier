@@ -17,6 +17,10 @@ public partial class Editor : Node2D
     private static readonly Color HiddenEditTint = new(1, 1, 1, 0.45f);
 
     private LevelData _level = LevelData.NewDefault();
+    private readonly AutosaveStore _autosaves = new("user://autosave", keep: 10);
+    private string _lastWrittenJson;
+    private bool _autosaveEnabled;
+    private Autosave _pendingRestore;
     private PackedScene _agentScene;
 
     // Undo and redo hold whole-level snapshots taken before each change. A
@@ -79,6 +83,7 @@ public partial class Editor : Node2D
     private LineEdit _nameEdit;
     private TextEdit _descEdit;
     private ConfirmationDialog _loadDialog;
+    private ConfirmationDialog _restoreDialog;
     private ItemList _levelList;
     private Minimap _minimap;
 
@@ -101,7 +106,7 @@ public partial class Editor : Node2D
         }
     }
 
-    private bool DialogOpen => _saveDialog.Visible || _loadDialog.Visible || _helpDialog.Visible;
+    private bool DialogOpen => _saveDialog.Visible || _loadDialog.Visible || _restoreDialog.Visible || _helpDialog.Visible;
 
     private EditorCommand[] BuildCommands() => new EditorCommand[]
     {
@@ -160,6 +165,51 @@ public partial class Editor : Node2D
         BuildUi();
         SetBrushTile(TileDefs.Wall);
         RedrawLevel();
+
+        _lastWrittenJson = LevelStore.Serialize(_level);
+        Callable.From(StartAutosave).CallDeferred();   // CurrentScene is not set yet in _Ready
+    }
+
+    private void StartAutosave()
+    {
+        // Tests and capture tools run the editor as a child scene and must not touch the player's autosaves.
+        _autosaveEnabled = GetTree().CurrentScene == this;
+        if (!_autosaveEnabled)
+            return;
+        var timer = new Timer { WaitTime = 60, Autostart = true };
+        timer.Timeout += AutosaveIfChanged;
+        AddChild(timer);
+
+        _pendingRestore = _autosaves.PendingRestore();
+        if (_pendingRestore != null)
+        {
+            _restoreDialog.DialogText = $"Restore unsaved work on '{_pendingRestore.Level.Name}' from {_pendingRestore.Time:HH:mm}?";
+            _restoreDialog.PopupCentered();
+        }
+    }
+
+    public override void _ExitTree() => AutosaveIfChanged();
+
+    private void AutosaveIfChanged()
+    {
+        if (!_autosaveEnabled || IsPlaying)
+            return;
+        string json = LevelStore.Serialize(_level);
+        if (json == _lastWrittenJson || !_autosaves.Write(_level))
+            return;
+        _lastWrittenJson = json;
+        SetStatus($"Autosaved {DateTime.Now:HH:mm}");
+    }
+
+    private void OnRestoreConfirmed()
+    {
+        _autosaves.MarkHandled(_pendingRestore.FileName);
+        if (IsPlaying)
+            StopPlay();
+        RecordUndo();
+        SetLevel(_pendingRestore.Level);
+        _lastWrittenJson = LevelStore.Serialize(_level);
+        SetStatus("Restored autosave");
     }
 
     public override void _Process(double delta)
@@ -786,7 +836,12 @@ public partial class Editor : Node2D
         }
         _level.Name = name;
         _level.Description = _descEdit.Text.Trim();
-        LevelStore.Save(_level);
+        if (!LevelStore.Save(_level))
+        {
+            SetStatus("Save failed", warn: true);
+            return;
+        }
+        _lastWrittenJson = LevelStore.Serialize(_level);
         SetStatus($"Saved {LevelStore.FileNameFor(name)}");
     }
 

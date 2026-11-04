@@ -34,8 +34,7 @@ public class Profile
 
     public void Save(string fileName = DefaultFileName)
     {
-        using var file = FileAccess.Open($"user://{fileName}", FileAccess.ModeFlags.Write);
-        file?.StoreString(JsonSerializer.Serialize(this, JsonOptions));
+        LevelStore.WriteAtomic($"user://{fileName}", JsonSerializer.Serialize(this, JsonOptions));
     }
 
     public static Profile Load(string fileName = DefaultFileName)
