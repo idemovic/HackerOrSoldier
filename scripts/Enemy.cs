@@ -11,7 +11,6 @@ public partial class Enemy : CharacterBody2D
     private const float EnemyGravity = 1200f;
     private const float RowSightRange = 320f;    // 10 tiles
     private const float AllSightRange = 256f;    // 8 tiles
-    private const float ContactRange = 28f;
     private const float ContactCooldownTime = 1f;
 
     public EnemyDef Def { get; set; }
@@ -26,6 +25,7 @@ public partial class Enemy : CharacterBody2D
 
     public bool IsTurnedOff => Def.Type == EnemyDefs.Robot && Session.RobotsOff;
     public string AnimationFrame => _animator?.Frame;
+    public Rect2 Hitbox => new(Position + Def.Body.Position, Def.Body.Size);
 
     public override void _Ready()
     {
@@ -34,7 +34,8 @@ public partial class Enemy : CharacterBody2D
         CollisionMask = 1;
         AddChild(new CollisionShape2D
         {
-            Shape = new RectangleShape2D { Size = new Vector2(28, 28) },
+            Shape = new RectangleShape2D { Size = Def.Body.Size },
+            Position = Def.Body.GetCenter(),
         });
         _sprite = new Sprite2D { Texture = Sprites.ForObject(Def.Type) };
         AddChild(_sprite);
@@ -81,7 +82,7 @@ public partial class Enemy : CharacterBody2D
             if (Def.Swims)
             {
                 if (Session.TileAt(
-                        (int)Mathf.Floor((Position.X + _facing * 18) / 32f),
+                        (int)Mathf.Floor((FrontX + _facing * 3) / 32f),
                         (int)Mathf.Floor(Position.Y / 32f)) != TileDefs.Water)
                     _facing = -_facing;   // eels stay inside the water
             }
@@ -93,8 +94,8 @@ public partial class Enemy : CharacterBody2D
                     _facing = -1;
             }
             else if (IsOnFloor() && !SolidAt(
-                    (int)Mathf.Floor((Position.X + _facing * 16) / 32f),
-                    (int)Mathf.Floor((Position.Y + 17) / 32f)))
+                    (int)Mathf.Floor((FrontX + _facing * 2) / 32f),
+                    (int)Mathf.Floor((Position.Y + Def.Body.End.Y + 2) / 32f)))
             {
                 _facing = -_facing;   // do not walk off ledges
             }
@@ -206,8 +207,8 @@ public partial class Enemy : CharacterBody2D
     {
         if (Session.Agent.IsHiding)
             return;
-        var d = (Session.Agent.Position - Position).Abs();
-        if (d.X >= ContactRange || d.Y >= ContactRange)
+        // Shrunk by a pixel so standing flush beside the agent is not contact.
+        if (!Session.Agent.Hitbox.Intersects(Hitbox.Grow(-1)))
             return;
         if (Def.Attack == EnemyAttack.Mine)
         {
@@ -222,6 +223,8 @@ public partial class Enemy : CharacterBody2D
         _contactCooldown = ContactCooldownTime;
         Session.AgentHit();
     }
+
+    private float FrontX => Position.X + (_facing > 0 ? Def.Body.End.X : Def.Body.Position.X);
 
     private bool SolidAt(int x, int y) => TileDefs.Get(Session.TileAt(x, y))?.Solid == true;
 }

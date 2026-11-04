@@ -17,6 +17,12 @@ public partial class Agent : CharacterBody2D
     private static readonly float JumpVelocity = -Gravity * TimeToApex;
     public static readonly float RunSpeed = JumpDistance / (2f * TimeToApex);
 
+    // The collision box fits the drawn body (about 11 px wide, legs reach
+    // +-11 mid-run), so the agent stands against walls and drops off ledges
+    // where it looks like it should. Full height keeps 1-tile corridors.
+    public static readonly Vector2 HalfSize = new(8, 15);
+    public Rect2 Hitbox => new(Position - HalfSize, HalfSize * 2);
+
     // README water spec: submerged vertical speed is capped by water
     // resistance; a jump from the surface line gets the full jump velocity.
     private const float WaterGravityFactor = 0.4f;
@@ -25,9 +31,9 @@ public partial class Agent : CharacterBody2D
 
     private const float ElectricInterval = 3f;
 
-    // Hazard overlap is sampled slightly inside the 30x30 collision box so
+    // Hazard overlap is sampled slightly inside the collision box so
     // standing next to a hazard tile does not count as touching it.
-    private const float HazardExtent = 14f;
+    private static readonly Vector2 HazardExtent = HalfSize - Vector2.One;
 
     public PlaySession Session { get; set; }
     public int Facing { get; private set; } = 1;
@@ -41,6 +47,7 @@ public partial class Agent : CharacterBody2D
 
     public override void _Ready()
     {
+        GetNode<CollisionShape2D>("CollisionShape2D").Shape = new RectangleShape2D { Size = HalfSize * 2 };
         _sprite = new Sprite2D { Texture = Sprites.Get("agent") };
         AddChild(_sprite);
         _animator = new AgentAnimator(_sprite);
@@ -151,7 +158,7 @@ public partial class Agent : CharacterBody2D
         if (spike < 0)
             return false;
         float left = x * Tile + spike * Tile / 2f;
-        return Position.X + HazardExtent > left && Position.X - HazardExtent < left + Tile / 2f;
+        return Position.X + HazardExtent.X > left && Position.X - HazardExtent.X < left + Tile / 2f;
     }
 
     private void CheckHazards(float dt)
@@ -163,10 +170,10 @@ public partial class Agent : CharacterBody2D
             return;
         }
 
-        int minX = (int)Mathf.Floor((Position.X - HazardExtent) / Tile);
-        int maxX = (int)Mathf.Floor((Position.X + HazardExtent) / Tile);
-        int minY = (int)Mathf.Floor((Position.Y - HazardExtent) / Tile);
-        int maxY = (int)Mathf.Floor((Position.Y + HazardExtent) / Tile);
+        int minX = (int)Mathf.Floor((Position.X - HazardExtent.X) / Tile);
+        int maxX = (int)Mathf.Floor((Position.X + HazardExtent.X) / Tile);
+        int minY = (int)Mathf.Floor((Position.Y - HazardExtent.Y) / Tile);
+        int maxY = (int)Mathf.Floor((Position.Y + HazardExtent.Y) / Tile);
         for (int y = minY; y <= maxY; y++)
             for (int x = minX; x <= maxX; x++)
             {
@@ -182,7 +189,7 @@ public partial class Agent : CharacterBody2D
         bool onElectric = false;
         if (IsOnFloor())
         {
-            int below = (int)Mathf.Floor((Position.Y + HazardExtent + 3f) / Tile);
+            int below = (int)Mathf.Floor((Position.Y + HazardExtent.Y + 3f) / Tile);
             for (int x = minX; x <= maxX; x++)
             {
                 int id = Session.TileAt(x, below);

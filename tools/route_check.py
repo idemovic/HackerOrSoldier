@@ -21,7 +21,8 @@ from collections import defaultdict
 
 TILE = 32
 DT = 1 / 60
-HALF = 15                       # the agent's 30x30 box
+HALF_X = 8                      # the agent's 16x30 box (Agent.HalfSize)
+HALF_Y = 15
 JUMP_HEIGHT = 2.5 * TILE
 JUMP_DISTANCE = 5 * TILE
 TIME_TO_APEX = 0.35
@@ -53,7 +54,6 @@ ENEMY_TYPES = GROUND_ENEMIES | {"drone", "turret", "electric_eel", "landmine"}
 
 ROW_SIGHT = 10 * TILE
 ALL_SIGHT = 8 * TILE
-CONTACT = 28.0
 EXPLOSION_RADIUS = 5 * TILE
 
 JUMP_HOLDS = (3, 6, 9, 12, 15, 18, 21, 24, 27, 30, 34, 38, 42, 48, 55, 65, 80, 100, 130)
@@ -105,8 +105,8 @@ class Platform:
             self.samples.append((ox + axis[0] * hi, oy + axis[1] * hi))
         xs = [s[0] for s in self.samples]
         ys = [s[1] for s in self.samples]
-        self.bbox = (min(xs) - 16 - HALF - 1, min(ys) - 10 - 2 * HALF - 1,
-                     max(xs) + 16 + HALF + 1, max(ys) + 2)
+        self.bbox = (min(xs) - 16 - HALF_X - 1, min(ys) - 10 - 2 * HALF_Y - 1,
+                     max(xs) + 16 + HALF_X + 1, max(ys) + 2)
 
     @staticmethod
     def box(sample):
@@ -115,7 +115,7 @@ class Platform:
 
     @staticmethod
     def rider(sample):
-        return (sample[0], sample[1] - 10 - HALF)
+        return (sample[0], sample[1] - 10 - HALF_Y)
 
 
 class EnemyZone:
@@ -168,7 +168,9 @@ class World:
                 elif t == WATER:
                     self.water.add((x, y))
                 elif t in (LAVA, SPEAR):
-                    self._add_deadly(x * TILE - 14, y * TILE - 14, (x + 1) * TILE + 14, (y + 1) * TILE + 14, None)
+                    # Agent.CheckHazards samples 1 px inside the box.
+                    self._add_deadly(x * TILE - (HALF_X - 1), y * TILE - (HALF_Y - 1),
+                                     (x + 1) * TILE + (HALF_X - 1), (y + 1) * TILE + (HALF_Y - 1), None)
                 if t == ELECTRIC:
                     self.electric[(x, y)] = None
 
@@ -220,10 +222,11 @@ class World:
                 while top > 0 and self.tile(x, top - 1) not in SOLID_TILES - {HIDDEN}:
                     top -= 1
                 self.lasers.append((cell, top, number))
-                # LaserBeam.cs contact test: |dx| < 17, agent.y + 15 > topY, agent.y - 15 < emitter.y + 10
-                self._add_deadly(cx - 17, top * TILE - HALF, cx + 17, cy + 10 + HALF, "off:" + number)
+                # LaserBeam.cs contact test: |dx| < HALF_X + 2, agent.y + HALF_Y > topY, agent.y - HALF_Y < emitter.y + 10
+                self._add_deadly(cx - HALF_X - 2, top * TILE - HALF_Y, cx + HALF_X + 2, cy + 10 + HALF_Y, "off:" + number)
             elif typ == "landmine":
-                self._add_deadly(cx - CONTACT, cy - CONTACT, cx + CONTACT, cy + CONTACT, None)
+                # Enemy.CheckContact: the agent box meets the mine body (-13, 7, 26, 8) shrunk by 1 px.
+                self._add_deadly(cx - 12 - HALF_X, cy + 8 - HALF_Y, cx + 12 + HALF_X, cy + 14 + HALF_Y, None)
             elif typ == "teleport":
                 capsules[props.get("number", "1")].append((cx, cy))
             elif typ in ("elevator", "moving_platform"):
@@ -349,8 +352,8 @@ class World:
 
     def ride_ok(self, node):
         rx, ry = Platform.rider(self.platforms[node[1]].samples[node[2]])
-        for cy in range(math.floor((ry - HALF) / TILE), math.ceil((ry + HALF) / TILE)):
-            for cx in range(math.floor((rx - HALF) / TILE), math.ceil((rx + HALF) / TILE)):
+        for cy in range(math.floor((ry - HALF_Y) / TILE), math.ceil((ry + HALF_Y) / TILE)):
+            for cx in range(math.floor((rx - HALF_X) / TILE), math.ceil((rx + HALF_X) / TILE)):
                 if self.static_solid((cx, cy)):
                     return False
         return True
@@ -450,12 +453,12 @@ class World:
         self_pid = self.platforms[self_node[1]].pid if self_node and self_node[0] == "r" else None
 
         def box_hits(nx, ny):
-            # The box is the half-open [c - HALF, c + HALF): resting exactly on
+            # The box is the half-open [c - half, c + half): resting exactly on
             # a floor does not overlap it, sinking into it by any amount does.
-            x0 = math.floor((nx - HALF) / TILE)
-            x1 = math.ceil((nx + HALF) / TILE) - 1
-            y0 = math.floor((ny - HALF) / TILE)
-            y1 = math.ceil((ny + HALF) / TILE) - 1
+            x0 = math.floor((nx - HALF_X) / TILE)
+            x1 = math.ceil((nx + HALF_X) / TILE) - 1
+            y0 = math.floor((ny - HALF_Y) / TILE)
+            y1 = math.ceil((ny + HALF_Y) / TILE) - 1
             for yy in range(y0, y1 + 1):
                 for xx in range(x0, x1 + 1):
                     if is_solid((xx, yy), inv, consulted):
@@ -463,8 +466,8 @@ class World:
             return False
 
         def extra_hit(nx, ny):
-            return extra_box is not None and nx + HALF > extra_box[0] and nx - HALF < extra_box[2] \
-                and ny + HALF > extra_box[1] and ny - HALF < extra_box[3]
+            return extra_box is not None and nx + HALF_X > extra_box[0] and nx - HALF_X < extra_box[2] \
+                and ny + HALF_Y > extra_box[1] and ny - HALF_Y < extra_box[3]
 
         for tick in range(MAX_TICKS):
             tx, ty = cell_of(cx, cy)
@@ -487,10 +490,10 @@ class World:
             if vx:
                 nx = cx + vx * DT
                 if box_hits(nx, cy):
-                    lead = math.ceil((nx + HALF) / TILE) - 1 if vx > 0 else math.floor((nx - HALF) / TILE)
-                    nx = lead * TILE - HALF if vx > 0 else (lead + 1) * TILE + HALF
+                    lead = math.ceil((nx + HALF_X) / TILE) - 1 if vx > 0 else math.floor((nx - HALF_X) / TILE)
+                    nx = lead * TILE - HALF_X if vx > 0 else (lead + 1) * TILE + HALF_X
                 if extra_hit(nx, cy):
-                    nx = extra_box[0] - HALF if vx > 0 else extra_box[2] + HALF
+                    nx = extra_box[0] - HALF_X if vx > 0 else extra_box[2] + HALF_X
                 cx = nx
 
             landed_on = None
@@ -500,7 +503,7 @@ class World:
             for _ in range(steps):
                 ny = cy + dy / steps
                 if vy > 0:
-                    prev_bottom, new_bottom = cy + HALF, ny + HALF
+                    prev_bottom, new_bottom = cy + HALF_Y, ny + HALF_Y
                     best_top = None
                     for p in self.platforms:
                         if p.pid == self_pid:
@@ -510,30 +513,30 @@ class World:
                             continue
                         for k, s in enumerate(p.samples):
                             top = s[1] - 10
-                            if prev_bottom <= top < new_bottom and abs(cx - s[0]) < 16 + HALF:
+                            if prev_bottom <= top < new_bottom and abs(cx - s[0]) < 16 + HALF_X:
                                 if best_top is None or top < best_top:
                                     best_top, landed_on = top, ("r", p.pid, k)
                     if box_hits(cx, ny):
-                        row = math.ceil((ny + HALF) / TILE) - 1
+                        row = math.ceil((ny + HALF_Y) / TILE) - 1
                         if best_top is None or row * TILE < best_top:
                             best_top, landed_on = row * TILE, None
                     if extra_box is not None and extra_hit(cx, ny) and prev_bottom <= extra_box[1]:
                         if best_top is None or extra_box[1] < best_top:
                             best_top, landed_on = extra_box[1], self_node
                     if best_top is not None:
-                        cy = best_top - HALF
+                        cy = best_top - HALF_Y
                         vy = 0.0
                         on_floor = True
                         break
                     cy = ny
                 else:
                     if box_hits(cx, ny):
-                        row = math.floor((ny - HALF) / TILE)
-                        cy = (row + 1) * TILE + HALF
+                        row = math.floor((ny - HALF_Y) / TILE)
+                        cy = (row + 1) * TILE + HALF_Y
                         vy = 0.0
                         break
                     if extra_box is not None and extra_hit(cx, ny):
-                        cy = extra_box[3] + HALF
+                        cy = extra_box[3] + HALF_Y
                         vy = 0.0
                         break
                     cy = ny
@@ -566,7 +569,7 @@ class World:
                     # steps onto it.
                     for side in (-1, 1):
                         n = (cell[0] + side, cell[1])
-                        overlaps = (cx - HALF < cell[0] * TILE) if side < 0 else (cx + HALF > (cell[0] + 1) * TILE)
+                        overlaps = (cx - HALF_X < cell[0] * TILE) if side < 0 else (cx + HALF_X > (cell[0] + 1) * TILE)
                         if overlaps and self.standable(n, inv, consulted):
                             return ("s", n[0], n[1]), ticks, trace
                     return None, ticks, trace

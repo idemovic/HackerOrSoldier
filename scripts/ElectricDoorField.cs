@@ -33,7 +33,7 @@ public partial class ElectricDoorField : Node2D
         if (!Active || Session.Agent.IsHiding)
             return;
         var d = (Session.Agent.Position - Position).Abs();
-        if (d.X < 26 && d.Y < 28)
+        if (d.X < Agent.HalfSize.X + 11 && d.Y < 28)
             Session.AgentHit();
     }
 }

@@ -17,8 +17,7 @@ public partial class Bullet : Node2D
         Position += new Vector2(Direction * Speed * (float)delta, 0);
         foreach (var enemy in Session.Enemies)
         {
-            var d = (enemy.Position - Position).Abs();
-            if (d.X < 18 && d.Y < 18)
+            if (enemy.Hitbox.Grow(4).HasPoint(Position))
             {
                 QueueFree();
                 Session.RegisterHit();

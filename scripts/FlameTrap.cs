@@ -31,7 +31,7 @@ public partial class FlameTrap : Node2D
         if (!Flaming || Session.Agent.IsHiding)
             return;
         var agent = Session.Agent;
-        bool touching = Mathf.Abs(agent.Position.X - Position.X) < 24
+        bool touching = Mathf.Abs(agent.Position.X - Position.X) < Agent.HalfSize.X + 9
             && agent.Position.Y + 14 > Position.Y - 48
             && agent.Position.Y - 14 < Position.Y + 14;
         if (touching)

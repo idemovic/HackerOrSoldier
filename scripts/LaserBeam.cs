@@ -53,9 +53,9 @@ public partial class LaserBeam : Node2D
 
         var agent = Session.Agent;
         bool touching = !agent.IsHiding
-            && Mathf.Abs(agent.Position.X - Position.X) < 17
-            && agent.Position.Y + 15 > _topY
-            && agent.Position.Y - 15 < Position.Y + 10;
+            && Mathf.Abs(agent.Position.X - Position.X) < Agent.HalfSize.X + 2
+            && agent.Position.Y + Agent.HalfSize.Y > _topY
+            && agent.Position.Y - Agent.HalfSize.Y < Position.Y + 10;
         if (!touching || _cooldown > 0)
             return;
         _cooldown = HitCooldown;

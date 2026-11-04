@@ -3,7 +3,7 @@
 [ext_resource type="Script" path="res://scripts/Agent.cs" id="1_agent"]
 
 [sub_resource type="RectangleShape2D" id="RectangleShape2D_agent"]
-size = Vector2(30, 30)
+size = Vector2(16, 30)
 
 [node name="Agent" type="CharacterBody2D"]
 collision_layer = 2

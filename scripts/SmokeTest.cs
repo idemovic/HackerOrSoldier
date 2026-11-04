@@ -24,6 +24,7 @@ public partial class SmokeTest : Node
         await ToolsCheck();
         await InvincibleCheck();
         await CorridorCheck();
+        await WallContactCheck();
         await DefaultLevelCheck();
         await WallTilesCheck();
         await ShadowCheck();
@@ -439,6 +440,40 @@ public partial class SmokeTest : Node
         Input.ActionRelease("move_right");
         Check(runner != null && runner.Position.X > 13 * 32,
             "agent fits through a 1-tile corridor");
+        editor.StopPlay();
+    }
+
+    // Collision boxes fit the drawn bodies: the agent and a soldier walk up
+    // to a wall, while a robot's wider body keeps it further off.
+    private async Task WallContactCheck()
+    {
+        var editor = await FreshEditor();
+        editor.SetBrushTile(TileDefs.Wall);
+        foreach (int x in new[] { 8, 20, 27 })
+            for (int y = 8; y <= 10; y++)
+                editor.PaintCell(new Vector2I(x, y));
+        editor.SetBrushObject(EnemyDefs.Soldier);
+        editor.PaintCell(new Vector2I(23, 10));
+        editor.SetBrushObject(EnemyDefs.Robot);
+        editor.PaintCell(new Vector2I(31, 10));
+        Check(editor.StartPlay(), "wall contact level starts");
+        var soldier = editor.Session.Enemies.First(e => e.Def.Type == EnemyDefs.Soldier);
+        var robot = editor.Session.Enemies.First(e => e.Def.Type == EnemyDefs.Robot);
+        float soldierMin = soldier.Position.X, robotMin = robot.Position.X;
+        Input.ActionPress("move_right");
+        for (int i = 0; i < 150; i++)
+        {
+            await Frames(1);
+            soldierMin = Mathf.Min(soldierMin, soldier.Position.X);
+            robotMin = Mathf.Min(robotMin, robot.Position.X);
+        }
+        Input.ActionRelease("move_right");
+        float agentGap = 8 * 32 - editor.PlayerAgent.Position.X;
+        Check(agentGap <= 9, $"the agent walks up to a wall (center {agentGap:0.0} px off it)");
+        float soldierGap = soldierMin - 21 * 32;
+        Check(soldierGap <= 9, $"a patrolling soldier walks up to a wall (center {soldierGap:0.0} px off it)");
+        float robotGap = robotMin - 28 * 32;
+        Check(robotGap >= 13, $"a robot's wide body keeps it off the wall (center {robotGap:0.0} px off it)");
         editor.StopPlay();
     }
 
@@ -1274,7 +1309,9 @@ public partial class SmokeTest : Node
         while (session.DisguiseActive && !fired)
         {
             await Frames(1);
-            fired = session.GetChildren().OfType<EnemyBullet>().Any();
+            // The frame the disguise runs out the soldier may fire at once; only
+            // a shot while it is still on counts.
+            fired = session.DisguiseActive && session.GetChildren().OfType<EnemyBullet>().Any();
         }
         Check(!fired && session.Lives == 3, "a soldier with the agent in its row does not fire while disguised");
 

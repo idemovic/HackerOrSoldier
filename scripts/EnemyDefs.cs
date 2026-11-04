@@ -11,7 +11,12 @@ public enum EnemyAttack { Contact, Pistol, MiniGun, Plasma, Dynamite, Mine }
 public record EnemyDef(string Type, string Name, Color Color, int Lives, int Speed,
     EnemyLoS LoS, EnemyAttack Attack,
     bool Flies = false, bool Swims = false, bool DropsAmmo = false,
-    bool InfiniteLives = false, string DegradesTo = null);
+    bool InfiniteLives = false, string DegradesTo = null)
+{
+    // The collision box around the enemy's position, fitted to its drawn
+    // body so it meets walls, ledges and the agent where it looks to.
+    public Rect2 Body { get; init; } = EnemyDefs.HumanBody;
+}
 
 public static class EnemyDefs
 {
@@ -26,6 +31,9 @@ public static class EnemyDefs
     public const string Landmine = "landmine";
     public const string ElectricEel = "electric_eel";
 
+    // Same box as the agent: the rigged soldiers share its body art.
+    public static readonly Rect2 HumanBody = new(-8, -15, 16, 30);
+
     public static readonly EnemyDef[] All =
     {
         new(Fighter, "Fighter", new Color(0.85f, 0.50f, 0.20f), Lives: 2, Speed: 2, EnemyLoS.Row, EnemyAttack.Contact),
@@ -36,16 +44,16 @@ public static class EnemyDefs
         new(UltimateSoldier, "Ultimate soldier", new Color(0.75f, 0.30f, 0.55f), Lives: 1, Speed: 3, EnemyLoS.Row, EnemyAttack.Contact,
             DegradesTo: SuperSoldier),
         new(Drone, "Drone", new Color(0.60f, 0.75f, 0.85f), Lives: 1, Speed: 1, EnemyLoS.All, EnemyAttack.Dynamite,
-            Flies: true, DropsAmmo: true),
+            Flies: true, DropsAmmo: true) { Body = new Rect2(-13, -13, 26, 20) },
         new(Robodog, "Robodog", new Color(0.55f, 0.55f, 0.50f), Lives: 2, Speed: 3, EnemyLoS.Row, EnemyAttack.Contact,
-            DropsAmmo: true),
-        new(Turret, "Turret", new Color(0.70f, 0.40f, 0.40f), Lives: 1, Speed: 0, EnemyLoS.All, EnemyAttack.Plasma),
+            DropsAmmo: true) { Body = new Rect2(-14, -3, 28, 18) },
+        new(Turret, "Turret", new Color(0.70f, 0.40f, 0.40f), Lives: 1, Speed: 0, EnemyLoS.All, EnemyAttack.Plasma) { Body = new Rect2(-13, -3, 26, 18) },
         new(Robot, "Robot", new Color(0.40f, 0.45f, 0.55f), Lives: 1, Speed: 1, EnemyLoS.Row, EnemyAttack.Plasma,
-            DropsAmmo: true, InfiniteLives: true),
+            DropsAmmo: true, InfiniteLives: true) { Body = new Rect2(-14, -15, 28, 30) },
         new(Landmine, "Landmine", new Color(0.35f, 0.40f, 0.35f), Lives: 1, Speed: 0, EnemyLoS.None, EnemyAttack.Mine,
-            InfiniteLives: true),
+            InfiniteLives: true) { Body = new Rect2(-13, 7, 26, 8) },
         new(ElectricEel, "Electric eel", new Color(0.30f, 0.80f, 0.80f), Lives: 1, Speed: 1, EnemyLoS.Row, EnemyAttack.Contact,
-            Swims: true),
+            Swims: true) { Body = new Rect2(-15, -3, 30, 12) },
     };
 
     public static EnemyDef Get(string type)
