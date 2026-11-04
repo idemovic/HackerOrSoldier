@@ -47,6 +47,9 @@ public partial class PlaySession : Node2D
     public int AccuracyPercent => ShotsFired == 0 ? 100 : Mathf.RoundToInt(100f * ShotsHit / ShotsFired);
     public int CompletenessPercent => _collectibleTotal == 0 ? 100 : Mathf.RoundToInt(100f * _collectibleGot / _collectibleTotal);
     public bool GogglesActive => _gogglesTime > 0;
+    // Editor playtest switch: hidden platforms behave as if goggles were on.
+    public bool RevealHidden { get; set; }
+    private bool HiddenRevealed => GogglesActive || RevealHidden;
     public float Time { get; set; }               // settable so tests can skip ahead
     // The two spikes of a spike tile take turns: the left one (0) is raised
     // during seconds 3-5 of each cycle, the right one (1) during the last
@@ -344,8 +347,8 @@ public partial class PlaySession : Node2D
 
         if (_gogglesTime > 0)
             _gogglesTime -= dt;
-        _grids.Hidden.Modulate = GogglesActive ? new Color(1f, 0.7f, 0.6f) : new Color(1, 1, 1, 0);
-        _grids.Hidden.CollisionEnabled = GogglesActive;   // hidden platforms are only solid while revealed
+        _grids.Hidden.Modulate = HiddenRevealed ? new Color(1f, 0.7f, 0.6f) : new Color(1, 1, 1, 0);
+        _grids.Hidden.CollisionEnabled = HiddenRevealed;   // hidden platforms are only solid while revealed
         if (_disguiseTime > 0)
             _disguiseTime -= dt;
 
@@ -437,7 +440,7 @@ public partial class PlaySession : Node2D
     public int TileAt(int x, int y)
     {
         int id = _destroyed.Contains(new Vector2I(x, y)) ? TileDefs.Empty : _level.GetTile(x, y);
-        return id == TileDefs.HiddenPlatform && !GogglesActive ? TileDefs.Empty : id;
+        return id == TileDefs.HiddenPlatform && !HiddenRevealed ? TileDefs.Empty : id;
     }
 
     public int TileAtPosition(Vector2 position)

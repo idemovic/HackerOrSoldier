@@ -119,6 +119,8 @@ public partial class Editor
         row.AddChild(_skyButton);
         _godButton = IconButton("shield", Command("Invincible playtest"), toggle: true);
         row.AddChild(_godButton);
+        _revealButton = IconButton("eye", Command("Solid hidden platforms"), toggle: true);
+        row.AddChild(_revealButton);
         row.AddChild(new VSeparator());
         row.AddChild(IconButton("undo", Command("Undo")));
         row.AddChild(IconButton("redo", Command("Redo")));
@@ -305,6 +307,17 @@ public partial class Editor
         };
         _playGodButton.Pressed += ToggleInvincible;
         row.AddChild(_playGodButton);
+
+        _playRevealButton = new Button
+        {
+            Text = "HIDDEN OFF",
+            Icon = EditorTheme.Icon("eye"),
+            ToggleMode = true,
+            FocusMode = Control.FocusModeEnum.None,
+            TooltipText = Command("Solid hidden platforms").Tooltip,
+        };
+        _playRevealButton.Pressed += ToggleRevealHidden;
+        row.AddChild(_playRevealButton);
 
         var stop = new Button
         {

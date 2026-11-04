@@ -851,6 +851,25 @@ public partial class SmokeTest : Node
         Input.ActionRelease("move_right");
         Check(editor.PlayerAgent.Position.X < 8 * 32, "a revealed platform blocks the agent");
         editor.StopPlay();
+
+        editor = await FreshEditor();
+        editor.SetBrushTile(TileDefs.HiddenPlatform);
+        editor.PaintCell(new Vector2I(8, 10));
+        editor._UnhandledInput(KeyEvent(Key.H));
+        Check(editor.RevealHidden, "H turns on solid hidden platforms");
+        Check(editor.StartPlay(), "solid hidden platform playtest starts");
+        Input.ActionPress("move_right");
+        await Frames(60);
+        Input.ActionRelease("move_right");
+        Check(editor.PlayerAgent.Position.X < 8 * 32, "the switch makes a hidden platform block the agent without goggles");
+        Check(editor.Grids.Hidden.Modulate.A > 0.9f, "the switch shows hidden platforms in play");
+        editor._UnhandledInput(KeyEvent(Key.H));
+        Check(!editor.Session.RevealHidden, "H during play turns it off");
+        Input.ActionPress("move_right");
+        await Frames(60);
+        Input.ActionRelease("move_right");
+        Check(editor.PlayerAgent.Position.X > 9 * 32, "with the switch off the agent walks through again");
+        editor.StopPlay();
     }
 
     // A patrolling fighter spots the agent (row LoS), chases and hits on contact.

@@ -53,6 +53,7 @@ public partial class Editor : Node2D
     private bool _rectErase;
     private bool _showGrid = true;
     private bool _invincible;
+    private bool _revealHidden;
     private int _zoomIndex;
 
     private EditorCommand[] _commands;
@@ -68,6 +69,7 @@ public partial class Editor : Node2D
     private Button _gridButton;
     private Button _skyButton;
     private Button _godButton;
+    private Button _revealButton;
     private TextureRect _brushIcon;
     private Label _brushLabel;
     private HBoxContainer _colorChips;
@@ -78,6 +80,7 @@ public partial class Editor : Node2D
     private Control _menuPanel;
     private Control _playBar;
     private Button _playGodButton;
+    private Button _playRevealButton;
     private AcceptDialog _helpDialog;
     private AcceptDialog _saveDialog;
     private LineEdit _nameEdit;
@@ -96,6 +99,7 @@ public partial class Editor : Node2D
     public PaletteEntry Brush => _brush;   // for tests
     public string BrushColor => _brushColor;   // for tests
     public bool Invincible => _invincible;
+    public bool RevealHidden => _revealHidden;
     // For tests: the center of what is on screen, after the camera limits.
     public Vector2 ViewCenter
     {
@@ -127,11 +131,15 @@ public partial class Editor : Node2D
         new("Prev category", "Palette", () => ShowCategory(Wrap(_category - 1, EditorPalette.Categories.Length)), new Chord(Key.Tab, Shift: true)),
         new("Play / stop", "View", TogglePlay, new Chord(Key.P), new Chord(Key.P, Ctrl: true)),
         new("Invincible playtest", "View", ToggleInvincible, new Chord(Key.I), new Chord(Key.I, Ctrl: true)),
+        new("Solid hidden platforms", "View", ToggleRevealHidden, new Chord(Key.H)),
         new("Zoom in", "View", () => ZoomBy(-1, null), new Chord(Key.Equal)),
         new("Zoom out", "View", () => ZoomBy(1, null), new Chord(Key.Minus)),
         new("Grid", "View", ToggleGrid, new Chord(Key.G)),
         new("Day / night sky", "View", ToggleSky, new Chord(Key.K, Ctrl: true), new Chord(Key.K)),
     };
+
+    // The playtest switches that also work while playing.
+    private static readonly string[] PlaytestCommands = { "Invincible playtest", "Solid hidden platforms" };
 
     private EditorCommand Command(string name) => Array.Find(_commands, c => c.Name == name);
 
@@ -243,10 +251,12 @@ public partial class Editor : Node2D
     {
         if (IsPlaying)
         {
-            if (@event is InputEventKey { Pressed: true, Echo: false } playKey
-                && Command("Invincible playtest").Chords.Any(c => c.Matches(playKey)))
+            var playCommand = @event is InputEventKey { Pressed: true, Echo: false } playKey
+                ? Array.Find(PlaytestCommands, name => Command(name).Chords.Any(c => c.Matches(playKey)))
+                : null;
+            if (playCommand != null)
             {
-                ToggleInvincible();
+                Command(playCommand).Run();
                 GetViewport()?.SetInputAsHandled();
             }
             else if (@event.IsActionPressed("pause") || @event.IsActionPressed("editor_play"))
@@ -584,7 +594,7 @@ public partial class Editor : Node2D
         }
 
         _drag = Drag.None;
-        _session = new PlaySession { Invincible = _invincible };
+        _session = new PlaySession { Invincible = _invincible, RevealHidden = _revealHidden };
         _session.Setup(_level, _grids, _agentScene);
         _session.Completed += () => Callable.From(() => EndPlay("Level complete!")).CallDeferred();
         _session.Failed += () => Callable.From(() => EndPlay("Out of lives.")).CallDeferred();
@@ -787,6 +797,17 @@ public partial class Editor : Node2D
         _playGodButton.SetPressedNoSignal(_invincible);
         _playGodButton.Text = _invincible ? "INVINCIBLE" : "MORTAL";
         SetStatus(_invincible ? "Invincible playtest on: hazards and enemies can't hurt the agent." : "Invincible playtest off.");
+    }
+
+    public void ToggleRevealHidden()
+    {
+        _revealHidden = !_revealHidden;
+        if (_session != null)
+            _session.RevealHidden = _revealHidden;
+        _revealButton.SetPressedNoSignal(_revealHidden);
+        _playRevealButton.SetPressedNoSignal(_revealHidden);
+        _playRevealButton.Text = _revealHidden ? "HIDDEN SOLID" : "HIDDEN OFF";
+        SetStatus(_revealHidden ? "Hidden platforms are visible and solid in playtest." : "Hidden platforms need goggles again.");
     }
 
     private void ToggleGrid()
