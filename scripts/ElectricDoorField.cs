@@ -24,6 +24,8 @@ public partial class ElectricDoorField : Node2D
     private static readonly Color LightGlow = new(0.95f, 0.85f, 0.25f, 0.35f);
     private static readonly Color BoltGlow = new(0.55f, 0.85f, 1f, 0.55f);
 
+    private bool _wasActive;
+
     public bool Active => Session.RaisedSpike == 1;
 
     public override void _Ready()
@@ -35,7 +37,11 @@ public partial class ElectricDoorField : Node2D
 
     public override void _PhysicsProcess(double delta)
     {
-        if (!Active || Session.Agent.IsHiding)
+        bool active = Active;
+        if (active && !_wasActive)
+            Sfx.PlayAt(Sound.ElectricZap, Position);
+        _wasActive = active;
+        if (!active || Session.Agent.IsHiding)
             return;
         var d = (Session.Agent.Position - Position).Abs();
         if (d.X < Agent.HalfSize.X + 11 && d.Y < 28)

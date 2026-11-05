@@ -33,6 +33,7 @@ public partial class SecurityDoor : StaticBody2D
     public void Open()
     {
         IsOpen = true;
+        Sfx.PlayAt(Sound.SecurityDoor, Position);
         _shape.SetDeferred(CollisionShape2D.PropertyName.Disabled, true);
         _label.Visible = false;
         _sprite.Modulate = new Color(1, 1, 1, 0.25f);   // a faint frame stays so the route reads

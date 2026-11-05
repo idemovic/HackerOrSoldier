@@ -28,6 +28,7 @@ public partial class RocketLauncher : Node2D
             return;
         _timer = Interval;
         Session.SpawnRocket(Position + new Vector2(_direction * 20, -2), _direction);
+        Sfx.PlayAt(Sound.RocketLaunch, Position);
         _direction = -_direction;
         _sprite.FlipH = _direction < 0;
     }

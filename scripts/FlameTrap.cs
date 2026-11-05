@@ -10,6 +10,7 @@ public partial class FlameTrap : Node2D
     public PlaySession Session { get; set; }
 
     private Sprite2D _flame;
+    private bool _wasFlaming;
 
     public bool Flaming => Session.Time % 10f is >= 4f and < 6f;
 
@@ -27,8 +28,12 @@ public partial class FlameTrap : Node2D
 
     public override void _PhysicsProcess(double delta)
     {
-        _flame.Visible = Flaming;
-        if (!Flaming || Session.Agent.IsHiding)
+        bool flaming = Flaming;
+        _flame.Visible = flaming;
+        if (flaming && !_wasFlaming)
+            Sfx.PlayAt(Sound.FlameBurst, Position);
+        _wasFlaming = flaming;
+        if (!flaming || Session.Agent.IsHiding)
             return;
         var agent = Session.Agent;
         bool touching = Mathf.Abs(agent.Position.X - Position.X) < Agent.HalfSize.X + 9

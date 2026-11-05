@@ -64,9 +64,14 @@ public partial class GameFlow : Node2D
         if (_session == null || !@event.IsActionPressed("pause"))
             return;
         if (_paused)
+        {
+            Sfx.Play(Sound.Unpause);
             Unpause();
+        }
         else
+        {
             ShowPauseMenu();
+        }
     }
 
     // The help screen shows while the help key is held and freezes the level
@@ -201,8 +206,13 @@ public partial class GameFlow : Node2D
             }
             button.Pressed += () =>
             {
-                if (Shop.TryBuy(captured.Id, _run))
+                if (!Shop.TryBuy(captured.Id, _run))
                 {
+                    Sfx.Play(Sound.CantAfford);
+                }
+                else
+                {
+                    Sfx.Play(Sound.Purchase);
                     Profile.Current.Save();
                     coinsLabel.Text = $"Coins {Profile.Current.Coins}";
                     if (captured.Id == Shop.HackingTool)
@@ -222,6 +232,7 @@ public partial class GameFlow : Node2D
     private void ShowPauseMenu()
     {
         _paused = true;
+        Sfx.Play(Sound.Pause);
         GetTree().Paused = true;
         ClearPanel();
         _panel.Visible = true;
@@ -296,7 +307,11 @@ public partial class GameFlow : Node2D
     private void AddPanelButton(string text, System.Action onPressed)
     {
         var button = new Button { Text = text };
-        button.Pressed += () => onPressed();
+        button.Pressed += () =>
+        {
+            Sfx.Play(Sound.UiClick);
+            onPressed();
+        };
         _panelBox.AddChild(button);
     }
 }

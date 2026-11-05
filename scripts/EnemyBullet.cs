@@ -28,7 +28,14 @@ public partial class EnemyBullet : Node2D
         var cell = new Vector2I(
             (int)Mathf.Floor(Position.X / tile),
             (int)Mathf.Floor(Position.Y / tile));
-        if (!Session.InLevel(cell) || TileDefs.Get(Session.TileAt(cell.X, cell.Y))?.Solid == true)
+        if (!Session.InLevel(cell))
+        {
             QueueFree();
+        }
+        else if (TileDefs.Get(Session.TileAt(cell.X, cell.Y))?.Solid == true)
+        {
+            Sfx.PlayAt(Sound.BulletHit, Position);
+            QueueFree();
+        }
     }
 }

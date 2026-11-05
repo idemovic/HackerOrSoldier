@@ -113,7 +113,10 @@ public partial class Enemy : CharacterBody2D
         if (Def.Type == EnemyDefs.Robot)
         {
             if (!Session.RobotsOff)
+            {
+                Sfx.PlayAt(Sound.BulletHit, Position);   // the shot pings off the live robot
                 return;
+            }
             Die();
             return;
         }
@@ -132,11 +135,14 @@ public partial class Enemy : CharacterBody2D
             Def = EnemyDefs.Get(Def.DegradesTo);
             _lives = StageLives(Def);
             _animator.SetType(Def.Type);
+            Sfx.PlayAt(Sound.EnemyHit, Position);
             return;
         }
         _lives--;
         if (_lives <= 0)
             Die();
+        else
+            Sfx.PlayAt(Sound.EnemyHit, Position);
     }
 
     // README difficulty: enemies get -1/+1 life on low/hard, minimum 1.
@@ -146,6 +152,7 @@ public partial class Enemy : CharacterBody2D
 
     private void Die()
     {
+        Sfx.PlayAt(Sound.EnemyDie, Position);
         if (Def.DropsAmmo && GD.Randf() < Session.DropChance)
             Session.SpawnAmmoPack(Position);
         if (Def.Type is EnemyDefs.Soldier or EnemyDefs.SuperSoldier)
@@ -185,14 +192,17 @@ public partial class Enemy : CharacterBody2D
         {
             case EnemyAttack.Pistol:
                 _shootCooldown = 1.5f;
+                Sfx.PlayAt(Sound.EnemyShot, Position);
                 Session.SpawnEnemyBullet(Position, new Vector2(_facing, 0), "bullet");
                 break;
             case EnemyAttack.MiniGun:
                 _shootCooldown = 0.6f;
+                Sfx.PlayAt(Sound.EnemyMinigun, Position);
                 Session.SpawnEnemyBullet(Position, new Vector2(_facing, 0), "bullet");
                 break;
             case EnemyAttack.Plasma:
                 _shootCooldown = 2f;
+                Sfx.PlayAt(Sound.EnemyPlasma, Position);
                 Session.SpawnEnemyBullet(Position,
                     (Session.Agent.Position - Position).Normalized(), "plasma");
                 break;

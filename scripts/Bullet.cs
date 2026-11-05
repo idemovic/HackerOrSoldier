@@ -62,6 +62,8 @@ public partial class Bullet : Node2D
         {
             if (id == TileDefs.DestructibleWall)
                 Session.DestroyTile(cell);
+            else
+                Sfx.PlayAt(Sound.BulletHit, Position);
             QueueFree();
         }
     }

@@ -26,6 +26,7 @@ public partial class WallSwitch : Node2D
     public void Activate()
     {
         Activated = true;
+        Sfx.PlayAt(Sound.Switch, Position);
         _sprite.Modulate = new Color(0.5f, 0.5f, 0.5f);
     }
 }
