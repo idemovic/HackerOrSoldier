@@ -155,6 +155,27 @@ public static class Sprites
         "..dddddddd......",
     }, row => row.Replace('F', fill).Replace('S', shade)));
 
+    // CCTV box: sun hood, record LED, glass lens, wall bracket.
+    private static SpriteMap CameraBox(char led) => new(System.Array.ConvertAll(new[]
+    {
+        "................",
+        "................",
+        "...kkkkkkkkkkkk.",
+        "...kvvvvvvvvvvvk",
+        "...kkkkkkkkkkkkk",
+        "...kLLlllllddddk",
+        "...kLLllllldcCdk",
+        "...kglllllldCkdk",
+        "...kgggggggddddk",
+        "...kkkkkkkkkkkkk",
+        ".......kdk......",
+        "kk.....kdk......",
+        "kdkkkkkkdk......",
+        "kddddddddk......",
+        "kkkkkkkkkk......",
+        "................",
+    }, row => row.Replace('L', led)));
+
     private static readonly Dictionary<string, SpriteMap> Maps = new()
     {
         [EnemyDefs.Drone] = new(new[]
@@ -732,25 +753,10 @@ public static class Sprites
             "................",
             "................",
         }),
-        [ObjectDefs.Camera] = new(new[]
-        {
-            "................",
-            "................",
-            "................",
-            "................",
-            "..gg............",
-            "..gggggggggg....",
-            "..ggggggggrg....",
-            "..gggggggggg....",
-            "....gg..........",
-            "................",
-            "................",
-            "................",
-            "................",
-            "................",
-            "................",
-            "................",
-        }),
+        // The record LED is dim, and ticks bright red / off during an alarm.
+        [ObjectDefs.Camera] = CameraBox('R'),
+        ["camera_alarm"] = CameraBox('r'),
+        ["camera_alarm_off"] = CameraBox('d'),
         [ObjectDefs.Closet] = new(new[]
         {
             "..NNNNNNNNNNNN..",
