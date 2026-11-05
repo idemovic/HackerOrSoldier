@@ -27,7 +27,7 @@ public partial class Minimap : Control
         _camera = camera;
         _tileScale = Mathf.Min(MaxWidth / level.Width, MaxHeight / level.Height);
         Size = new Vector2(level.Width, level.Height) * _tileScale;
-        Position = new Vector2(640 - Size.X - Margin, Top);
+        Position = new Vector2(GetViewportRect().Size.X - Size.X - Margin, Top);
     }
 
     public override void _GuiInput(InputEvent @event)

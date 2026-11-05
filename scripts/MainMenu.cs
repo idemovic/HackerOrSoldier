@@ -20,15 +20,14 @@ public partial class MainMenu : Control
         Profile.Current.ApplyKeyBinds();
         Sfx.ApplySettings();
 
-        SetAnchorsPreset(LayoutPreset.FullRect);
+        SetAnchorsAndOffsetsPreset(LayoutPreset.FullRect);
         var background = new ColorRect { Color = new Color(0.058f, 0.058f, 0.09f) };
         background.SetAnchorsPreset(LayoutPreset.FullRect);
         AddChild(background);
 
         var theme = new Theme { DefaultFontSize = 10 };
         var box = new VBoxContainer { Theme = theme, CustomMinimumSize = new Vector2(180, 0) };
-        box.SetAnchorsPreset(LayoutPreset.Center);
-        box.Position = new Vector2(230, 100);
+        PlaceFromCenter(box, new Vector2(-90, -80));
         AddChild(box);
 
         box.AddChild(new Label
@@ -62,6 +61,16 @@ public partial class MainMenu : Control
         BuildSettingsPanel(theme);
     }
 
+    // Pins a control's top-left corner at a fixed offset from the screen
+    // center, so the menu stays together as the window grows; the control
+    // then grows right and down to fit its content.
+    private static void PlaceFromCenter(Control control, Vector2 offset)
+    {
+        control.SetAnchorsPreset(LayoutPreset.Center);
+        control.OffsetLeft = control.OffsetRight = offset.X;
+        control.OffsetTop = control.OffsetBottom = offset.Y;
+    }
+
     private void AddMenuButton(VBoxContainer box, string text, System.Action onPressed)
     {
         var button = new Button { Text = text };
@@ -75,7 +84,8 @@ public partial class MainMenu : Control
 
     private void BuildSettingsPanel(Theme theme)
     {
-        _settingsPanel = new PanelContainer { Theme = theme, Visible = false, Position = new Vector2(430, 90) };
+        _settingsPanel = new PanelContainer { Theme = theme, Visible = false };
+        PlaceFromCenter(_settingsPanel, new Vector2(110, -90));
         AddChild(_settingsPanel);
         var box = new VBoxContainer();
         _settingsPanel.AddChild(box);

@@ -33,6 +33,7 @@ public partial class GameFlow : Node2D
         _agentScene = GD.Load<PackedScene>("res://scenes/agent.tscn");
         _sky = new SkyBackdrop();
         AddChild(_sky);   // behind the grids: empty cells show the sky
+        GetViewport().SizeChanged += OnScreenResized;
         _grids = new LevelGrids(this);
         _grids.Hidden.Modulate = new Color(1, 1, 1, 0);
 
@@ -281,6 +282,13 @@ public partial class GameFlow : Node2D
         _grids.Main.Modulate = Colors.White;
         _grids.Hidden.Modulate = new Color(1, 1, 1, 0);
         _sky.Apply(GetViewportRect().Size, day: false);
+    }
+
+    // Between levels the sky fills the screen, so it follows a resized window.
+    private void OnScreenResized()
+    {
+        if (_session == null)
+            _sky.Apply(GetViewportRect().Size, day: false);
     }
 
     private void ClearPanel()
