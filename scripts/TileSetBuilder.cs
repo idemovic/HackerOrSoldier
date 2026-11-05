@@ -52,7 +52,7 @@ public static class TileSetBuilder
     // bare holes, tips showing in the holes, spears out. Not a native
     // animation: the play session picks the frame from its own clock.
     public const int SpearFrames = 3;
-    private static readonly int[] SpearRise = { 0, 3, 12 };   // pixels above the plate, per frame
+    private static readonly int[] SpearRise = { 0, 3, 24 };   // pixels above the plate, per frame
     private const int ShadowRow = 5;
     private const int ShadowMasks = 8;
     // Electric floor joins: join = (left neighbour is electric ? 1 : 0) |
@@ -479,7 +479,7 @@ public static class TileSetBuilder
     }
 
     // Spear frame on a transparent tile: an iron ground plate with three
-    // holes, and three short spears standing SpearRise[frame] pixels out of
+    // holes, and three spears standing SpearRise[frame] pixels out of
     // them (frame 0 shows only the holes, frame 1 just the tips). Each
     // spear is a lit tip, a blade lit along its left edge, a steel guard and
     // a two-tone shaft.
