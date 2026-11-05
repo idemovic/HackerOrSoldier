@@ -637,7 +637,6 @@ public static class Sprites
         }),
         [ObjectDefs.Computer] = new(new[]
         {
-            "................",
             "...gggggggggg...",
             "...gccccccccg...",
             "...gcckkkkccg...",
@@ -645,14 +644,15 @@ public static class Sprites
             "...gggggggggg...",
             "......gg........",
             ".....gggg.......",
-            "...dddddddddd...",
-            "................",
-            "................",
-            "................",
-            "................",
-            "................",
-            "................",
-            "................",
+            ".nnnnnnnnnnnnnn.",
+            ".NNNNNNNNNNNNNN.",
+            "..nN.....nnnnn..",
+            "..nN.....nntnn..",
+            "..nN.....NNNNN..",
+            "..nN.....nnnnn..",
+            "..nN.....nntnn..",
+            "..nN.....NNNNN..",
+            "..nN.....nnnnn..",
         }),
         [ObjectDefs.Switch] = new(new[]
         {
