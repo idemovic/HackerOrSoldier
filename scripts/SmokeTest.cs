@@ -1357,8 +1357,16 @@ public partial class SmokeTest : Node
         editor.PaintCell(new Vector2I(6, 10));
         Check(editor.StartPlay(), "barrel level starts");
         Input.ActionPress("move_right");
-        await Frames(100);
+        await Frames(60);
+        var pushFrames = new HashSet<string>();
+        for (int i = 0; i < 40; i++)
+        {
+            await Frames(1);
+            pushFrames.Add(editor.PlayerAgent.AnimationFrame);
+        }
         Input.ActionRelease("move_right");
+        Check(pushFrames.All(f => f?.StartsWith("agent_push") == true) && pushFrames.Count > 3,
+            "pushing a barrel plays the push cycle without flickering");
         var barrel = editor.Session.GetChildren().OfType<Barrel>().FirstOrDefault();
         Check(barrel != null && barrel.Position.X > 6 * 32 + 60, "agent pushes the barrel");
         Check(editor.PlayerAgent.Position.X > 6 * 32, "agent advances behind the barrel");

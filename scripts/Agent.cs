@@ -130,11 +130,15 @@ public partial class Agent : CharacterBody2D
         Velocity = velocity;
         MoveAndSlide();
 
+        bool pushing = false;
         for (int i = 0; i < GetSlideCollisionCount(); i++)
         {
             var collision = GetSlideCollision(i);
             if (collision.GetCollider() is Barrel barrel && Mathf.Abs(collision.GetNormal().X) > 0.9f)
+            {
                 barrel.Push(collision.GetNormal().X < 0 ? 1 : -1);   // the normal points back at the agent
+                pushing = true;
+            }
         }
 
         // The shoot pose only plays when a shot actually left the weapon, so
@@ -142,7 +146,7 @@ public partial class Agent : CharacterBody2D
         if (Session != null && Input.IsActionJustPressed("shoot") && Session.TryShoot(this))
             _animator.Shoot();
 
-        _animator.Update(dt, Velocity, IsOnFloor(), submerged, Facing);
+        _animator.Update(dt, Velocity, IsOnFloor(), submerged, Facing, pushing);
 
         if (Session != null)
             CheckHazards(dt);

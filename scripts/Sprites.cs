@@ -777,25 +777,25 @@ public static class Sprites
             "..NN........NN..",
         }),
         // Fills the cell like its 30x30 collision box so it rests on the
-        // floor: wooden staves bulging at the middle, two steel hoops.
+        // floor: square-cut wooden staves and two steel hoops.
         [ObjectDefs.Barrel] = new(new[]
         {
-            "..NNNNNNNNNNNN..",
-            ".NttnNnnnnNnnnN.",
-            ".VvvvvvvvvvvvvV.",
-            ".VVVVVVVVVVVVVV.",
-            ".NttnNnnnnNnnnN.",
+            "NNNNNNNNNNNNNNNN",
+            "NnttnNnnnnNnnnnN",
+            "VvvvvvvvvvvvvvvV",
+            "VVVVVVVVVVVVVVVV",
             "NnttnNnnnnNnnnnN",
             "NnttnNnnnnNnnnnN",
             "NnttnNnnnnNnnnnN",
             "NnttnNnnnnNnnnnN",
             "NnttnNnnnnNnnnnN",
             "NnttnNnnnnNnnnnN",
-            ".NttnNnnnnNnnnN.",
-            ".VvvvvvvvvvvvvV.",
-            ".VVVVVVVVVVVVVV.",
-            ".NttnNnnnnNnnnN.",
-            "..NNNNNNNNNNNN..",
+            "NnttnNnnnnNnnnnN",
+            "NnttnNnnnnNnnnnN",
+            "VvvvvvvvvvvvvvvV",
+            "VVVVVVVVVVVVVVVV",
+            "NnttnNnnnnNnnnnN",
+            "NNNNNNNNNNNNNNNN",
         }),
         // Taller than a cell: the emitter hangs over the agent's head and the
         // pad sits on the floor; sprites taller than 32 px are bottom-aligned.

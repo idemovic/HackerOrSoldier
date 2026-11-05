@@ -19,6 +19,7 @@ public sealed class AgentAnimator
     private const float LandFrameTime = 0.05f;
     private const float DieFrameTime = 0.055f;
     private const float RunFrameStride = 7f;     // px travelled per run frame
+    private const float PushFrameTime = 0.06f;   // a heavy, deliberate step
     private const float FlashTime = 0.05f;
     private const float RecoilTime = 0.11f;
     private const float ShootPoseTime = 0.24f;
@@ -67,7 +68,7 @@ public sealed class AgentAnimator
         _dying = false;
     }
 
-    public void Update(float dt, Vector2 velocity, bool onFloor, bool submerged, int facing)
+    public void Update(float dt, Vector2 velocity, bool onFloor, bool submerged, int facing, bool pushing = false)
     {
         bool left = facing < 0;
 
@@ -84,7 +85,7 @@ public sealed class AgentAnimator
         _shootTime = Mathf.Max(_shootTime - dt, 0f);
         TrackLanding(dt, onFloor, submerged);
 
-        var clip = SelectClip(velocity, onFloor, submerged);
+        var clip = SelectClip(velocity, onFloor, submerged, pushing);
         if (clip != _clip)
         {
             _clip = clip;
@@ -98,6 +99,7 @@ public sealed class AgentAnimator
         int index = clip switch
         {
             BodyClip.Run => Cycle(RunFrameStride, count),
+            BodyClip.Push => Cycle(PushFrameTime, count),
             BodyClip.Idle => Cycle(IdleFrameTime, count),
             BodyClip.Swim => Cycle(SwimFrameTime, count),
             // Jump frames track vertical speed, so the tuck is timed by the
@@ -126,12 +128,16 @@ public sealed class AgentAnimator
         _airTime = onFloor || submerged ? 0f : _airTime + dt;
     }
 
-    private BodyClip SelectClip(Vector2 velocity, bool onFloor, bool submerged)
+    // Pushing beats the run: against a barrel the slide leaves the agent
+    // almost no horizontal speed, which would otherwise read as standing.
+    private BodyClip SelectClip(Vector2 velocity, bool onFloor, bool submerged, bool pushing)
     {
         if (submerged)
             return BodyClip.Swim;
         if (!onFloor)
             return velocity.Y < 0f ? BodyClip.Jump : BodyClip.Fall;
+        if (pushing)
+            return BodyClip.Push;
         if (Mathf.Abs(velocity.X) > 1f)
             return BodyClip.Run;
         return _landTime > 0f ? BodyClip.Land : BodyClip.Idle;

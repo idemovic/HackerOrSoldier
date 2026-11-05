@@ -4,7 +4,7 @@ using Godot;
 
 namespace HackerOrSoldier;
 
-public enum BodyClip { Idle, Walk, Run, Jump, Fall, Land, Swim, Die }
+public enum BodyClip { Idle, Walk, Run, Push, Jump, Fall, Land, Swim, Die }
 
 // The upper-body overlay while the gun is out. It replaces only the arms,
 // so the legs keep walking, running, falling or swimming under it.
@@ -34,6 +34,7 @@ public static class BodyPoses
         [BodyClip.Idle] = 4,
         [BodyClip.Walk] = 12,
         [BodyClip.Run] = 12,
+        [BodyClip.Push] = 12,
         [BodyClip.Jump] = 4,
         [BodyClip.Fall] = 4,
         [BodyClip.Land] = 3,
@@ -114,7 +115,7 @@ public static class BodyPoses
             },
             HeadColors: Tones(('H', "6e5238"), ('h', "402d1d"), ('j', "1f150d"), ('c', "3e5a78"))),
             Weapon.Pistol,
-            new[] { BodyClip.Idle, BodyClip.Run, BodyClip.Jump, BodyClip.Fall, BodyClip.Land, BodyClip.Swim, BodyClip.Die }),
+            new[] { BodyClip.Idle, BodyClip.Run, BodyClip.Push, BodyClip.Jump, BodyClip.Fall, BodyClip.Land, BodyClip.Swim, BodyClip.Die }),
         // Bare-knuckle brawler: orange tee, black trousers, no gun.
         [EnemyDefs.Fighter] = new(new Look(
             Skin: Skin,
@@ -223,6 +224,7 @@ public static class BodyPoses
             BodyClip.Idle => Idle(t),
             BodyClip.Walk => Walk(t),
             BodyClip.Run => Run(t),
+            BodyClip.Push => Push(t),
             BodyClip.Jump => Jump[index],
             BodyClip.Fall => Fall[index],
             BodyClip.Land => CharacterRig.Grounded(Pose.Lerp(Crouch, Idle(0f), index / 3f)),
@@ -302,6 +304,25 @@ public static class BodyPoses
     private static Pose Run(float t) => CharacterRig.Grounded(new Pose(Vector2.Zero, 11f,
         NearArm: RunArm(t), FarArm: RunArm(t + 0.5f),
         NearLeg: StrideAt(Stride, t), FarLeg: StrideAt(Stride, t + 0.5f)));
+
+    // Shoving a barrel: hips back, the body leaning into it, both palms on
+    // the barrel at chest height. The legs drive in short steps, the back
+    // leg straightening as it pushes off, and the lean dips with each drive.
+    private static readonly Limb[] PushStride =
+    {
+        new(18f, 2f, 95f),      // plant under the hips
+        new(6f, -8f, 90f),
+        new(-8f, -20f, 85f),
+        new(-22f, -32f, 75f),   // drive
+        new(-34f, -44f, 55f),   // back leg straight, toe pushing off
+        new(-26f, -78f, 35f),   // heel lifts
+        new(-4f, -66f, 55f),    // swing through low
+        new(16f, -18f, 85f),    // reach
+    };
+
+    private static Pose Push(float t) => CharacterRig.Grounded(new Pose(new Vector2(-2f, 0f), 24f + 3f * Mathf.Abs(Wave(t)),
+        NearArm: new(28f, 112f), FarArm: new(22f, 104f),
+        NearLeg: StrideAt(PushStride, t), FarLeg: StrideAt(PushStride, t + 0.5f)));
 
     // Jump frames run from take-off to the apex; the animator picks one by
     // vertical speed, so the body tucks exactly as fast as the jump slows.
