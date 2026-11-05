@@ -31,6 +31,10 @@ public partial class Agent : CharacterBody2D
 
     private const float ElectricInterval = 3f;
 
+    // Landing faster than a normal jump's return counts as a fall worth a thud.
+    private static readonly float HardLanding = -JumpVelocity * 1.25f;
+    private const float PushRearm = 0.3f;   // pushing flickers; only a pause re-arms the scrape
+
     // Hazard overlap is sampled slightly inside the collision box so
     // standing next to a hazard tile does not count as touching it.
     private static readonly Vector2 HazardExtent = HalfSize - Vector2.One;
@@ -42,6 +46,7 @@ public partial class Agent : CharacterBody2D
     public string AnimationFrame => _animator?.Frame;
 
     private float _electricTime;
+    private float _pushIdle = PushRearm;
     private Sprite2D _sprite;
     private AgentAnimator _animator;
 
@@ -112,9 +117,15 @@ public partial class Agent : CharacterBody2D
         if (Input.IsActionJustPressed("jump"))
         {
             if (submerged)
+            {
                 velocity.Y = atSurface ? JumpVelocity : -SwimSpeed;
+                Sfx.Play(atSurface ? Sound.Jump : Sound.Swim);
+            }
             else if (IsOnFloor())
+            {
                 velocity.Y = JumpVelocity;
+                Sfx.Play(Sound.Jump);
+            }
         }
 
         if (submerged)
@@ -128,7 +139,10 @@ public partial class Agent : CharacterBody2D
         velocity.X = axis * RunSpeed * (submerged ? 0.5f : 1f);
 
         Velocity = velocity;
+        bool airborne = !IsOnFloor();
         MoveAndSlide();
+        if (airborne && IsOnFloor() && velocity.Y > HardLanding)
+            Sfx.Play(Sound.Land);
 
         bool pushing = false;
         for (int i = 0; i < GetSlideCollisionCount(); i++)
@@ -139,6 +153,17 @@ public partial class Agent : CharacterBody2D
                 barrel.Push(collision.GetNormal().X < 0 ? 1 : -1);   // the normal points back at the agent
                 pushing = true;
             }
+        }
+
+        if (!pushing)
+        {
+            _pushIdle += dt;
+        }
+        else
+        {
+            if (_pushIdle >= PushRearm)
+                Sfx.Play(Sound.BarrelPush);
+            _pushIdle = 0f;
         }
 
         // The shoot pose only plays when a shot actually left the weapon, so

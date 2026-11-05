@@ -372,6 +372,7 @@ public partial class PlaySession : Node2D
             {
                 door.QueueFree();
                 _doors.RemoveAt(i);
+                Sfx.PlayAt(Sound.DoorOpen, door.Position);
             }
         }
 
@@ -393,6 +394,7 @@ public partial class PlaySession : Node2D
                     capsule.Open();
                     partner.Open();
                     _teleportLock = true;
+                    Sfx.Play(Sound.Teleport);
                     break;
                 }
             break;
@@ -410,6 +412,7 @@ public partial class PlaySession : Node2D
                 && (_usbKeys.Contains(computer.Number) || Profile.Current.HasHackingTool))
             {
                 computer.SetHacked();
+                Sfx.Play(Sound.ComputerHack);
                 TurnOffCircuit(computer.Number);
             }
         }
@@ -458,6 +461,8 @@ public partial class PlaySession : Node2D
 
     public void DestroyTile(Vector2I cell)
     {
+        int tile = TileSetBuilder.TileSize;
+        Sfx.PlayAt(Sound.WallCrumble, new Vector2(cell.X * tile + tile / 2f, cell.Y * tile + tile / 2f));
         _destroyed.Add(cell);
         _grids.EraseCell(cell);
     }
@@ -476,17 +481,19 @@ public partial class PlaySession : Node2D
                     if (Mathf.Abs(to.Y) < 28 && to.X * agent.Facing > 0 && Mathf.Abs(to.X) < 44)
                         enemy.TakeHit();
                 }
+                Sfx.Play(Sound.Chainsaw);
                 return true;
             case "crossbow":
                 if (Arrows <= 0)
-                    return false;
+                    return Misfire();
                 Arrows--;
                 ShotsFired++;
+                Sfx.Play(Sound.Crossbow);
                 SpawnAgentBullet(agent, 0);   // README: the crossbow does not trigger the alarm
                 return true;
             case "dynamite":
                 if (DynamiteSticks <= 0)
-                    return false;
+                    return Misfire();
                 DynamiteSticks--;
                 SpawnDynamite(agent.Position);
                 return true;
@@ -496,14 +503,26 @@ public partial class PlaySession : Node2D
                 int burst = Weapon == "assault_rifle" ? 3 : Weapon == "minigun" ? 2 : 1;
                 burst = Mathf.Min(burst, Ammo);
                 if (burst <= 0)
-                    return false;
+                    return Misfire();
                 Ammo -= burst;
                 ShotsFired += burst;
                 TriggerAlarm();   // README: a gun shot triggers the alarm
+                Sfx.Play(Weapon switch
+                {
+                    "assault_rifle" => Sound.ShotRifle,
+                    "minigun" => Sound.ShotMinigun,
+                    _ => Sound.ShotPistol,
+                });
                 for (int i = 0; i < burst; i++)
                     SpawnAgentBullet(agent, (i - (burst - 1) / 2f) * 6f);
                 return true;
         }
+    }
+
+    private static bool Misfire()
+    {
+        Sfx.Play(Sound.EmptyClick);
+        return false;
     }
 
     private void SpawnAgentBullet(Agent agent, float offsetY) =>
@@ -526,7 +545,12 @@ public partial class PlaySession : Node2D
             SpriteKey = "rocket",
         });
 
-    public void TriggerAlarm() => _alarmTime = AlarmDuration;
+    public void TriggerAlarm()
+    {
+        if (_alarmTime <= 0)
+            Sfx.Play(Sound.Alarm);
+        _alarmTime = AlarmDuration;
+    }
 
     public bool IsCircuitOff(string number) => _circuitsOff.Contains(number);
 
@@ -540,6 +564,7 @@ public partial class PlaySession : Node2D
     {
         if (!_circuitsOff.Add(number))
             return;
+        Sfx.Play(Sound.PowerDown);
         foreach (var door in _securityDoors)
             if (door.Number == number)
                 door.Open();
@@ -615,6 +640,7 @@ public partial class PlaySession : Node2D
         if (Agent.IsHiding)
         {
             Agent.SetHiding(false);
+            Sfx.Play(Sound.Unhide);
             return;
         }
         foreach (var closet in _closets)
@@ -623,6 +649,7 @@ public partial class PlaySession : Node2D
             if (offset.X < 24 && offset.Y < 24)
             {
                 Agent.SetHiding(true);
+                Sfx.Play(Sound.Hide);
                 Agent.Position = closet.Position;
                 return;
             }
@@ -649,8 +676,11 @@ public partial class PlaySession : Node2D
     public void SpawnEnemyBullet(Vector2 from, Vector2 direction, string spriteKey) =>
         AddChild(new EnemyBullet { Session = this, Position = from, Direction = direction, SpriteKey = spriteKey });
 
-    public void SpawnDynamite(Vector2 from) =>
+    public void SpawnDynamite(Vector2 from)
+    {
+        Sfx.PlayAt(Sound.DynamiteThrow, from);
         AddChild(new Dynamite { Session = this, Position = from });
+    }
 
     public void SpawnAmmoPack(Vector2 at)
     {
@@ -679,6 +709,7 @@ public partial class PlaySession : Node2D
     // infinite lives survive (README: does not apply to infinite lives).
     public void Explode(Vector2 center)
     {
+        Sfx.PlayAt(Sound.Explosion, center);
         TriggerAlarm();
         int tile = TileSetBuilder.TileSize;
         int minX = (int)Mathf.Floor((center.X - ExplosionRadius) / tile);
@@ -715,9 +746,15 @@ public partial class PlaySession : Node2D
             return;
         _heldItems.Remove(item);
         if (item == ObjectDefs.InfraGoggles)
+        {
             _gogglesTime = ItemDuration;
+            Sfx.Play(Sound.GogglesOn);
+        }
         else
+        {
             _disguiseTime = ItemDuration;
+            Sfx.Play(Sound.DisguiseOn);
+        }
     }
 
     // Editor playtest toggle: hits do nothing and falling out of the level
@@ -742,6 +779,7 @@ public partial class PlaySession : Node2D
             // hit is not a death, so it costs the agent its ground, not the
             // whole death sequence.
             HasVest = false;
+            Sfx.Play(Sound.VestBreak);
             Agent.ResetForRespawn(_respawnPoint);
             return;
         }
@@ -751,6 +789,7 @@ public partial class PlaySession : Node2D
         Lives--;
         _agentDown = true;
         _failAfterDeath = Lives <= 0;
+        Sfx.Play(_failAfterDeath ? Sound.Death : Sound.Hurt);
         _deathTime = DeathDuration;
         Agent.Die();
         _death = new DeathEffect { Duration = DeathDuration, Camera = _camera };
@@ -765,6 +804,7 @@ public partial class PlaySession : Node2D
             _checkpoint.Lit = false;
         _checkpoint = checkpoint;
         checkpoint.Lit = true;
+        Sfx.Play(Sound.Checkpoint);
         _respawnPoint = checkpoint.Position;
     }
 
@@ -787,6 +827,7 @@ public partial class PlaySession : Node2D
         if (_ended)
             return;
         _ended = true;
+        Sfx.Play(signal == SignalName.Completed ? Sound.LevelComplete : Sound.MissionFailed);
         Agent?.SetPhysicsProcess(false);
         foreach (var enemy in _enemies)
             enemy.SetPhysicsProcess(false);
@@ -799,47 +840,59 @@ public partial class PlaySession : Node2D
         {
             case ObjectDefs.DoorKey:
                 _keys.Add(ColorOf(pickup.Source));
+                Sfx.Play(Sound.PickupKey);
                 break;
             case ObjectDefs.HealthKit:
                 Lives++;
+                Sfx.Play(Sound.PickupHealth);
                 break;
             case ObjectDefs.AmmoPack:
                 Ammo += 10;
+                Sfx.Play(Sound.PickupAmmo);
                 break;
             case ObjectDefs.Vest:
                 HasVest = true;
+                Sfx.Play(Sound.PickupVest);
                 break;
             case ObjectDefs.Briefcase:
             case ObjectDefs.InfraGoggles:
                 _heldItems.Add(pickup.Source.Type);
+                Sfx.Play(Sound.PickupItem);
                 break;
             case ObjectDefs.UsbKey:
                 _usbKeys.Add(NumberOf(pickup.Source));
+                Sfx.Play(Sound.PickupKey);
                 break;
             // Weapon pickups equip the weapon and grant its README default ammo.
             case ObjectDefs.WeaponChainsaw:
                 Weapon = "chainsaw";
+                Sfx.Play(Sound.PickupWeapon);
                 break;
             case ObjectDefs.WeaponAssaultRifle:
                 Weapon = "assault_rifle";
                 Ammo += 10;
+                Sfx.Play(Sound.PickupWeapon);
                 break;
             case ObjectDefs.WeaponMinigun:
                 Weapon = "minigun";
                 Ammo += 20;
+                Sfx.Play(Sound.PickupWeapon);
                 break;
             case ObjectDefs.WeaponCrossbow:
                 Weapon = "crossbow";
                 Arrows += 20;
+                Sfx.Play(Sound.PickupWeapon);
                 break;
             case ObjectDefs.WeaponDynamite:
                 Weapon = "dynamite";
                 DynamiteSticks += 3;
+                Sfx.Play(Sound.PickupWeapon);
                 break;
             default:
                 var collectible = CollectibleDefs.Get(pickup.Source.Type);
                 if (collectible != null)
                 {
+                    var jingle = Sound.Coin;
                     Score += collectible.Score;
                     CoinsCollected += collectible.Coins;
                     if (pickup.FromLevel)
@@ -851,8 +904,10 @@ public partial class PlaySession : Node2D
                         {
                             Score += CollectibleDefs.LetterSetBonusScore;
                             CoinsCollected += CollectibleDefs.LetterSetBonusCoins;
+                            jingle = Sound.LetterBonus;
                         }
                     }
+                    Sfx.Play(jingle);
                 }
                 break;
         }
