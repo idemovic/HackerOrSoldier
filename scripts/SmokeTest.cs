@@ -77,6 +77,7 @@ public partial class SmokeTest : Node
         await CrossbowCheck();
         await ChainsawCheck();
         await DynamiteWeaponCheck();
+        await DynamiteLandingCheck();
         await ElectricDoorCheck();
         await FlameTrapCheck();
         await RocketLauncherCheck();
@@ -1869,6 +1870,24 @@ public partial class SmokeTest : Node
         Check(editor.Session.TileAt(8, 10) == TileDefs.DestructibleWall, "dynamite waits out its fuse");
         await Frames(70);
         Check(editor.Session.TileAt(8, 10) == TileDefs.Empty, "dynamite destroys destructible walls after its 2.5s fuse");
+        editor.StopPlay();
+    }
+
+    // A stick dropped from high up lands flush on the floor instead of
+    // sinking into it after a fast last step.
+    private async Task DynamiteLandingCheck()
+    {
+        var editor = await FreshEditor();
+        Check(editor.StartPlay(), "dynamite landing level starts");
+        int tile = TileSetBuilder.TileSize;
+        float x = 20 * tile + tile / 2f;
+        editor.Session.SpawnDynamite(new Vector2(x, tile));
+        await Frames(60);
+        var stick = editor.Session.GetChildren().OfType<Dynamite>().FirstOrDefault();
+        Check(stick != null, "the dropped stick is still burning");
+        int floorRow = Enumerable.Range(0, 12).First(y => TileDefs.Get(editor.Session.TileAt(20, y))?.Solid == true);
+        Check(stick != null && Mathf.IsEqualApprox(stick.Position.Y + 8, floorRow * tile),
+            "dropped dynamite rests on top of the floor tile");
         editor.StopPlay();
     }
 
