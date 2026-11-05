@@ -180,7 +180,7 @@ public partial class Sfx : Node
         [Sound.Switch] = new[] { Note(Wave.Square, 1000, 0, 0.05f, 0.25f), Note(Wave.Square, 1500, 0.06f, 0.08f, 0.25f) },
         [Sound.Explosion] = new[]
         {
-            Noise(3000, 200, 0, 0.8f, 0.5f, 1.5f), Noise(800, 80, 0, 0.9f, 0.4f, 1.2f), Saw(90, 30, 0, 0.6f, 0.35f),
+            Noise(3000, 200, 0, 0.8f, 0.4f, 1.5f), Noise(800, 80, 0, 0.9f, 0.3f, 1.2f), Saw(90, 30, 0, 0.6f, 0.22f),
         },
         [Sound.Alarm] = new[]
         {
@@ -207,7 +207,7 @@ public partial class Sfx : Node
         [Sound.Unhide] = new[] { Tri(250, 500, 0, 0.1f, 0.28f) },
         [Sound.GogglesOn] = new[] { Tri(400, 1200, 0, 0.15f, 0.3f), Note(Wave.Square, 1200, 0.15f, 0.06f, 0.2f) },
         [Sound.DisguiseOn] = new[] { Sq(500, 250, 0, 0.2f, 0.2f, 0.5f, 0.05f), Note(Wave.Triangle, 800, 0.1f, 0.12f, 0.28f) },
-        [Sound.WallCrumble] = new[] { Noise(1800, 300, 0, 0.35f, 0.45f), Noise(500, 100, 0, 0.3f, 0.35f) },
+        [Sound.WallCrumble] = new[] { Noise(1800, 300, 0, 0.35f, 0.35f), Noise(500, 100, 0, 0.3f, 0.28f) },
         [Sound.FlameBurst] = new[] { Noise(1800, 900, 0, 0.5f, 0.28f, 0.5f), Saw(90, 70, 0, 0.5f, 0.18f, decay: 0.5f) },
         [Sound.ElectricZap] = new[] { Noise(9000, 5000, 0, 0.3f, 0.22f, 0.5f), Saw(110, 130, 0, 0.3f, 0.22f, decay: 0.5f) },
 

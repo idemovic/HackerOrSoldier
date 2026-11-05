@@ -153,8 +153,8 @@ Known simplifications (tuning constants, not README rules):
 - Difficulty (Low/Medium/Hard): agent 4/3/2 lives, enemies -1/+1 life
   (min 1, applied to the final stage of the soldier chain), low-difficulty
   super soldiers die outright with a tombstone
-- Settings: difficulty picker, music/sound volume 0-10 (stored; applied when
-  audio lands), keyboard rebinding per action (gamepad binds preserved)
+- Settings: difficulty picker, music/sound volume 0-10 and on/off toggles
+  (see Sound effects), keyboard rebinding per action (gamepad binds preserved)
 - Score, kills, shots fired/hit tracked in PlaySession; accuracy and
   completeness computed there so the editor's test mode shows them too
 
@@ -401,6 +401,22 @@ Known simplifications (tuning constants, not README rules):
 - Run from the project, LevelStore uses the repo's levels/ folder, so
   levels are committed and pushed like code; exported builds keep
   user://levels. The smoke test deletes the levels it saves
+
+### Sound effects
+- Sfx autoload (scripts/Sfx.cs): every sound is a row of tones (square,
+  triangle, saw, noise, pitch sweeps) rendered once at startup into an
+  AudioStreamWav, so there are no audio assets. `Sfx.Play` for the agent and
+  UI, `Sfx.PlayAt` (700 px range) for enemies and traps; the same sound
+  restarting within 40 ms is skipped
+- Each action plays from the place it happens, one owner per event: the
+  explosion from PlaySession.Explode, the alarm from the off-to-on step of
+  TriggerAlarm, the level jingles from PlaySession.End (so editor playtest
+  has them too)
+- Settings: Sound and Music toggles beside the volume sliders; the profile
+  fields SoundOn/MusicOn default on. The "SFX" and "Music" buses are created
+  at startup, so music code only has to play on `Sfx.MusicBus`
+- Audition: `godot --headless --path . res://scenes/sfx_dump.tscn` writes
+  every sound to user://sfx/<name>.wav
 
 ## Milestone 6 - Steam prep (next)
 - Export presets for Windows and Linux

@@ -1,3 +1,4 @@
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
@@ -83,6 +84,7 @@ public partial class SmokeTest : Node
         await AgentDeathCheck();
         await EnemyAnimationCheck();
         await MenuSceneCheck();
+        SfxChecks();
 
         GD.Print(_failures == 0 ? "SMOKE OK" : $"SMOKE FAILED ({_failures})");
         GetTree().Quit(_failures == 0 ? 0 : 1);
@@ -1545,6 +1547,46 @@ public partial class SmokeTest : Node
         var listed = HelpOverlay.EntriesFor(full).Select(e => e.Name).OrderBy(n => n);
         Check(listed.SequenceEqual(expected),
             $"help explains every gameplay palette entry (missing: {string.Join(", ", expected.Except(listed))})");
+    }
+
+    // Every sound renders, playing is safe headless, and the toggles drive the
+    // buses.
+    private void SfxChecks()
+    {
+        var empty = Enum.GetValues<Sound>().Where(sound => Sfx.Synthesize(sound).Data.Length == 0).ToList();
+        Check(empty.Count == 0, "every sound synthesizes a non-empty stream");
+
+        Sfx.Play(Sound.UiClick);
+        Sfx.PlayAt(Sound.Explosion, new Vector2(100, 100));
+        Check(true, "playing sounds headless does not throw");
+
+        var saved = Profile.Current;
+        Profile.Current = new Profile();
+        int sfx = AudioServer.GetBusIndex(Sfx.SfxBus);
+        int music = AudioServer.GetBusIndex(Sfx.MusicBus);
+        Check(sfx >= 0 && music >= 0, "the SFX and Music buses exist");
+        Sfx.ApplySettings();
+        Check(!AudioServer.IsBusMute(sfx) && !AudioServer.IsBusMute(music), "default settings leave both buses audible");
+        Profile.Current.SoundOn = false;
+        Sfx.ApplySettings();
+        Check(AudioServer.IsBusMute(sfx) && !AudioServer.IsBusMute(music), "Sound off mutes only the SFX bus");
+        Profile.Current.SoundOn = true;
+        Profile.Current.MusicOn = false;
+        Sfx.ApplySettings();
+        Check(!AudioServer.IsBusMute(sfx) && AudioServer.IsBusMute(music), "Music off mutes only the Music bus");
+        Profile.Current.MusicOn = true;
+        Profile.Current.SoundVolume = 0;
+        Sfx.ApplySettings();
+        Check(AudioServer.IsBusMute(sfx), "volume 0 mutes the bus");
+        Profile.Current = saved;
+        Sfx.ApplySettings();
+
+        // A profile saved before the toggles existed loads with both on.
+        using (var file = FileAccess.Open("user://profile_old.json", FileAccess.ModeFlags.Write))
+            file.StoreString("{\"coins\": 7, \"musicVolume\": 3}");
+        var old = Profile.Load("profile_old.json");
+        DirAccess.RemoveAbsolute("user://profile_old.json");
+        Check(old.Coins == 7 && old.SoundOn && old.MusicOn, "an old profile without the toggles loads with sound and music on");
     }
 
     // Profile persistence and the shop economy (pure logic, no UI).
