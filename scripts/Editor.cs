@@ -722,10 +722,12 @@ public partial class Editor : Node2D
         foreach (var obj in _level.Objects)
         {
             obj.Properties.TryGetValue("color", out var colorName);
+            var texture = Sprites.ForObject(obj.Type, colorName);
             var marker = new Sprite2D
             {
-                Texture = Sprites.ForObject(obj.Type, colorName),
+                Texture = texture,
                 Position = CellCenter(new Vector2I(obj.X, obj.Y)),
+                Offset = new Vector2(0, Mathf.Min(0, 16 - texture.GetHeight() / 2f)),   // tall art stands on the cell floor
                 Modulate = new Color(1, 1, 1, 0.9f),
             };
             if (ObjectDefs.HasNumberProperty(obj.Type) && obj.Properties.TryGetValue("number", out var number))

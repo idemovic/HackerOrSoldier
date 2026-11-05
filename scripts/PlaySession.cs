@@ -231,6 +231,8 @@ public partial class PlaySession : Node2D
                     var capsule = new Teleporter { Position = pos, Number = NumberOf(obj) };
                     _teleports.Add(capsule);
                     AddChild(capsule);
+                    if (Agent != null)
+                        MoveChild(capsule, Agent.GetIndex());   // the agent stands in front of it
                     break;
                 case ObjectDefs.Elevator:
                     AddChild(new MovingPlatform { Position = pos, Session = this, Vertical = true });
@@ -387,6 +389,8 @@ public partial class PlaySession : Node2D
                 if (partner != capsule && partner.Number == capsule.Number)
                 {
                     Agent.Position = partner.Position;
+                    capsule.Open();
+                    partner.Open();
                     _teleportLock = true;
                     break;
                 }
