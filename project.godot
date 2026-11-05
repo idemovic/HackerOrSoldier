@@ -14,6 +14,7 @@ config/icon="res://icon.svg"
 [autoload]
 
 PixelFont="*res://scripts/PixelFont.cs"
+Sfx="*res://scripts/Sfx.cs"
 
 [display]
 

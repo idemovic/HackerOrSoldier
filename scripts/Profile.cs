@@ -22,8 +22,10 @@ public class Profile
     public int Coins { get; set; } = 100;   // README: default 100 coins
     public int LevelIndex { get; set; }
     public string Difficulty { get; set; } = "medium";
-    public int MusicVolume { get; set; } = 5;   // 0-10; applied once audio exists
+    public int MusicVolume { get; set; } = 5;   // 0-10; 0 mutes
     public int SoundVolume { get; set; } = 5;
+    public bool MusicOn { get; set; } = true;
+    public bool SoundOn { get; set; } = true;
     public bool HasHackingTool { get; set; }
     public Dictionary<string, long> KeyBinds { get; set; } = new();
 

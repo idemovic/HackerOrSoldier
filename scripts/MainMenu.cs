@@ -18,6 +18,7 @@ public partial class MainMenu : Control
     {
         Profile.Current = Profile.Load();
         Profile.Current.ApplyKeyBinds();
+        Sfx.ApplySettings();
 
         SetAnchorsPreset(LayoutPreset.FullRect);
         var background = new ColorRect { Color = new Color(0.058f, 0.058f, 0.09f) };
@@ -64,7 +65,11 @@ public partial class MainMenu : Control
     private void AddMenuButton(VBoxContainer box, string text, System.Action onPressed)
     {
         var button = new Button { Text = text };
-        button.Pressed += () => onPressed();
+        button.Pressed += () =>
+        {
+            Sfx.Play(Sound.UiClick);
+            onPressed();
+        };
         box.AddChild(button);
     }
 
@@ -88,8 +93,10 @@ public partial class MainMenu : Control
         };
         box.AddChild(difficulty);
 
+        box.AddChild(MakeToggle("Music", Profile.Current.MusicOn, on => Profile.Current.MusicOn = on));
         box.AddChild(new Label { Text = "Music volume" });
         box.AddChild(MakeVolumeSlider(Profile.Current.MusicVolume, v => Profile.Current.MusicVolume = v));
+        box.AddChild(MakeToggle("Sound", Profile.Current.SoundOn, on => Profile.Current.SoundOn = on));
         box.AddChild(new Label { Text = "Sound volume" });
         box.AddChild(MakeVolumeSlider(Profile.Current.SoundVolume, v => Profile.Current.SoundVolume = v));
 
@@ -125,8 +132,22 @@ public partial class MainMenu : Control
         {
             onChanged((int)v);
             Profile.Current.Save();
+            Sfx.ApplySettings();
         };
         return slider;
+    }
+
+    private static CheckButton MakeToggle(string text, bool on, System.Action<bool> onChanged)
+    {
+        var toggle = new CheckButton { Text = text, ButtonPressed = on };
+        toggle.Toggled += pressed =>
+        {
+            onChanged(pressed);
+            Profile.Current.Save();
+            Sfx.ApplySettings();
+            Sfx.Play(Sound.UiClick);
+        };
+        return toggle;
     }
 
     private static string CurrentKeyName(string action)
