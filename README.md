@@ -236,6 +236,7 @@ Jump - Space / Enter
 Shoot - E
 Activate - C
 Pause - Esc
+Help - hold Tab (pauses and shows the controls beside what each thing in the level does)
 
 #### Music / Sound volume
 Music and sounds have separate volume controls with 0-10 values (0 means no sound / music).

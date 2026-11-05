@@ -67,6 +67,7 @@ public partial class SmokeTest : Node
         await TombstoneScoreCheck();
         await DifficultyCheck();
         ProfileShopChecks();
+        HelpChecks();
         await HackingToolCheck();
         await TeleportCheck();
         await ElevatorCheck();
@@ -1493,6 +1494,37 @@ public partial class SmokeTest : Node
         Check(editor.Session.Lives == 2, "hard difficulty removes a life");
         editor.StopPlay();
         Profile.Current.Difficulty = "medium";
+    }
+
+    // The Tab help screen lists what the level holds: the default level
+    // shows only its exit door, and a level holding every palette entry
+    // explains each one except scenery, with collectibles folded into one.
+    private void HelpChecks()
+    {
+        string Names(LevelData level) => string.Join(", ", HelpOverlay.EntriesFor(level).Select(e => e.Name));
+
+        var plain = LevelData.NewDefault();
+        Check(Names(plain) == "Exit door", $"help for the default level lists the exit door only ({Names(plain)})");
+
+        var full = LevelData.NewDefault();
+        var all = EditorPalette.Categories.SelectMany(c => c.Entries).ToArray();
+        for (int i = 0; i < all.Length; i++)
+            if (all[i].IsTile)
+                full.SetTile(i, 0, all[i].TileId);
+            else
+                full.Objects.Add(new LevelObject { Type = all[i].ObjectType, X = i, Y = 1 });
+        var scenery = new[] { "Walls", "Decorations", "Collectibles" };
+        var expected = EditorPalette.Categories
+            .Where(c => !scenery.Contains(c.Name))
+            .SelectMany(c => c.Entries)
+            .Where(e => e.ObjectType is not (ObjectDefs.AgentStart or ObjectDefs.FloorCircuit))
+            .Select(e => e.Name)
+            .Prepend(TileDefs.Get(TileDefs.DestructibleWall).Name)
+            .Append("Collectibles")
+            .OrderBy(n => n);
+        var listed = HelpOverlay.EntriesFor(full).Select(e => e.Name).OrderBy(n => n);
+        Check(listed.SequenceEqual(expected),
+            $"help explains every gameplay palette entry (missing: {string.Join(", ", expected.Except(listed))})");
     }
 
     // Profile persistence and the shop economy (pure logic, no UI).

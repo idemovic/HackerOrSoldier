@@ -22,6 +22,7 @@ public partial class GameFlow : Node2D
     private VBoxContainer _panelBox;
     private Theme _theme;
     private bool _paused;
+    private HelpOverlay _help;
 
     public override void _Ready()
     {
@@ -66,6 +67,27 @@ public partial class GameFlow : Node2D
             Unpause();
         else
             ShowPauseMenu();
+    }
+
+    // The help screen shows while the help key is held and freezes the level
+    // meanwhile, so the player can read it with enemies on screen. Polled
+    // rather than event-driven so a release lost to a focus change still
+    // closes it.
+    public override void _Process(double delta)
+    {
+        bool held = _session != null && !_paused && Input.IsActionPressed(HelpOverlay.Action);
+        if (held && _help == null)
+        {
+            _help = new HelpOverlay(_level);
+            AddChild(_help);
+            GetTree().Paused = true;
+        }
+        else if (!held && _help != null)
+        {
+            _help.QueueFree();
+            _help = null;
+            GetTree().Paused = _paused;   // Esc while holding leaves the pause menu up
+        }
     }
 
     // README: the level briefing shows the level name and description.
