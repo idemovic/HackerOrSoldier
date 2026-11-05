@@ -59,6 +59,7 @@ public partial class SmokeTest : Node
         await FloorCircuitCheck();
         await SwitchCheck();
         await CameraAlarmCheck();
+        await CameraFacingCheck();
         await DisguiseCheck();
         await EnemyDisguiseCheck();
         await ClosetCheck();
@@ -1381,6 +1382,49 @@ public partial class SmokeTest : Node
         Check(editor.StartPlay(), "camera level starts");
         await Frames(5);
         Check(editor.Session.AlarmActive, "security camera raises the alarm");
+        editor.StopPlay();
+    }
+
+    // A camera faces right unless the brush says left; the facing survives
+    // placing, picking, copy/paste, play, and the alarm blink.
+    private async Task CameraFacingCheck()
+    {
+        var editor = await FreshEditor();
+        var right = new Vector2I(8, 8);
+        var left = new Vector2I(12, 8);
+        editor.SetBrushObject(ObjectDefs.Camera);
+        Check(editor.BrushFacing == "right" && !editor.GhostFlipped, "a camera brush faces right by default");
+        editor.PaintCell(right);
+        Check(editor.Level.Objects.Find(o => o.X == right.X && o.Y == right.Y).Properties["facing"] == "right",
+            "a right-facing camera stores facing right");
+        Check(!editor.MarkerFlipped(right), "the editor marker of a right-facing camera is not flipped");
+
+        editor._UnhandledInput(KeyEvent(Key.Bracketright));
+        Check(editor.BrushFacing == "left" && editor.GhostFlipped, "] turns the camera brush to face left");
+        editor.PaintCell(left);
+        Check(editor.Level.Objects.Find(o => o.X == left.X && o.Y == left.Y).Properties["facing"] == "left",
+            "a left-facing camera stores facing left");
+        Check(editor.MarkerFlipped(left) && !editor.MarkerFlipped(right), "only the left-facing camera marker is flipped");
+
+        editor.SetBrushTile(TileDefs.RedBrick);
+        editor.Pick(left);
+        Check(editor.Brush.ObjectType == ObjectDefs.Camera && editor.BrushFacing == "left", "the picker copies the facing into the brush");
+        editor.PaintCell(right);
+        Check(editor.MarkerFlipped(right), "repainting a camera with the other facing replaces it");
+
+        editor.SetBrushObject(ObjectDefs.Camera, facing: "right");
+        editor.PaintCell(right);
+        editor.SelectArea(left, left);
+        editor.CopySelection();
+        editor.PasteAt(new Vector2I(20, 8));
+        Check(editor.MarkerFlipped(new Vector2I(20, 8)), "pasting a selection carries the camera facing");
+
+        Check(editor.StartPlay(), "camera facing level starts");
+        await Frames(5);
+        Check(editor.Session.AlarmActive, "the alarm is raised so the sprite blinks");
+        var cameras = editor.Session.GetChildren().OfType<SecurityCamera>().OrderBy(c => c.Position.X).ToArray();
+        Check(cameras.Length == 3 && !cameras[0].Sprite.FlipH && cameras[1].Sprite.FlipH && cameras[2].Sprite.FlipH,
+            "in play the left-facing camera sprites are flipped, alarm blink included");
         editor.StopPlay();
     }
 

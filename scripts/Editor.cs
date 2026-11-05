@@ -50,6 +50,7 @@ public partial class Editor : Node2D
     // platform paints), so switching brushes keeps both.
     private readonly Dictionary<string[], string> _brushColors = new();
     private string _brushNumber = ObjectDefs.Numbers[0];
+    private string _brushFacing = ObjectDefs.Facings[0];
     private Drag _drag;
     private Vector2I _dragStart;
     private bool _rectErase;
@@ -78,6 +79,7 @@ public partial class Editor : Node2D
     private Label _brushLabel;
     private HBoxContainer _colorChips;
     private HBoxContainer _numberChips;
+    private HBoxContainer _facingChips;
     private Label _propertyHint;
     private Label _cellLabel;
     private Label _zoomLabel;
@@ -104,6 +106,10 @@ public partial class Editor : Node2D
     public LevelClip Clipboard => _clipboard;   // for tests
     public PaletteEntry Brush => _brush;   // for tests
     public string BrushColor => BrushColorFor(_brush.ObjectType);   // for tests
+    public string BrushFacing => _brushFacing;   // for tests
+    public bool GhostFlipped => _ghost.FlipH;   // for tests
+    public bool MarkerFlipped(Vector2I cell) =>   // for tests
+        _markers.GetChildren().OfType<Sprite2D>().First(m => !m.IsQueuedForDeletion() && m.Position == CellCenter(cell)).FlipH;
     public bool Invincible => _invincible;
     public bool RevealHidden => _revealHidden;
     // For tests: the center of what is on screen, after the camera limits.
@@ -133,8 +139,8 @@ public partial class Editor : Node2D
         new("Select", "Tools", () => SetTool(Tool.Rect), new Chord(Key.R)),
         new("Eraser", "Tools", () => SetTool(Tool.Eraser), new Chord(Key.E)),
         new("Picker", "Tools", () => SetTool(Tool.Picker), new Chord(Key.Q)),
-        new("Next color/number", "Tools", () => CycleProperty(1), new Chord(Key.Bracketright)),
-        new("Prev color/number", "Tools", () => CycleProperty(-1), new Chord(Key.Bracketleft)),
+        new("Next color/number/direction", "Tools", () => CycleProperty(1), new Chord(Key.Bracketright)),
+        new("Prev color/number/direction", "Tools", () => CycleProperty(-1), new Chord(Key.Bracketleft)),
         new("Next category", "Palette", () => ShowCategory(Wrap(_category + 1, EditorPalette.Categories.Length)), new Chord(Key.Tab)),
         new("Prev category", "Palette", () => ShowCategory(Wrap(_category - 1, EditorPalette.Categories.Length)), new Chord(Key.Tab, Shift: true)),
         new("Play / stop", "View", TogglePlay, new Chord(Key.P), new Chord(Key.P, Ctrl: true)),
@@ -576,12 +582,14 @@ public partial class Editor : Node2D
 
     public void SetBrushTile(int tileId) => SelectBrush(EntryFor(tileId, null));
 
-    public void SetBrushObject(string type, string color = null, string number = null)
+    public void SetBrushObject(string type, string color = null, string number = null, string facing = null)
     {
         if (color != null && ObjectDefs.HasColorProperty(type))
             _brushColors[ObjectDefs.ColorChoices(type)] = ObjectDefs.ColorOf(type, color);
         if (number != null)
             _brushNumber = number;
+        if (facing != null && ObjectDefs.HasFacingProperty(type))
+            _brushFacing = facing;
         SelectBrush(EntryFor(-1, type));
     }
 
@@ -634,8 +642,10 @@ public partial class Editor : Node2D
         }
         else if (_brush.ObjectType != null && ObjectDefs.HasNumberProperty(_brush.ObjectType))
             _brushNumber = ObjectDefs.Numbers[Wrap(Array.IndexOf(ObjectDefs.Numbers, _brushNumber) + step, ObjectDefs.Numbers.Length)];
+        else if (_brush.ObjectType != null && ObjectDefs.HasFacingProperty(_brush.ObjectType))
+            _brushFacing = ObjectDefs.Facings[Wrap(Array.IndexOf(ObjectDefs.Facings, _brushFacing) + step, ObjectDefs.Facings.Length)];
         else
-            SetStatus($"{_brush.Name} has no color or number.");
+            SetStatus($"{_brush.Name} has no color, number or direction.");
         RefreshBrushUi();
     }
 
@@ -648,7 +658,7 @@ public partial class Editor : Node2D
         var obj = _level.Objects.Find(o => o.X == cell.X && o.Y == cell.Y);
         int tile = _level.GetTile(cell.X, cell.Y);
         if (obj != null)
-            SetBrushObject(obj.Type, obj.Properties.GetValueOrDefault("color"), obj.Properties.GetValueOrDefault("number"));
+            SetBrushObject(obj.Type, obj.Properties.GetValueOrDefault("color"), obj.Properties.GetValueOrDefault("number"), obj.Properties.GetValueOrDefault("facing"));
         else if (tile != TileDefs.Empty)
             SetBrushTile(tile);
         else
@@ -803,7 +813,8 @@ public partial class Editor : Node2D
         var existing = _level.Objects.Find(o => o.X == cell.X && o.Y == cell.Y);
         if (existing?.Type == type
             && (!ObjectDefs.HasColorProperty(type) || existing.Properties.GetValueOrDefault("color") == BrushColorFor(type))
-            && (!ObjectDefs.HasNumberProperty(type) || existing.Properties.GetValueOrDefault("number") == _brushNumber))
+            && (!ObjectDefs.HasNumberProperty(type) || existing.Properties.GetValueOrDefault("number") == _brushNumber)
+            && (!ObjectDefs.HasFacingProperty(type) || existing.Properties.GetValueOrDefault("facing", ObjectDefs.Facings[0]) == _brushFacing))
             return;
         RecordStroke();
         _level.Objects.RemoveAll(o => o.X == cell.X && o.Y == cell.Y);
@@ -814,6 +825,8 @@ public partial class Editor : Node2D
             obj.Properties["color"] = BrushColorFor(type);
         if (ObjectDefs.HasNumberProperty(type))
             obj.Properties["number"] = _brushNumber;
+        if (ObjectDefs.HasFacingProperty(type))
+            obj.Properties["facing"] = _brushFacing;
         _level.Objects.Add(obj);
         RebuildMarkers();
     }
@@ -850,6 +863,7 @@ public partial class Editor : Node2D
                 Position = CellCenter(new Vector2I(obj.X, obj.Y)),
                 Offset = MarkerOffset(obj.Type, texture),
                 Modulate = new Color(1, 1, 1, 0.9f),
+                FlipH = ObjectDefs.FacesLeft(obj),
             };
             if (ObjectDefs.HasNumberProperty(obj.Type) && obj.Properties.TryGetValue("number", out var number))
                 marker.AddChild(new Label

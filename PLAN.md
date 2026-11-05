@@ -118,6 +118,9 @@ Known simplifications (tuning constants, not README rules):
   blocked by solid tiles); an active briefcase disguise or hiding defeats them.
   Enemies share the rule: SeesAgent returns false while disguised or hiding,
   so they do not chase, fire or drop dynamite; contact damage still applies
+- Security cameras carry a facing property (`right` default, or `left`), picked with
+  two chips in the status bar or [ ]; left is the same sprite mirrored (FlipH) in
+  the editor and in play. Sight is still all-around; levels saved without a facing stay right
 - Closets: activate (C) next to a closet hides the agent (immobile,
   invisible to enemies, cameras, bullets and contact damage); C again leaves.
   Priority for C: leave closet, hide in closet, then use held items

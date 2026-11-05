@@ -196,6 +196,15 @@ public static class ObjectDefs
     public static bool HasNumberProperty(string type) =>
         type is Computer or UsbKey or Switch or Laser or Teleport or SecurityDoor or FloorCircuit;
 
+    // Security cameras face right or left. Right comes first so a level saved
+    // without a facing keeps its right-facing cameras.
+    public static readonly string[] Facings = { "right", "left" };
+
+    public static bool HasFacingProperty(string type) => type == Camera;
+
+    public static bool FacesLeft(LevelObject obj) =>
+        HasFacingProperty(obj.Type) && obj.Properties.TryGetValue("facing", out var facing) && facing == Facings[1];
+
     public static bool IsPickup(string type) =>
         type is DoorKey or HealthKit or AmmoPack or Vest or Briefcase or InfraGoggles or UsbKey
             or WeaponChainsaw or WeaponAssaultRifle or WeaponMinigun or WeaponCrossbow or WeaponDynamite;

@@ -216,7 +216,7 @@ public partial class PlaySession : Node2D
                     AddChild(new LaserBeam { Position = pos, Number = NumberOf(obj), Session = this });
                     break;
                 case ObjectDefs.Camera:
-                    AddChild(new SecurityCamera { Position = pos, Session = this });
+                    AddChild(new SecurityCamera { Position = pos, Session = this, FacesLeft = ObjectDefs.FacesLeft(obj) });
                     break;
                 case ObjectDefs.Closet:
                     var closet = new Closet { Position = pos };

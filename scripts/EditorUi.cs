@@ -249,6 +249,28 @@ public partial class Editor
             _numberChips.AddChild(chip);
         }
         row.AddChild(_numberChips);
+
+        _facingChips = new HBoxContainer();
+        for (int i = 0; i < ObjectDefs.Facings.Length; i++)
+        {
+            string captured = ObjectDefs.Facings[i];
+            var chip = new Button
+            {
+                Text = i == 0 ? ">" : "<",
+                ThemeTypeVariation = EditorTheme.Chip,
+                ToggleMode = true,
+                FocusMode = Control.FocusModeEnum.None,
+                TooltipText = $"Facing {captured}  ([ / ])",
+                CustomMinimumSize = new Vector2(10, 0),
+            };
+            chip.Pressed += () =>
+            {
+                _brushFacing = captured;
+                RefreshBrushUi();
+            };
+            _facingChips.AddChild(chip);
+        }
+        row.AddChild(_facingChips);
         _propertyHint = new Label { Text = "[ ]", ThemeTypeVariation = EditorTheme.DimLabel, VerticalAlignment = VerticalAlignment.Center };
         row.AddChild(_propertyHint);
 
@@ -478,8 +500,12 @@ public partial class Editor
         _colorChips.Visible = hasColor;
         if (hasColor)
             ShowColorChips(ObjectDefs.ColorChoices(_brush.ObjectType));
+        bool hasFacing = painting && _brush.ObjectType != null && ObjectDefs.HasFacingProperty(_brush.ObjectType);
         _numberChips.Visible = hasNumber;
-        _propertyHint.Visible = hasColor || hasNumber;
+        _facingChips.Visible = hasFacing;
+        _propertyHint.Visible = hasColor || hasNumber || hasFacing;
+        for (int i = 0; i < ObjectDefs.Facings.Length; i++)
+            ((Button)_facingChips.GetChild(i)).SetPressedNoSignal(ObjectDefs.Facings[i] == _brushFacing);
         foreach (var node in _colorChips.GetChildren())
             ((Button)node).SetPressedNoSignal(hasColor && (string)node.GetMeta("color") == BrushColor);
         for (int i = 0; i < ObjectDefs.Numbers.Length; i++)
@@ -488,6 +514,7 @@ public partial class Editor
         _ghost.Texture = _brush.IsTile
             ? TileSetBuilder.TileTexture(_brush.TileId)
             : Sprites.ForObject(_brush.ObjectType, hasColor ? BrushColor : null);
+        _ghost.FlipH = hasFacing && _brushFacing == ObjectDefs.Facings[1];
         _ghost.Offset = _brush.IsTile ? Vector2.Zero : MarkerOffset(_brush.ObjectType, _ghost.Texture);
     }
 

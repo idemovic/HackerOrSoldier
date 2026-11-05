@@ -28,13 +28,15 @@ public partial class SecurityCamera : Node2D
     }
 
     public PlaySession Session { get; set; }
+    public bool FacesLeft { get; set; }
+    public Sprite2D Sprite => _sprite;   // for tests
 
     private Sprite2D _sprite;
     private float _blinkTime;
 
     public override void _Ready()
     {
-        _sprite = new Sprite2D { Texture = Sprites.Get(ObjectDefs.Camera) };
+        _sprite = new Sprite2D { Texture = Sprites.Get(ObjectDefs.Camera), FlipH = FacesLeft };
         AddChild(_sprite);
     }
 
