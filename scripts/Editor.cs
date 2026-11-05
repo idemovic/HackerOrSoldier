@@ -434,6 +434,7 @@ public partial class Editor : Node2D
                 _overlay.DrawLine(new Vector2(view.Position.X, y), new Vector2(view.End.X, y), line, -1);
         }
         _overlay.DrawRect(levelRect, new Color(1, 1, 1, 0.25f), false);
+        DrawCameraSight();
 
         var cell = MouseCell();
         if (GetViewport().GuiGetHoveredControl() != null && _drag != Drag.Rect)
@@ -456,6 +457,28 @@ public partial class Editor : Node2D
             _ => EditorTheme.Accent,
         };
         _overlay.DrawRect(new Rect2(cell * TileSize, new Vector2(TileSize, TileSize)), cursor, false, 1);
+    }
+
+    // Where each security camera spots the agent. Hidden platforms block
+    // sight only when the playtest makes them solid.
+    private void DrawCameraSight()
+    {
+        var fill = new Color(1f, 0.25f, 0.2f, 0.12f);
+        var edge = new Color(1f, 0.25f, 0.2f, 0.4f);
+        bool Solid(Vector2 p)
+        {
+            int id = _level.GetTile(Mathf.FloorToInt(p.X / TileSize), Mathf.FloorToInt(p.Y / TileSize));
+            return (id != TileDefs.HiddenPlatform || _revealHidden) && TileDefs.Get(id)?.Solid == true;
+        }
+        foreach (var obj in _level.Objects.Where(o => o.Type == ObjectDefs.Camera))
+        {
+            var origin = CellCenter(new Vector2I(obj.X, obj.Y));
+            var outline = SecurityCamera.SightOutline(origin, Solid);
+            var colors = new[] { fill, fill, fill };
+            for (int i = 0; i < outline.Length; i++)
+                _overlay.DrawPrimitive(new[] { origin, outline[i], outline[(i + 1) % outline.Length] }, colors, Array.Empty<Vector2>());
+            _overlay.DrawPolyline(outline.Append(outline[0]).ToArray(), edge, 1);
+        }
     }
 
     public void SetTool(Tool tool)
