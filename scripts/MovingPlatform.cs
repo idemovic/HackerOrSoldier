@@ -15,6 +15,8 @@ public partial class MovingPlatform : AnimatableBody2D
 
     private Vector2 _origin;
     private int _direction;
+    private float _speed;
+    private float _delay;
 
     public override void _Ready()
     {
@@ -23,6 +25,11 @@ public partial class MovingPlatform : AnimatableBody2D
         CollisionMask = 0;
         _origin = Position;
         _direction = Vertical ? -1 : 1;   // elevators start upward, platforms rightward
+        // Speed and start delay vary per platform so neighbours drift out of
+        // sync. Seeded from the start position, so a level always plays the same.
+        var rng = new RandomNumberGenerator { Seed = (ulong)GD.Hash(_origin) };
+        _speed = Speed * rng.RandfRange(0.85f, 1.15f);
+        _delay = rng.RandfRange(0f, 1.5f);
         AddChild(new CollisionShape2D
         {
             Position = new Vector2(0, -4),
@@ -38,8 +45,13 @@ public partial class MovingPlatform : AnimatableBody2D
 
     public override void _PhysicsProcess(double delta)
     {
+        if (_delay > 0)
+        {
+            _delay -= (float)delta;
+            return;
+        }
         var axis = Vertical ? Vector2.Down : Vector2.Right;
-        var next = Position + axis * (_direction * Speed * (float)delta);
+        var next = Position + axis * (_direction * _speed * (float)delta);
         float offset = (next - _origin).Dot(axis);
         var probe = next + new Vector2(0, -4) + axis * (_direction * 16);
         if (Mathf.Abs(offset) > Range || TileDefs.Get(Session.TileAtPosition(probe))?.Solid == true)
