@@ -35,7 +35,6 @@ public sealed class EnemyAnimator
         // Walkers stride one leg, pass through the standing frame, then
         // stride the other.
         [EnemyDefs.Robodog] = new(new[] { EnemyDefs.Robodog, "robodog_walk", EnemyDefs.Robodog, "robodog_walk2" }),
-        [EnemyDefs.Turret] = new(new[] { EnemyDefs.Turret }, Attack: "turret_fire"),
         [EnemyDefs.Robot] = new(new[] { EnemyDefs.Robot, "robot_walk", EnemyDefs.Robot, "robot_walk2" },
             Attack: "robot_fire", Off: "robot_off"),
         [EnemyDefs.Landmine] = new(new[] { EnemyDefs.Landmine, "landmine_blink" }, ClockDriven: true),

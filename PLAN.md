@@ -419,6 +419,21 @@ Known simplifications (tuning constants, not README rules):
 - Audition: `godot --headless --path . res://scenes/sfx_dump.tscn` writes
   every sound to user://sfx/<name>.wav
 
+### Swivelling turret
+- The turret is a fixed platform and mast (turret_base) under a gun head
+  (scripts/TurretGun.cs) that turns toward the agent at 120 degrees a
+  second and fires only once the barrel is within 3 degrees of the agent.
+  The plasma leaves the muzzle along the barrel, so a moving agent can
+  outrun the aim
+- The platform blocks a 70-degree cone straight down: the barrel covers
+  145 degrees either side of straight up, swings over the top to change
+  sides, and never fires at an agent directly underneath
+- Aiming left flips the head vertically so its lit dome stays on top. The
+  editor marker is built by overlaying the head on the base, so it matches
+  the in-play turret at rest (level, facing right)
+- Smoke test: an agent on the far side keeps the turret silent while it
+  swings round, then the plasma takes a life
+
 ## Milestone 6 - Steam prep (next)
 - Export presets for Windows and Linux
 - GodotSteam integration: achievements, cloud saves

@@ -181,6 +181,98 @@ public static class Sprites
         "................",
     }, row => row.Replace('L', led)));
 
+    // The turret's fixed half: platform and mast. The gun head swivels on
+    // top of the mast (TurretGun.Pivot).
+    private static readonly string[] TurretBase =
+    {
+        "................................",
+        "................................",
+        "................................",
+        "................................",
+        "................................",
+        "................................",
+        "................................",
+        "................................",
+        "................................",
+        "................................",
+        "................................",
+        "................................",
+        "................................",
+        "..........kdggdk................",
+        "..........kdggdk................",
+        "..........kdggdk................",
+        "..........kdggdk................",
+        "..........kdggdk................",
+        "..........kdggdk................",
+        "..........kdggdk................",
+        "..........kdggdk................",
+        "..........kdggdk................",
+        "..........kdggdk................",
+        ".........kVVVVVVk...............",
+        ".........kVVVVVVk...............",
+        "..........llllllllllll..........",
+        "........llvvvvvvvvvvvvll........",
+        ".......kyykkyykkyykkyykkk.......",
+        "......lvvvvvvvvvvvvvvvvvvu......",
+        ".....lvdvvvvvvvvvvvvvvvvdvu.....",
+        "....lvvvvvvvvvvvvvvvvvvvvvvu....",
+        "....VVVVVVVVVVVVVVVVVVVVVVVV....",
+    };
+
+    // The swivelling gun head, barrel pointing right. Its 12 rows put the
+    // barrel's axis on the texture's centre line, so a vertical flip mirrors
+    // the barrel onto itself; the hinge sits 4px left of centre
+    // (TurretGun.HeadOffset).
+    private static readonly string[] TurretHead =
+    {
+        "..........llllll................",
+        "........llvvvvvvll..............",
+        ".......lvvvvvvvkkkk.............",
+        "...kVVkvvvvvvvkcccwk............",
+        "...VcclvvvvvvvkkkkkkVVVVVVVVk...",
+        "...VcCvvvvvvvvvvvvkvvcvvcvvlk...",
+        "...VCCvddddddvvvvvkuuCuuCuudk...",
+        "...kVVvvvvvvvvvvvvkkVVVVVVVVk...",
+        "......uvvvvvvvvvvvuV............",
+        ".......uuuuuuuuuuuV.............",
+        "........VVVVVVVVVV..............",
+        "................................",
+    };
+
+    // The same head recoiling behind its muzzle flash.
+    private static readonly string[] TurretHeadFiring =
+    {
+        "..........llllll................",
+        "........llvvvvvvll..............",
+        ".......lvvvvvvvkkkk.............",
+        "...kVVkvvvvvvvkcccwk............",
+        "...VcclvvvvvvvkkkkkVVVVVVVVk.yy.",
+        "...VcCvvvvvvvvvvvkvvwvvwvvlkywo.",
+        "...VCCvddddddvvvvkuucuucuudkywo.",
+        "...kVVvvvvvvvvvvvkkVVVVVVVVk.oy.",
+        "......uvvvvvvvvvvvuV............",
+        ".......uuuuuuuuuuuV.............",
+        "........VVVVVVVVVV..............",
+        "................................",
+    };
+
+    // Lays one map over another, shifted by (dx, dy); '.' stays see-through.
+    private static string[] Overlay(string[] under, string[] over, int dx, int dy)
+    {
+        var rows = (string[])under.Clone();
+        for (int y = 0; y < over.Length; y++)
+        {
+            var row = rows[y + dy].ToCharArray();
+            for (int x = 0; x < over[y].Length; x++)
+            {
+                if (over[y][x] != '.')
+                    row[x + dx] = over[y][x];
+            }
+            rows[y + dy] = new string(row);
+        }
+        return rows;
+    }
+
     private static readonly Dictionary<string, SpriteMap> Maps = new()
     {
         [EnemyDefs.Drone] = new(new[]
@@ -358,76 +450,12 @@ public static class Sprites
             "........glllg...lllg.....gggd...",
             "........kkkkk...kkkk.....kkkk...",
         }, Scale: 1),
-        [EnemyDefs.Turret] = new(new[]
-        {
-            "................................",
-            "................................",
-            "................................",
-            "................................",
-            "................................",
-            "................................",
-            "................................",
-            "................................",
-            "................................",
-            "................................",
-            "................................",
-            "..........llllll................",
-            "........llvvvvvvll..............",
-            ".......lvvvvvvvkkkk.............",
-            "...kVVkvvvvvvvkcccwk............",
-            "...VcclvvvvvvvkkkkkkVVVVVVVVk...",
-            "...VcCvvvvvvvvvvvvkvvcvvcvvlk...",
-            "...VCCvddddddvvvvvkuuCuuCuudk...",
-            "...kVVvvvvvvvvvvvvkkVVVVVVVVk...",
-            "......uvvvvvvvvvvvuV............",
-            ".......uuuuuuuuuuuV.............",
-            "........VVVVVVVVVV..............",
-            "...........kdgggdk..............",
-            "...........kdgggdk..............",
-            "................................",
-            "..........llllllllllll..........",
-            "........llvvvvvvvvvvvvll........",
-            ".......kyykkyykkyykkyykkk.......",
-            "......lvvvvvvvvvvvvvvvvvvu......",
-            ".....lvdvvvvvvvvvvvvvvvvdvu.....",
-            "....lvvvvvvvvvvvvvvvvvvvvvvu....",
-            "....VVVVVVVVVVVVVVVVVVVVVVVV....",
-        }, Scale: 1),
-        ["turret_fire"] = new(new[]
-        {
-            "................................",
-            "................................",
-            "................................",
-            "................................",
-            "................................",
-            "................................",
-            "................................",
-            "................................",
-            "................................",
-            "................................",
-            "................................",
-            "..........llllll................",
-            "........llvvvvvvll..............",
-            ".......lvvvvvvvkkkk.............",
-            "...kVVkvvvvvvvkcccwk............",
-            "...VcclvvvvvvvkkkkkVVVVVVVVk.yy.",
-            "...VcCvvvvvvvvvvvkvvwvvwvvlkywo.",
-            "...VCCvddddddvvvvkuucuucuudkywo.",
-            "...kVVvvvvvvvvvvvkkVVVVVVVVk.oy.",
-            "......uvvvvvvvvvvvuV............",
-            ".......uuuuuuuuuuuV.............",
-            "........VVVVVVVVVV..............",
-            "...........kdgggdk..............",
-            "...........kdgggdk..............",
-            "................................",
-            "..........llllllllllll..........",
-            "........llvvvvvvvvvvvvll........",
-            ".......kyykkyykkyykkyykkk.......",
-            "......lvvvvvvvvvvvvvvvvvvu......",
-            ".....lvdvvvvvvvvvvvvvvvvdvu.....",
-            "....lvvvvvvvvvvvvvvvvvvvvvvu....",
-            "....VVVVVVVVVVVVVVVVVVVVVVVV....",
-        }, Scale: 1),
+        // The editor marker: the head laid level on its mast, hinged where
+        // TurretGun.Pivot and TurretGun.HeadOffset put it in play.
+        [EnemyDefs.Turret] = new(Overlay(TurretBase, TurretHead, dx: 1, dy: 4), Scale: 1),
+        ["turret_base"] = new(TurretBase, Scale: 1),
+        ["turret_gun"] = new(TurretHead, Scale: 1),
+        ["turret_fire"] = new(TurretHeadFiring, Scale: 1),
         [EnemyDefs.Robot] = new(new[]
         {
             "................................",

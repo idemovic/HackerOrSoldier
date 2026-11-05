@@ -68,7 +68,7 @@ public partial class HelpOverlay : CanvasLayer
         [EnemyDefs.UltimateSoldier] = "Chainsaw. A hit demotes it.",
         [EnemyDefs.Drone] = "Flies, sees all around, drops dynamite.",
         [EnemyDefs.Robodog] = "Fast biter. 2 hits.",
-        [EnemyDefs.Turret] = "Fires plasma in every direction.",
+        [EnemyDefs.Turret] = "Swings its gun onto you, then fires plasma.",
         [EnemyDefs.Robot] = "Hit it in its 1s shutdown every 10s.",
         [EnemyDefs.Landmine] = "Blows up on touch. Indestructible.",
         [EnemyDefs.ElectricEel] = "Shocks on touch in water.",

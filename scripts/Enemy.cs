@@ -21,10 +21,11 @@ public partial class Enemy : CharacterBody2D
     private float _shootCooldown = 0.5f;   // small delay before the first attack
     private float _contactCooldown;
     private Sprite2D _sprite;
-    private EnemyAnimator _animator;
+    private EnemyAnimator _animator;   // every enemy but the turret
+    private TurretGun _gun;            // the turret only
 
     public bool IsTurnedOff => Def.Type == EnemyDefs.Robot && Session.RobotsOff;
-    public string AnimationFrame => _animator?.Frame;
+    public string AnimationFrame => _gun?.Frame ?? _animator?.Frame;
     public Rect2 Hitbox => new(Position + Def.Body.Position, Def.Body.Size);
 
     public override void _Ready()
@@ -37,6 +38,13 @@ public partial class Enemy : CharacterBody2D
             Shape = new RectangleShape2D { Size = Def.Body.Size },
             Position = Def.Body.GetCenter(),
         });
+        if (Def.Type == EnemyDefs.Turret)
+        {
+            // A fixed platform under a gun head that swivels on its own.
+            AddChild(_sprite = new Sprite2D { Texture = Sprites.Get("turret_base") });
+            AddChild(_gun = new TurretGun());
+            return;
+        }
         _sprite = new Sprite2D { Texture = Sprites.ForObject(Def.Type) };
         AddChild(_sprite);
         _animator = new EnemyAnimator(_sprite, Def.Type);
@@ -65,8 +73,6 @@ public partial class Enemy : CharacterBody2D
 
         if (spotted && Def.Attack == EnemyAttack.Contact)
             _facing = Session.Agent.Position.X < Position.X ? -1 : 1;   // chase
-        else if (spotted && Def.Speed == 0 && Def.LoS == EnemyLoS.All)
-            _facing = Session.Agent.Position.X < Position.X ? -1 : 1;   // the turret tracks its target
 
         Vector2 velocity = Velocity;
         bool stands = Def.Speed == 0 || (ranged && spotted);
@@ -101,10 +107,12 @@ public partial class Enemy : CharacterBody2D
             }
         }
 
-        if (spotted && _shootCooldown <= 0)
+        // The turret swings its barrel onto the agent before it may fire.
+        bool onTarget = _gun?.Track(spotted ? Session.Agent.Position - Position : null, dt) ?? true;
+        if (spotted && onTarget && _shootCooldown <= 0)
             Attack();
 
-        _animator.Update(dt, Velocity, turnedOff: false, _facing);
+        _animator?.Update(dt, Velocity, turnedOff: false, _facing);
         CheckContact();
     }
 
@@ -187,7 +195,7 @@ public partial class Enemy : CharacterBody2D
     private void Attack()
     {
         if (Def.Attack != EnemyAttack.Contact && Def.Attack != EnemyAttack.Mine)
-            _animator.Attack();
+            _animator?.Attack();
         switch (Def.Attack)
         {
             case EnemyAttack.Pistol:
@@ -203,8 +211,16 @@ public partial class Enemy : CharacterBody2D
             case EnemyAttack.Plasma:
                 _shootCooldown = 2f;
                 Sfx.PlayAt(Sound.EnemyPlasma, Position);
-                Session.SpawnEnemyBullet(Position,
-                    (Session.Agent.Position - Position).Normalized(), "plasma");
+                if (_gun != null)
+                {
+                    _gun.Fire();
+                    Session.SpawnEnemyBullet(Position + _gun.Muzzle, _gun.Aim, "plasma");
+                }
+                else
+                {
+                    Session.SpawnEnemyBullet(Position,
+                        (Session.Agent.Position - Position).Normalized(), "plasma");
+                }
                 break;
             case EnemyAttack.Dynamite:
                 _shootCooldown = 4f;

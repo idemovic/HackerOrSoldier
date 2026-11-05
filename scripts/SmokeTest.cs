@@ -232,7 +232,8 @@ public partial class SmokeTest : Node
                 Sprites.ForObject(def.Type);
             foreach (var def in TileDefs.All)
                 TileSetBuilder.TileIcon(def.Id);
-            foreach (var key in new[] { "platform", "flame", "bullet", "plasma", "rocket", "dynamite" }
+            foreach (var key in new[] { "platform", "flame", "bullet", "plasma", "rocket", "dynamite",
+                         "turret_base", TurretGun.Idle, TurretGun.Firing }
                 .Concat(AgentAnimator.AllFrames).Concat(EnemyAnimator.AllFrames))
                 Check(Sprites.Get(key) != null, $"sprite '{key}' exists");
             Check(true, "all object sprites build");
@@ -1042,14 +1043,18 @@ public partial class SmokeTest : Node
         editor.StopPlay();
     }
 
-    // Turret sees in all directions and hits the agent with aimed plasma.
+    // The turret starts aimed right; the agent stands to its left. It swings
+    // its barrel over the top onto the agent before it fires.
     private async Task TurretCheck()
     {
         var editor = await FreshEditor();
         editor.SetBrushObject(EnemyDefs.Turret);
         editor.PaintCell(new Vector2I(8, 10));
         Check(editor.StartPlay(), "turret level starts");
-        await Frames(80);
+        await Frames(45);
+        Check(!editor.Session.GetChildren().OfType<EnemyBullet>().Any() && editor.Session.Lives == 3,
+            "the turret holds fire while its barrel swings round");
+        await Frames(120);
         Check(editor.IsPlaying && editor.Session.Lives == 2, "turret plasma takes a life");
         editor.StopPlay();
     }
@@ -2127,14 +2132,14 @@ public partial class SmokeTest : Node
             "a patrolling fighter cycles its walk frames");
         editor.StopPlay();
 
-        // The turret never travels, so its cycle holds until it fires.
+        // The turret's gun holds its plain frame while it swings, then flashes.
         editor = await FreshEditor();
         editor.SetBrushObject(EnemyDefs.Turret);
         editor.PaintCell(new Vector2I(8, 10));
         Check(editor.StartPlay(), "turret animation level starts");
-        var fired = await SampleFrames(editor.Session.Enemies[0], 90);
-        Check(fired.Contains(EnemyDefs.Turret), "an idle turret holds its first frame");
-        Check(fired.Contains("turret_fire"), "a firing turret shows the muzzle flash");
+        var fired = await SampleFrames(editor.Session.Enemies[0], 150);
+        Check(fired.Contains(TurretGun.Idle), "an aiming turret holds its plain gun frame");
+        Check(fired.Contains(TurretGun.Firing), "a firing turret shows the muzzle flash");
         editor.StopPlay();
 
         // The robot has a dedicated powered-down pose for its off window.
