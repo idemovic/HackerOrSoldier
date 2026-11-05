@@ -13,7 +13,7 @@ public partial class LaserBeam : Node2D
     public PlaySession Session { get; set; }
     public string Number { get; set; } = "1";
 
-    private const float LensY = 5f;   // the emitter sprite's lens, below the node origin
+    private const float LensY = 9f;   // the emitter sprite's lens, below the node origin
     private const float SparkReseed = 0.05f;
 
     private static readonly Color OuterGlow = new(1f, 0.10f, 0.10f, 0.20f);

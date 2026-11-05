@@ -46,7 +46,9 @@ public partial class Editor : Node2D
     private Tool _tool = Tool.Brush;
     private PaletteEntry _brush;
     private int _category = -1;
-    private string _brushColor = ObjectDefs.KeyColors[0];
+    // The brush color last chosen for each list of choices (door/key colors,
+    // platform paints), so switching brushes keeps both.
+    private readonly Dictionary<string[], string> _brushColors = new();
     private string _brushNumber = ObjectDefs.Numbers[0];
     private Drag _drag;
     private Vector2I _dragStart;
@@ -97,7 +99,7 @@ public partial class Editor : Node2D
     public LevelGrids Grids => _grids;   // for tests
     public Tool CurrentTool => _tool;   // for tests
     public PaletteEntry Brush => _brush;   // for tests
-    public string BrushColor => _brushColor;   // for tests
+    public string BrushColor => BrushColorFor(_brush.ObjectType);   // for tests
     public bool Invincible => _invincible;
     public bool RevealHidden => _revealHidden;
     // For tests: the center of what is on screen, after the camera limits.
@@ -491,8 +493,8 @@ public partial class Editor : Node2D
 
     public void SetBrushObject(string type, string color = null, string number = null)
     {
-        if (color != null)
-            _brushColor = color;
+        if (color != null && ObjectDefs.HasColorProperty(type))
+            _brushColors[ObjectDefs.ColorChoices(type)] = ObjectDefs.ColorOf(type, color);
         if (number != null)
             _brushNumber = number;
         SelectBrush(EntryFor(-1, type));
@@ -534,12 +536,18 @@ public partial class Editor : Node2D
         SelectBrush(entries[current < 0 ? 0 : Wrap(current + step, entries.Length)]);
     }
 
+    private string BrushColorFor(string type) =>
+        ObjectDefs.HasColorProperty(type) ? ObjectDefs.ColorOf(type, _brushColors.GetValueOrDefault(ObjectDefs.ColorChoices(type))) : null;
+
     private static int Wrap(int value, int count) => ((value % count) + count) % count;
 
     private void CycleProperty(int step)
     {
         if (_brush.ObjectType != null && ObjectDefs.HasColorProperty(_brush.ObjectType))
-            _brushColor = ObjectDefs.KeyColors[Wrap(Array.IndexOf(ObjectDefs.KeyColors, _brushColor) + step, ObjectDefs.KeyColors.Length)];
+        {
+            var choices = ObjectDefs.ColorChoices(_brush.ObjectType);
+            _brushColors[choices] = choices[Wrap(Array.IndexOf(choices, BrushColorFor(_brush.ObjectType)) + step, choices.Length)];
+        }
         else if (_brush.ObjectType != null && ObjectDefs.HasNumberProperty(_brush.ObjectType))
             _brushNumber = ObjectDefs.Numbers[Wrap(Array.IndexOf(ObjectDefs.Numbers, _brushNumber) + step, ObjectDefs.Numbers.Length)];
         else
@@ -710,7 +718,7 @@ public partial class Editor : Node2D
     {
         var existing = _level.Objects.Find(o => o.X == cell.X && o.Y == cell.Y);
         if (existing?.Type == type
-            && (!ObjectDefs.HasColorProperty(type) || existing.Properties.GetValueOrDefault("color") == _brushColor)
+            && (!ObjectDefs.HasColorProperty(type) || existing.Properties.GetValueOrDefault("color") == BrushColorFor(type))
             && (!ObjectDefs.HasNumberProperty(type) || existing.Properties.GetValueOrDefault("number") == _brushNumber))
             return;
         RecordStroke();
@@ -719,7 +727,7 @@ public partial class Editor : Node2D
             _level.Objects.RemoveAll(o => o.Type == ObjectDefs.AgentStart);
         var obj = new LevelObject { Type = type, X = cell.X, Y = cell.Y };
         if (ObjectDefs.HasColorProperty(type))
-            obj.Properties["color"] = _brushColor;
+            obj.Properties["color"] = BrushColorFor(type);
         if (ObjectDefs.HasNumberProperty(type))
             obj.Properties["number"] = _brushNumber;
         _level.Objects.Add(obj);
@@ -750,7 +758,7 @@ public partial class Editor : Node2D
             {
                 Texture = texture,
                 Position = CellCenter(new Vector2I(obj.X, obj.Y)),
-                Offset = new Vector2(0, Mathf.Min(0, 16 - texture.GetHeight() / 2f)),   // tall art stands on the cell floor
+                Offset = MarkerOffset(obj.Type, texture),
                 Modulate = new Color(1, 1, 1, 0.9f),
             };
             if (ObjectDefs.HasNumberProperty(obj.Type) && obj.Properties.TryGetValue("number", out var number))
@@ -765,6 +773,12 @@ public partial class Editor : Node2D
             _markers.AddChild(marker);
         }
     }
+
+    // Tall art stands on the cell floor; a platform deck sits where play mode draws it.
+    private static Vector2 MarkerOffset(string type, Texture2D texture) => new(0,
+        type is ObjectDefs.Elevator or ObjectDefs.MovingPlatform
+            ? MovingPlatform.DeckOffsetY
+            : Mathf.Min(0, 16 - texture.GetHeight() / 2f));
 
     private void ApplyCameraLimits(Camera2D camera)
     {

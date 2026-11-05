@@ -1174,6 +1174,26 @@ public partial class SmokeTest : Node
         Check(OpenDoor(editor), "shooting a switch of its number opens the security door");
         Check(editor.PlayerAgent.Position.X > 10 * 32, "the agent walks through after the switch");
         editor.StopPlay();
+
+        // The agent can walk into a switch's cell; a shot from there still hits it.
+        editor = await FreshEditor();
+        PaintDoorColumn(editor, 8, "7");
+        editor.SetBrushObject(ObjectDefs.Switch, number: "7");
+        editor.PaintCell(new Vector2I(3, 10));
+        Check(editor.StartPlay(), "switch under the agent level starts");
+        float switchX = editor.Session.Switches[0].Position.X;
+        Input.ActionPress("move_right");
+        for (int i = 0; i < 60 && editor.PlayerAgent.Position.X < switchX; i++)
+            await Frames(1);
+        Input.ActionRelease("move_right");
+        await Frames(2);
+        Check(Mathf.Abs(editor.PlayerAgent.Position.X - switchX) < 12, "the agent stands on the switch");
+        Input.ActionPress("shoot");
+        await Frames(2);
+        Input.ActionRelease("shoot");
+        await Frames(10);
+        Check(OpenDoor(editor), "shooting while standing on a switch opens its security door");
+        editor.StopPlay();
     }
 
     // Four tiles tall so the agent cannot jump over it.
@@ -1619,6 +1639,26 @@ public partial class SmokeTest : Node
         Check(editor.StartPlay(), "adjacent elevator level starts");
         var lifts = editor.Session.GetChildren().OfType<MovingPlatform>().ToList();
         Check(lifts.Count == 1 && lifts[0].Cells.Count == 3, "adjacent elevators form one platform");
+        editor.StopPlay();
+
+        // Platform paint is a brush color, so the editor and play draw the same sprite.
+        editor = await FreshEditor();
+        editor.SetBrushObject(ObjectDefs.Door, "blue");
+        editor.SetBrushObject(ObjectDefs.Elevator);
+        Check(editor.BrushColor == "steel", "elevators start with the steel paint");
+        editor._UnhandledInput(KeyEvent(Key.Bracketright));
+        Check(editor.BrushColor == "hazard", "] steps the elevator paint");
+        editor.PaintCell(new Vector2I(9, 9));
+        Check(editor.Level.Objects.Exists(o => o.Type == ObjectDefs.Elevator && o.Properties.GetValueOrDefault("color") == "hazard"),
+            "the elevator stores its paint");
+        Check(Sprites.ForObject(ObjectDefs.Elevator, "hazard") == Sprites.Get("platform", "hazard"),
+            "the editor marker uses the painted platform sprite");
+        editor.SetBrushObject(ObjectDefs.Door);
+        Check(editor.BrushColor == "blue", "the door brush keeps its own color");
+        Check(editor.StartPlay(), "painted elevator level starts");
+        var painted = editor.Session.GetChildren().OfType<MovingPlatform>().Single();
+        Check(painted.GetChildren().OfType<Sprite2D>().Single().Texture == Sprites.Get("platform", "hazard"),
+            "play mode draws the elevator in its paint");
         editor.StopPlay();
     }
 

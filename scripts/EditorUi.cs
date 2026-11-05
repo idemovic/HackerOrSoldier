@@ -225,27 +225,7 @@ public partial class Editor
         _brushLabel = new Label { VerticalAlignment = VerticalAlignment.Center };
         row.AddChild(_brushLabel);
 
-        _colorChips = new HBoxContainer();
-        foreach (var color in ObjectDefs.KeyColors)
-        {
-            var swatch = Image.CreateEmpty(8, 8, false, Image.Format.Rgba8);
-            swatch.Fill(ObjectDefs.KeyColor(color));
-            string captured = color;
-            var chip = new Button
-            {
-                Icon = ImageTexture.CreateFromImage(swatch),
-                ThemeTypeVariation = EditorTheme.Chip,
-                ToggleMode = true,
-                FocusMode = Control.FocusModeEnum.None,
-                TooltipText = $"{color}  ([ / ])",
-            };
-            chip.Pressed += () =>
-            {
-                _brushColor = captured;
-                RefreshBrushUi();
-            };
-            _colorChips.AddChild(chip);
-        }
+        _colorChips = new HBoxContainer();   // filled by ShowColorChips for the brush's choices
         row.AddChild(_colorChips);
 
         _numberChips = new HBoxContainer();
@@ -494,15 +474,55 @@ public partial class Editor
         bool hasColor = painting && _brush.ObjectType != null && ObjectDefs.HasColorProperty(_brush.ObjectType);
         bool hasNumber = painting && _brush.ObjectType != null && ObjectDefs.HasNumberProperty(_brush.ObjectType);
         _colorChips.Visible = hasColor;
+        if (hasColor)
+            ShowColorChips(ObjectDefs.ColorChoices(_brush.ObjectType));
         _numberChips.Visible = hasNumber;
         _propertyHint.Visible = hasColor || hasNumber;
-        for (int i = 0; i < ObjectDefs.KeyColors.Length; i++)
-            ((Button)_colorChips.GetChild(i)).SetPressedNoSignal(ObjectDefs.KeyColors[i] == _brushColor);
+        foreach (var node in _colorChips.GetChildren())
+            ((Button)node).SetPressedNoSignal(hasColor && (string)node.GetMeta("color") == BrushColor);
         for (int i = 0; i < ObjectDefs.Numbers.Length; i++)
             ((Button)_numberChips.GetChild(i)).SetPressedNoSignal(ObjectDefs.Numbers[i] == _brushNumber);
 
         _ghost.Texture = _brush.IsTile
             ? TileSetBuilder.TileTexture(_brush.TileId)
-            : Sprites.ForObject(_brush.ObjectType, hasColor ? _brushColor : null);
+            : Sprites.ForObject(_brush.ObjectType, hasColor ? BrushColor : null);
+        _ghost.Offset = _brush.IsTile ? Vector2.Zero : MarkerOffset(_brush.ObjectType, _ghost.Texture);
+    }
+
+    // One swatch chip per color the brush can carry; rebuilt only when the
+    // list changes (door/key colors vs platform paints).
+    private string[] _chipChoices;
+
+    private void ShowColorChips(string[] choices)
+    {
+        if (choices == _chipChoices)
+            return;
+        _chipChoices = choices;
+        foreach (var old in _colorChips.GetChildren())
+        {
+            _colorChips.RemoveChild(old);
+            old.QueueFree();
+        }
+        foreach (var color in choices)
+        {
+            var swatch = Image.CreateEmpty(8, 8, false, Image.Format.Rgba8);
+            swatch.Fill(ObjectDefs.SlotColor(color));
+            string captured = color;
+            var chip = new Button
+            {
+                Icon = ImageTexture.CreateFromImage(swatch),
+                ThemeTypeVariation = EditorTheme.Chip,
+                ToggleMode = true,
+                FocusMode = Control.FocusModeEnum.None,
+                TooltipText = $"{color}  ([ / ])",
+            };
+            chip.SetMeta("color", color);
+            chip.Pressed += () =>
+            {
+                _brushColors[choices] = captured;
+                RefreshBrushUi();
+            };
+            _colorChips.AddChild(chip);
+        }
     }
 }

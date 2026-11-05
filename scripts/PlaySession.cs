@@ -512,6 +512,7 @@ public partial class PlaySession : Node2D
             Session = this,
             Direction = agent.Facing,
             Position = agent.Position + new Vector2(agent.Facing * 20, -2 + offsetY),
+            FromX = agent.Position.X,
         });
 
     // README ammo table: rockets take a life and move at 1x agent speed.
@@ -562,20 +563,21 @@ public partial class PlaySession : Node2D
         var start = new Vector2I(obj.X, obj.Y);
         if (!_platformCells.Add(start))
             return;
-        var same = new HashSet<Vector2I>();
+        var same = new Dictionary<Vector2I, LevelObject>();
         foreach (var other in _level.Objects)
             if (other.Type == obj.Type)
-                same.Add(new Vector2I(other.X, other.Y));
+                same[new Vector2I(other.X, other.Y)] = other;
         int tile = TileSetBuilder.TileSize;
-        var cells = new List<Vector2>();
+        var cells = new List<PlatformCell>();
         var queue = new Queue<Vector2I>();
         queue.Enqueue(start);
         while (queue.Count > 0)
         {
             var cell = queue.Dequeue();
-            cells.Add((Vector2)(cell - start) * tile);
+            var paint = ObjectDefs.ColorOf(obj.Type, same[cell].Properties.GetValueOrDefault("color"));
+            cells.Add(new PlatformCell((Vector2)(cell - start) * tile, paint));
             foreach (var step in new[] { Vector2I.Left, Vector2I.Right, Vector2I.Up, Vector2I.Down })
-                if (same.Contains(cell + step) && _platformCells.Add(cell + step))
+                if (same.ContainsKey(cell + step) && _platformCells.Add(cell + step))
                     queue.Enqueue(cell + step);
         }
         AddChild(new MovingPlatform { Position = pos, Session = this, Vertical = vertical, Cells = cells });

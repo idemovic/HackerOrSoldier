@@ -51,7 +51,7 @@ public static class Sprites
             return cached;
         if (!Maps.TryGetValue(key, out var map))
             return BodyPoses.Find(key) is BodyFrame frame ? BodyPoses.Texture(frame) : null;
-        var slot = colorName != null ? ObjectDefs.KeyColor(colorName) : Colors.Magenta;
+        var slot = colorName != null ? ObjectDefs.SlotColor(colorName) : Colors.Magenta;
         var texture = ImageTexture.CreateFromImage(FromMap(key, map.Rows, map.Scale, map.ShadeBody, slot));
         Cache[cacheKey] = texture;
         return texture;
@@ -62,8 +62,13 @@ public static class Sprites
     // crash the editor.
     public static ImageTexture ForObject(string type, string colorName = null)
     {
-        string key = type == ObjectDefs.AgentStart ? "agent" : type;
-        var texture = Get(key, ObjectDefs.HasColorProperty(type) ? colorName ?? "red" : null);
+        string key = type switch
+        {
+            ObjectDefs.AgentStart => "agent",
+            ObjectDefs.Elevator or ObjectDefs.MovingPlatform => "platform",
+            _ => type,
+        };
+        var texture = Get(key, ObjectDefs.HasColorProperty(type) ? ObjectDefs.ColorOf(type, colorName) : null);
         if (texture != null)
             return texture;
         var color = System.Array.Find(ObjectDefs.All, d => d.Type == type)?.Color
@@ -706,12 +711,12 @@ public static class Sprites
             "................",
             "................",
             "................",
+            "................",
+            "................",
             ".....rrrrrr.....",
             "....RRrrrrRR....",
             "....RRRRRRRR....",
             "...RRRRRRRRRR...",
-            "................",
-            "................",
         }),
         // The red lamp marks a closed door; the circuit number is a label.
         [ObjectDefs.SecurityDoor] = new(new[]
@@ -826,14 +831,15 @@ public static class Sprites
             "..vVVVVVVVVVVv..",
             ".vvvvvvvvvvvvvv.",
         }),
+        // Steel deck over a painted underside (the platform's color property).
         ["platform"] = new(new[]
         {
             "vvvvvvvvvvvvvvvv",
             "vlvvvvlvvvvlvvvv",
             "vvvvvvvvvvvvvvvv",
-            "VVVVVVVVVVVVVVVV",
-            "VVVVVVVVVVVVVVVV",
-            "VVVVVVVVVVVVVVVV",
+            "XXXXXXXXXXXXXXXX",
+            "XXXXXXXXXXXXXXXX",
+            "xxxxxxxxxxxxxxxx",
         }),
         [ObjectDefs.ElectricDoor] = new(new[]
         {

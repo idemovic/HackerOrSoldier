@@ -151,15 +151,40 @@ public static class ObjectDefs
     // Colors available for door / key pairs (README: matching colors).
     public static readonly string[] KeyColors = { "red", "blue", "yellow", "magenta" };
 
-    public static Color KeyColor(string name) => name switch
+    // Underside paints for elevators and moving platforms; purely visual.
+    public static readonly string[] PlatformPaints = { "steel", "hazard", "rust", "teal", "olive", "maroon" };
+
+    // The fill for a sprite's 'X' slot, for any name in either list.
+    public static Color SlotColor(string name) => name switch
     {
         "blue" => new Color(0.25f, 0.50f, 0.95f),
         "yellow" => new Color(0.95f, 0.85f, 0.20f),
         "magenta" => new Color(0.85f, 0.25f, 0.85f),
+        "steel" => new Color("4a5570"),
+        "hazard" => new Color("c8a020"),
+        "rust" => new Color("b8562a"),
+        "teal" => new Color("2f8a7a"),
+        "olive" => new Color("5e7a2e"),
+        "maroon" => new Color("8a2f3a"),
         _ => new Color(0.90f, 0.20f, 0.20f),
     };
 
-    public static bool HasColorProperty(string type) => type is Door or DoorKey;
+    // The colors a type can carry, or null when it has no color property.
+    public static string[] ColorChoices(string type) => type switch
+    {
+        Door or DoorKey => KeyColors,
+        Elevator or MovingPlatform => PlatformPaints,
+        _ => null,
+    };
+
+    public static bool HasColorProperty(string type) => ColorChoices(type) != null;
+
+    // The object's stored color, or its type's first choice when unset or unknown.
+    public static string ColorOf(string type, string stored)
+    {
+        var choices = ColorChoices(type);
+        return System.Array.IndexOf(choices, stored) >= 0 ? stored : choices[0];
+    }
 
     // Circuits: a computer or switch with number N turns off the lasers,
     // security doors and floor circuits with number N; USB keys hack the

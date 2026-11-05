@@ -115,7 +115,7 @@ The agent can hide in the closet on activate action, e.g. in case of an alarm.
 - Security camera - triggers the alarm
 - Laser beam - a beam between two ends, takes a life the moment the agent touches it (then a 1 second cooldown before it can hit again)
 - Rocket launcher - launches rockets
-- Switch - switches off the laser beams, security doors and floor circuits with its number on hit
+- Switch - switches off the laser beams, security doors and floor circuits with its number on hit (a shot counts even when the agent stands on the switch)
 - Security door - a solid door wired to a circuit number; opens for good when the circuit goes off, colored keys do not open it
 - Floor circuit - editor-only marker with a number, placed on an electric floor tile; it assigns that tile's connected electric floor region to the circuit
 
@@ -269,6 +269,7 @@ edit mode and play mode at any time.
   - Computer / USB key - number (matching pairs)
   - Teleport - capsules are placed as a joined pair
   - Elevator / moving platform - movement range (start and end tile)
+  - Elevator / moving platform - paint color (steel, hazard, rust, teal, olive, maroon), drawn the same in the editor and in play
   - Switch / Computer / Laser beam / Security door / Floor circuit - number 1-8, the circuit they share
 - Every level must contain exactly one agent start position and at least one exit door
 
