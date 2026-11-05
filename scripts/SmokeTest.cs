@@ -23,6 +23,7 @@ public partial class SmokeTest : Node
         await ShortcutAndPanCheck();
         await PaletteKeysCheck();
         await ToolsCheck();
+        await SelectCopyPasteCheck();
         await InvincibleCheck();
         await CorridorCheck();
         await WallContactCheck();
@@ -367,6 +368,81 @@ public partial class SmokeTest : Node
         editor._UnhandledInput(KeyEvent(Key.Minus));
         editor._UnhandledInput(KeyEvent(Key.Equal));
         Check(editor.ViewCenter.DistanceTo(center) < 1f, "zooming out and back in keeps the view");
+    }
+
+    // The Select tool picks an area; Ctrl+C / Ctrl+V move it around.
+    private async Task SelectCopyPasteCheck()
+    {
+        var editor = await FreshEditor(legacySize: false);
+        var level = editor.Level;
+        level.SetTile(10, 10, TileDefs.RedBrick);
+        level.SetTile(11, 10, TileDefs.Wall);
+        level.SetTile(12, 11, TileDefs.Lava);
+        level.Objects.Add(new LevelObject
+        {
+            Type = ObjectDefs.Door, X = 11, Y = 11, Properties = new() { ["color"] = "blue" },
+        });
+
+        editor._UnhandledInput(KeyEvent(Key.R));
+        Check(editor.CurrentTool == Editor.Tool.Rect, "R picks the Select tool");
+        editor._UnhandledInput(KeyEvent(Key.C, ctrl: true));
+        Check(editor.Clipboard == null, "Ctrl+C with nothing selected copies nothing");
+        editor.SelectArea(new Vector2I(12, 11), new Vector2I(10, 10));
+        Check(editor.Selection == new Rect2I(10, 10, 3, 2), "dragging corners in any order selects the cells between");
+        editor._UnhandledInput(KeyEvent(Key.C, ctrl: true));
+        Check(editor.Clipboard?.Size == new Vector2I(3, 2), "Ctrl+C copies the selection");
+
+        editor.PasteAt(new Vector2I(20, 30));
+        Check(level.GetTile(20, 30) == TileDefs.RedBrick && level.GetTile(21, 30) == TileDefs.Wall
+            && level.GetTile(22, 31) == TileDefs.Lava, "paste puts the tiles at the offset");
+        var pastedDoor = level.Objects.Find(o => o.X == 21 && o.Y == 31);
+        Check(pastedDoor?.Type == ObjectDefs.Door && pastedDoor.Properties["color"] == "blue", "paste keeps the door and its color");
+        Check(level.GetTile(10, 10) == TileDefs.RedBrick && level.Objects.Any(o => o.X == 11 && o.Y == 11),
+            "the source stays untouched");
+        Check(editor.Selection == new Rect2I(20, 30, 3, 2), "the pasted area becomes the selection");
+        editor.Undo();
+        Check(editor.Level.GetTile(20, 30) == TileDefs.Empty && !editor.Level.Objects.Any(o => o.X == 21 && o.Y == 31),
+            "one undo reverts the whole paste");
+        level = editor.Level;
+
+        level.SetTile(22, 30, TileDefs.Wall);
+        editor.PasteAt(new Vector2I(20, 30));
+        Check(level.GetTile(22, 30) == TileDefs.Empty, "paste replaces a wall with the clip's empty cell");
+
+        editor.SetLevel(LevelData.NewDefault(80, 80));
+        level = editor.Level;
+        level.SetTile(1, 1, TileDefs.Wall);
+        level.SetTile(2, 1, TileDefs.Wall);
+        level.SetTile(1, 2, TileDefs.Wall);
+        level.Objects.Add(new LevelObject { Type = ObjectDefs.Door, X = 2, Y = 2, Properties = new() { ["color"] = "red" } });
+        level.Objects.Add(new LevelObject { Type = ObjectDefs.Door, X = 1, Y = 1, Properties = new() { ["color"] = "red" } });
+        level.SetTile(79, 79, TileDefs.RedBrick);
+        editor.SelectArea(new Vector2I(1, 1), new Vector2I(3, 3));
+        editor.CopySelection();
+        int before = level.Objects.Count;
+        editor.PasteAt(new Vector2I(79, 79));
+        Check(level.GetTile(79, 79) == TileDefs.Wall && level.Objects.Count == before + 1
+            && level.Objects.Any(o => o.X == 79 && o.Y == 79), "paste at the corner keeps only what fits");
+        Check(editor.Selection == new Rect2I(79, 79, 1, 1), "the selection after a cut-off paste is what landed");
+        int undoDepth = editor.Level.Objects.Count;
+        editor.PasteAt(new Vector2I(80, 80));
+        editor.PasteAt(new Vector2I(-9, -9));
+        Check(editor.Level.Objects.Count == undoDepth, "a paste that lands outside the level changes nothing");
+        editor.Undo();
+        Check(editor.Level.GetTile(79, 79) == TileDefs.RedBrick, "no undo step was recorded for the failed pastes");
+
+        editor.SetLevel(LevelData.NewDefault(80, 80));
+        editor.SelectArea(new Vector2I(0, 76), new Vector2I(5, 79));
+        editor.CopySelection();
+        editor.PasteAt(new Vector2I(30, 70));
+        Check(editor.Level.Objects.Count(o => o.Type == ObjectDefs.AgentStart) == 1 && editor.Level.Validate() == null,
+            "pasting a copied agent start keeps exactly one");
+        editor.PasteAt(new Vector2I(2, 78));
+        Check(editor.Level.Validate() == null, "pasting over the agent start leaves it in place");
+
+        Check(editor.Selection != null, "the paste left a selection");
+        editor._UnhandledInput(KeyEvent(Key.Escape));
+        Check(editor.Selection == null, "Esc clears the selection");
     }
 
     // Ctrl+I (or I) makes the playtest agent take no damage; it applies when

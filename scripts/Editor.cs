@@ -41,7 +41,7 @@ public partial class Editor : Node2D
     public enum Tool { Brush, Rect, Eraser, Picker }
 
     // What a held mouse button is doing, decided on press.
-    private enum Drag { None, Paint, Erase, Rect, Pan }
+    private enum Drag { None, Paint, Erase, Rect, Select, Pan }
 
     private Tool _tool = Tool.Brush;
     private PaletteEntry _brush;
@@ -53,6 +53,8 @@ public partial class Editor : Node2D
     private Drag _drag;
     private Vector2I _dragStart;
     private bool _rectErase;
+    private Rect2I? _selection;
+    private LevelClip _clipboard;
     private bool _showGrid = true;
     private bool _invincible;
     private bool _revealHidden;
@@ -98,6 +100,8 @@ public partial class Editor : Node2D
     public Agent PlayerAgent => _session?.Agent;
     public LevelGrids Grids => _grids;   // for tests
     public Tool CurrentTool => _tool;   // for tests
+    public Rect2I? Selection => _selection;   // for tests
+    public LevelClip Clipboard => _clipboard;   // for tests
     public PaletteEntry Brush => _brush;   // for tests
     public string BrushColor => BrushColorFor(_brush.ObjectType);   // for tests
     public bool Invincible => _invincible;
@@ -123,8 +127,10 @@ public partial class Editor : Node2D
         new("Help", "File", () => _helpDialog.PopupCentered(), new Chord(Key.F1), new Chord(Key.H, Ctrl: true)),
         new("Undo", "Edit", Undo, new Chord(Key.Z, Ctrl: true)),
         new("Redo", "Edit", Redo, new Chord(Key.Y, Ctrl: true), new Chord(Key.Z, Ctrl: true, Shift: true)),
+        new("Copy", "Edit", CopySelection, new Chord(Key.C, Ctrl: true)),
+        new("Paste", "Edit", () => PasteAt(MouseCell()), new Chord(Key.V, Ctrl: true)),
         new("Brush", "Tools", () => SetTool(Tool.Brush), new Chord(Key.B)),
-        new("Rectangle fill", "Tools", () => SetTool(Tool.Rect), new Chord(Key.R)),
+        new("Select", "Tools", () => SetTool(Tool.Rect), new Chord(Key.R)),
         new("Eraser", "Tools", () => SetTool(Tool.Eraser), new Chord(Key.E)),
         new("Picker", "Tools", () => SetTool(Tool.Picker), new Chord(Key.Q)),
         new("Next color/number", "Tools", () => CycleProperty(1), new Chord(Key.Bracketright)),
@@ -241,7 +247,7 @@ public partial class Editor : Node2D
         var cell = MouseCell();
         bool overUi = GetViewport().GuiGetHoveredControl() != null;
         bool inLevel = _level.InBounds(cell.X, cell.Y) && !overUi;
-        _ghost.Visible = inLevel && _drag != Drag.Rect && _tool is Tool.Brush or Tool.Rect && !AltHeld();
+        _ghost.Visible = inLevel && _drag != Drag.Rect && _tool == Tool.Brush && !AltHeld();
         _ghost.Position = CellCenter(cell);
         _cellLabel.Text = inLevel ? $"{cell.X},{cell.Y}" : "";
         _overlay.QueueRedraw();
@@ -276,6 +282,13 @@ public partial class Editor : Node2D
         if (_menuPanel.Visible && (@event.IsActionPressed("pause") || @event is InputEventMouseButton { Pressed: true }))
         {
             _menuPanel.Hide();
+            GetViewport()?.SetInputAsHandled();
+            return;
+        }
+
+        if (_selection != null && @event.IsActionPressed("pause"))
+        {
+            _selection = null;
             GetViewport()?.SetInputAsHandled();
             return;
         }
@@ -351,9 +364,12 @@ public partial class Editor : Node2D
             case MouseButton.Left when button.AltPressed || _tool == Tool.Picker:
                 Pick(cell);
                 break;
-            case MouseButton.Left when button.ShiftPressed || _tool == Tool.Rect:
+            case MouseButton.Left when button.ShiftPressed:
                 _drag = Drag.Rect;
                 _rectErase = _tool == Tool.Eraser;
+                break;
+            case MouseButton.Left when _tool == Tool.Rect:
+                _drag = Drag.Select;
                 break;
             case MouseButton.Left when _tool == Tool.Eraser:
                 _drag = Drag.Erase;
@@ -378,6 +394,8 @@ public partial class Editor : Node2D
     {
         if (_drag == Drag.Rect)
             ApplyRect(_dragStart, MouseCell(), _rectErase);
+        else if (_drag == Drag.Select)
+            SelectArea(_dragStart, MouseCell());
         _drag = Drag.None;
         _strokeOpen = false;   // the next paint starts a new stroke
     }
@@ -419,6 +437,47 @@ public partial class Editor : Node2D
         _strokeOpen = false;
     }
 
+    public void SelectArea(Vector2I from, Vector2I to)
+    {
+        var area = CellRect(from, to).Intersection(LevelBounds);
+        _selection = area.HasArea() ? area : null;
+    }
+
+    public void CopySelection()
+    {
+        if (_selection is not { } area)
+        {
+            SetStatus("Select an area first (R, then drag).", warn: true);
+            return;
+        }
+        _clipboard = LevelClip.Copy(_level, area);
+        SetStatus($"Copied {area.Size.X}x{area.Size.Y}. Ctrl+V pastes at the cursor.");
+    }
+
+    // The clip's top-left lands on the cell; whatever falls outside the level is cut off.
+    public void PasteAt(Vector2I cell)
+    {
+        if (_clipboard == null)
+        {
+            SetStatus("Nothing copied yet.", warn: true);
+            return;
+        }
+        if (!_clipboard.FootprintAt(_level, cell).HasArea())
+        {
+            SetStatus("Paste lands outside the level.", warn: true);
+            return;
+        }
+        RecordUndo();
+        var written = _clipboard.PasteInto(_level, cell);
+        RedrawLevel();
+        _selection = written;
+        SetStatus(written.Size == _clipboard.Size
+            ? $"Pasted {written.Size.X}x{written.Size.Y}."
+            : $"Pasted {written.Size.X}x{written.Size.Y}, cut off at the level edge.");
+    }
+
+    private Rect2I LevelBounds => new(0, 0, _level.Width, _level.Height);
+
     private void DrawOverlay()
     {
         if (IsPlaying)
@@ -437,21 +496,22 @@ public partial class Editor : Node2D
         }
         _overlay.DrawRect(levelRect, new Color(1, 1, 1, 0.25f), false);
         DrawCameraSight();
+        if (_selection is { } selected)
+            DrawCellRect(selected, EditorTheme.Accent, 0.12f);
 
         var cell = MouseCell();
-        if (GetViewport().GuiGetHoveredControl() != null && _drag != Drag.Rect)
+        bool dragging = _drag is Drag.Rect or Drag.Select;
+        if (GetViewport().GuiGetHoveredControl() != null && !dragging)
             return;
-        if (_drag == Drag.Rect)
+        if (dragging)
         {
-            var rect = CellRect(_dragStart, cell);
-            var area = new Rect2(rect.Position * TileSize, rect.Size * TileSize);
-            var color = _rectErase ? EditorTheme.Danger : EditorTheme.Accent;
-            _overlay.DrawRect(area, color with { A = 0.2f });
-            _overlay.DrawRect(area, color, false, 1);
+            DrawCellRect(CellRect(_dragStart, cell), _rectErase && _drag == Drag.Rect ? EditorTheme.Danger : EditorTheme.Accent, 0.2f);
             return;
         }
         if (!_level.InBounds(cell.X, cell.Y))
             return;
+        if (_tool == Tool.Rect && _clipboard != null)
+            DrawCellRect(_clipboard.FootprintAt(_level, cell), EditorTheme.Gold, 0);
         var cursor = (AltHeld() ? Tool.Picker : _tool) switch
         {
             Tool.Eraser => EditorTheme.Danger,
@@ -459,6 +519,14 @@ public partial class Editor : Node2D
             _ => EditorTheme.Accent,
         };
         _overlay.DrawRect(new Rect2(cell * TileSize, new Vector2(TileSize, TileSize)), cursor, false, 1);
+    }
+
+    private void DrawCellRect(Rect2I cells, Color color, float fillAlpha)
+    {
+        var area = new Rect2(cells.Position * TileSize, cells.Size * TileSize);
+        if (fillAlpha > 0)
+            _overlay.DrawRect(area, color with { A = fillAlpha });
+        _overlay.DrawRect(area, color, false, 1);
     }
 
     // Where each security camera spots the agent. Hidden platforms block
@@ -513,8 +581,7 @@ public partial class Editor : Node2D
     private void SelectBrush(PaletteEntry entry)
     {
         _brush = entry;
-        if (_tool is Tool.Eraser or Tool.Picker)
-            _tool = Tool.Brush;
+        _tool = Tool.Brush;
         var (category, _) = EditorPalette.Find(entry.TileId, entry.ObjectType);
         if (category >= 0 && category != _category)
             ShowCategory(category);
@@ -740,6 +807,12 @@ public partial class Editor : Node2D
         if (_skyButton != null)
             _skyButton.Icon = EditorTheme.Icon(_level.Sky == "day" ? "sun" : "moon");
         _grids.Fill(_level);
+        // Undo or a new level may have shrunk the grid under the selection.
+        if (_selection is { } selected)
+        {
+            var kept = selected.Intersection(LevelBounds);
+            _selection = kept.HasArea() ? kept : null;
+        }
         RebuildMarkers();
         ApplyCameraLimits(_camera);
         ClampCamera();
