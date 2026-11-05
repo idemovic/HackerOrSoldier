@@ -26,6 +26,8 @@ public partial class Screenshot : Node
         editor.PaintCell(new Vector2I(8, 38));
         editor.SetBrushObject(ObjectDefs.Barrel);
         editor.PaintCell(new Vector2I(9, 38));
+        editor.SetBrushObject(ObjectDefs.SteelBarrel);
+        editor.PaintCell(new Vector2I(9, 37));
         editor.SetBrushTile(TileDefs.Water);
         editor.PaintCell(new Vector2I(10, 37));
         editor.PaintCell(new Vector2I(10, 38));

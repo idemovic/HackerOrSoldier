@@ -100,6 +100,7 @@ public static class ObjectDefs
     public const string Camera = "camera";
     public const string Closet = "closet";
     public const string Barrel = "barrel";
+    public const string SteelBarrel = "barrel_steel";
     public const string Teleport = "teleport";
     public const string Elevator = "elevator";
     public const string MovingPlatform = "moving_platform";
@@ -134,6 +135,7 @@ public static class ObjectDefs
         new(Camera, "Security camera", new Color(0.65f, 0.65f, 0.72f)),
         new(Closet, "Closet", new Color(0.50f, 0.33f, 0.18f)),
         new(Barrel, "Barrel", new Color(0.62f, 0.44f, 0.24f)),
+        new(SteelBarrel, "Steel barrel", new Color(0.48f, 0.54f, 0.65f)),
         new(Teleport, "Teleport", new Color(0.45f, 0.30f, 0.90f)),
         new(Elevator, "Elevator", new Color(0.55f, 0.60f, 0.70f)),
         new(MovingPlatform, "Moving platform", new Color(0.60f, 0.65f, 0.55f)),

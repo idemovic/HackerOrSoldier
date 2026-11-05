@@ -122,7 +122,8 @@ Known simplifications (tuning constants, not README rules):
   invisible to enemies, cameras, bullets and contact damage); C again leaves.
   Priority for C: leave closet, hide in closet, then use held items
 - Movable barrels: pushed by walking into them (100 px/s), solid to stand
-  on, treated as walls by enemies
+  on, treated as walls by enemies; wooden and steel kinds (barrel,
+  barrel_steel) share the physics and differ only in art
 - Smoke test covers hack-by-number, wrong-number stays locked, laser damage
   and pass-through when off, switch shooting, floor disabling, camera alarm,
   disguise, closet hiding and leaving, barrel pushing; milestone 6 mechanics

@@ -1032,6 +1032,26 @@ public static class Sprites
             "NnttnNnnnnNnnnnN",
             "NNNNNNNNNNNNNNNN",
         }),
+        // The barrel's shape in riveted steel: ribbed panels and two bands.
+        [ObjectDefs.SteelBarrel] = new(new[]
+        {
+            "dddddddddddddddd",
+            "dulluVuuuuVuuuud",
+            "dlklllllllllllkd",
+            "dggggggggggggggd",
+            "dulluVuuuuVuuuud",
+            "dulluVuuuuVuuuud",
+            "dulluVuuuuVuuuud",
+            "dulluVuuuuVuuuud",
+            "dulluVuuuuVuuuud",
+            "dulluVuuuuVuuuud",
+            "dulluVuuuuVuuuud",
+            "dulluVuuuuVuuuud",
+            "dlklllllllllllkd",
+            "dggggggggggggggd",
+            "dulluVuuuuVuuuud",
+            "dddddddddddddddd",
+        }),
         // Taller than a cell: the emitter hangs over the agent's head and the
         // pad sits on the floor; sprites taller than 32 px are bottom-aligned.
         [ObjectDefs.Teleport] = new(new[]

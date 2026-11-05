@@ -49,6 +49,7 @@ public partial class HelpOverlay : CanvasLayer
         [ObjectDefs.RocketLauncher] = "Fires rockets.",
         [ObjectDefs.Closet] = "Activate beside it to hide.",
         [ObjectDefs.Barrel] = "Push it to climb to high ledges.",
+        [ObjectDefs.SteelBarrel] = "Push it to climb to high ledges.",
         [ObjectDefs.DoorKey] = "Opens the door of its color.",
         [ObjectDefs.UsbKey] = "Hacks the computer of its number.",
         [ObjectDefs.HealthKit] = "Adds a life.",

@@ -132,7 +132,7 @@ public static class EditorPalette
                 Obj(ObjectDefs.SecurityDoor), Obj(ObjectDefs.FloorCircuit),
                 Obj(ObjectDefs.Camera), Obj(ObjectDefs.RocketLauncher), Obj(ObjectDefs.Closet),
             }),
-            Category("Movables", new[] { Obj(ObjectDefs.Barrel) }),
+            Category("Movables", new[] { Obj(ObjectDefs.Barrel), Obj(ObjectDefs.SteelBarrel) }),
             Category("Enemies", enemies, Array.FindIndex(enemies, e => e.ObjectType == EnemyDefs.Soldier)),
             Category("Items", new[]
             {

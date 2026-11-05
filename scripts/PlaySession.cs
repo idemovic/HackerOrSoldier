@@ -225,8 +225,8 @@ public partial class PlaySession : Node2D
                     if (Agent != null)
                         MoveChild(closet, Agent.GetIndex());   // draw behind the agent
                     break;
-                case ObjectDefs.Barrel:
-                    AddChild(new Barrel { Position = pos });
+                case ObjectDefs.Barrel or ObjectDefs.SteelBarrel:
+                    AddChild(new Barrel { Position = pos, Type = obj.Type });
                     break;
                 case ObjectDefs.Teleport:
                     var capsule = new Teleporter { Position = pos, Number = NumberOf(obj) };

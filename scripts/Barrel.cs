@@ -10,6 +10,8 @@ public partial class Barrel : CharacterBody2D
     private const float PushSpeed = 100f;
     private const float BarrelGravity = 1200f;
 
+    public string Type = ObjectDefs.Barrel;   // wooden or steel art, same physics
+
     private int _pushDir;
 
     public override void _Ready()
@@ -20,7 +22,7 @@ public partial class Barrel : CharacterBody2D
         {
             Shape = new RectangleShape2D { Size = new Vector2(30, 30) },
         });
-        AddChild(new Sprite2D { Texture = Sprites.Get(ObjectDefs.Barrel) });
+        AddChild(new Sprite2D { Texture = Sprites.Get(Type) });
     }
 
     public void Push(int direction) => _pushDir = direction;

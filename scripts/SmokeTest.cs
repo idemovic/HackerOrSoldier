@@ -62,7 +62,8 @@ public partial class SmokeTest : Node
         await DisguiseCheck();
         await EnemyDisguiseCheck();
         await ClosetCheck();
-        await BarrelCheck();
+        await BarrelCheck(ObjectDefs.Barrel);
+        await BarrelCheck(ObjectDefs.SteelBarrel);
         await CollectibleCheck();
         await LettersBonusCheck();
         await StatsCheck();
@@ -132,7 +133,7 @@ public partial class SmokeTest : Node
         {
             "agent_start", "exit_door", "checkpoint", "door", "door_key", "health_kit", "ammo_pack", "vest", "briefcase",
             "infra_goggles", "computer", "usb_key", "switch", "laser", "security_door", "floor_circuit", "camera", "closet",
-            "barrel", "teleport", "elevator", "moving_platform", "electric_door", "flame_trap", "rocket_launcher", "light",
+            "barrel", "barrel_steel", "teleport", "elevator", "moving_platform", "electric_door", "flame_trap", "rocket_launcher", "light",
             "weapon_chainsaw", "weapon_assault_rifle", "weapon_minigun", "weapon_crossbow", "weapon_dynamite",
             "fighter", "soldier", "super_soldier", "ultimate_soldier", "drone", "robodog", "turret", "robot", "landmine",
             "electric_eel",
@@ -1466,13 +1467,13 @@ public partial class SmokeTest : Node
         editor.StopPlay();
     }
 
-    // The agent pushes a barrel by walking into it.
-    private async Task BarrelCheck()
+    // The agent pushes a wooden or steel barrel by walking into it.
+    private async Task BarrelCheck(string type)
     {
         var editor = await FreshEditor();
-        editor.SetBrushObject(ObjectDefs.Barrel);
+        editor.SetBrushObject(type);
         editor.PaintCell(new Vector2I(6, 10));
-        Check(editor.StartPlay(), "barrel level starts");
+        Check(editor.StartPlay(), $"{type} level starts");
         Input.ActionPress("move_right");
         await Frames(60);
         var pushFrames = new HashSet<string>();
@@ -1483,10 +1484,11 @@ public partial class SmokeTest : Node
         }
         Input.ActionRelease("move_right");
         Check(pushFrames.All(f => f?.StartsWith("agent_push") == true) && pushFrames.Count > 3,
-            "pushing a barrel plays the push cycle without flickering");
+            $"pushing a {type} plays the push cycle without flickering");
         var barrel = editor.Session.GetChildren().OfType<Barrel>().FirstOrDefault();
-        Check(barrel != null && barrel.Position.X > 6 * 32 + 60, "agent pushes the barrel");
-        Check(editor.PlayerAgent.Position.X > 6 * 32, "agent advances behind the barrel");
+        Check(barrel?.GetChildren().OfType<Sprite2D>().Single().Texture == Sprites.Get(type), $"{type} shows its own sprite");
+        Check(barrel != null && barrel.Position.X > 6 * 32 + 60, $"agent pushes the {type}");
+        Check(editor.PlayerAgent.Position.X > 6 * 32, $"agent advances behind the {type}");
         editor.StopPlay();
     }
 
