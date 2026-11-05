@@ -32,9 +32,11 @@ public sealed class EnemyAnimator
     private static readonly Dictionary<string, Set> Sets = new()
     {
         [EnemyDefs.Drone] = new(new[] { EnemyDefs.Drone, "drone_hover" }, ClockDriven: true),
-        [EnemyDefs.Robodog] = new(new[] { EnemyDefs.Robodog, "robodog_walk" }),
+        // Walkers stride one leg, pass through the standing frame, then
+        // stride the other.
+        [EnemyDefs.Robodog] = new(new[] { EnemyDefs.Robodog, "robodog_walk", EnemyDefs.Robodog, "robodog_walk2" }),
         [EnemyDefs.Turret] = new(new[] { EnemyDefs.Turret }, Attack: "turret_fire"),
-        [EnemyDefs.Robot] = new(new[] { EnemyDefs.Robot, "robot_walk" },
+        [EnemyDefs.Robot] = new(new[] { EnemyDefs.Robot, "robot_walk", EnemyDefs.Robot, "robot_walk2" },
             Attack: "robot_fire", Off: "robot_off"),
         [EnemyDefs.Landmine] = new(new[] { EnemyDefs.Landmine, "landmine_blink" }, ClockDriven: true),
         // Four phases of a travelling wave, on the clock so the eel keeps
