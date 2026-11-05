@@ -12,9 +12,14 @@ public partial class RocketLauncher : Node2D
 
     private float _timer = Interval / 2f;
     private int _direction = -1;
+    private Sprite2D _sprite;
 
-    public override void _Ready() =>
-        AddChild(new Sprite2D { Texture = Sprites.Get(ObjectDefs.RocketLauncher) });
+    // The sprite faces right; it turns to aim each next shot.
+    public override void _Ready()
+    {
+        _sprite = new Sprite2D { Texture = Sprites.Get(ObjectDefs.RocketLauncher), FlipH = _direction < 0 };
+        AddChild(_sprite);
+    }
 
     public override void _PhysicsProcess(double delta)
     {
@@ -24,5 +29,6 @@ public partial class RocketLauncher : Node2D
         _timer = Interval;
         Session.SpawnRocket(Position + new Vector2(_direction * 20, -2), _direction);
         _direction = -_direction;
+        _sprite.FlipH = _direction < 0;
     }
 }

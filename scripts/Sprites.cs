@@ -896,23 +896,26 @@ public static class Sprites
             "rrrrrrrrr",
             "rrrrrrrrr",
         }),
+        // Launch tube on a swivel mount: flared exhaust at the back, hazard
+        // band, sight on top and a rocket nose in the muzzle. Faces right;
+        // RocketLauncher flips it towards its next shot.
         [ObjectDefs.RocketLauncher] = new(new[]
         {
             "................",
             "................",
             "................",
-            "................",
-            "................",
-            "..VVVVVVVVVVVV..",
-            "..VVVVVVVVVVVV..",
-            "llllllllllVVVV..",
-            "llllllllllVVVV..",
-            "..VVVVVVVVVVVV..",
-            "..VVVVVVVVVVVV..",
-            "...VV......VV...",
-            "................",
-            "................",
-            "................",
+            "......kkk.......",
+            "gg....kck.......",
+            "gVvvvvvvvykykvvd",
+            "gkuuuuuuuykykuur",
+            "gkuuuuuuuykykurr",
+            "gkuuuuuuuykykuur",
+            "gVVVVVVVVykykVVd",
+            "gg.....gg.......",
+            ".......gg.......",
+            "......dggd......",
+            ".....dlllld.....",
+            "....dddddddd....",
             "................",
         }),
         // A wall lamp: a bracket holding a shade over the glow.
