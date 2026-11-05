@@ -101,7 +101,7 @@ public partial class Editor
             var button = IconButton(icon, Command(name), toggle: true);
             button.TooltipText += tool switch
             {
-                Tool.Rect => "\nCtrl+C copies, Ctrl+V pastes at the cursor\nShift+drag still fills a rectangle",
+                Tool.Rect => "\nCtrl+C copies, Ctrl+V pastes at the cursor\nEsc, right click or another tool clears it\nShift+drag still fills a rectangle",
                 Tool.Eraser => "\nor right mouse button",
                 Tool.Picker => "\nor Alt+click",
                 _ => "",

@@ -286,9 +286,9 @@ public partial class Editor : Node2D
             return;
         }
 
-        if (_selection != null && @event.IsActionPressed("pause"))
+        if ((_selection != null || _clipboard != null) && @event.IsActionPressed("pause"))
         {
-            _selection = null;
+            ResetSelection();
             GetViewport()?.SetInputAsHandled();
             return;
         }
@@ -379,9 +379,12 @@ public partial class Editor : Node2D
                 _drag = Drag.Paint;
                 PaintCell(cell);
                 break;
-            case MouseButton.Right when button.ShiftPressed || _tool == Tool.Rect:
+            case MouseButton.Right when button.ShiftPressed:
                 _drag = Drag.Rect;
                 _rectErase = true;
+                break;
+            case MouseButton.Right when _tool == Tool.Rect:
+                ResetSelection();
                 break;
             case MouseButton.Right:
                 _drag = Drag.Erase;
@@ -553,8 +556,22 @@ public partial class Editor : Node2D
 
     public void SetTool(Tool tool)
     {
-        _tool = tool;
+        ChangeTool(tool);
         RefreshBrushUi();
+    }
+
+    private void ChangeTool(Tool tool)
+    {
+        if (tool != _tool)
+            ResetSelection();
+        _tool = tool;
+    }
+
+    // Back to the one-cell cursor: nothing selected and nothing to paste.
+    private void ResetSelection()
+    {
+        _selection = null;
+        _clipboard = null;
     }
 
     public void SetBrushTile(int tileId) => SelectBrush(EntryFor(tileId, null));
@@ -581,7 +598,7 @@ public partial class Editor : Node2D
     private void SelectBrush(PaletteEntry entry)
     {
         _brush = entry;
-        _tool = Tool.Brush;
+        ChangeTool(Tool.Brush);
         var (category, _) = EditorPalette.Find(entry.TileId, entry.ObjectType);
         if (category >= 0 && category != _category)
             ShowCategory(category);

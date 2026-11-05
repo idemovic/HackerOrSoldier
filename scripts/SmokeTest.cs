@@ -443,7 +443,24 @@ public partial class SmokeTest : Node
 
         Check(editor.Selection != null, "the paste left a selection");
         editor._UnhandledInput(KeyEvent(Key.Escape));
-        Check(editor.Selection == null, "Esc clears the selection");
+        Check(editor.Selection == null && editor.Clipboard == null, "Esc clears the selection and the copy");
+
+        void SelectAndCopy()
+        {
+            editor.SetTool(Editor.Tool.Rect);
+            editor.SelectArea(new Vector2I(3, 3), new Vector2I(5, 5));
+            editor.CopySelection();
+        }
+        SelectAndCopy();
+        editor._UnhandledInput(new InputEventMouseButton { ButtonIndex = MouseButton.Right, Pressed = true });
+        editor._UnhandledInput(new InputEventMouseButton { ButtonIndex = MouseButton.Right, Pressed = false });
+        Check(editor.Selection == null && editor.Clipboard == null, "a right click with the Select tool clears the selection and the copy");
+        SelectAndCopy();
+        editor._UnhandledInput(KeyEvent(Key.B));
+        Check(editor.Selection == null && editor.Clipboard == null, "switching tools clears the selection and the copy");
+        SelectAndCopy();
+        editor.SetBrushTile(TileDefs.Wall);
+        Check(editor.Clipboard == null && editor.CurrentTool == Editor.Tool.Brush, "picking a brush leaves Select and clears the copy");
     }
 
     // Ctrl+I (or I) makes the playtest agent take no damage; it applies when
