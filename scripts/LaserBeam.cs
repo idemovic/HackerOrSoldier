@@ -13,9 +13,16 @@ public partial class LaserBeam : Node2D
     public PlaySession Session { get; set; }
     public string Number { get; set; } = "1";
 
+    private const float LensY = 5f;   // the emitter sprite's lens, below the node origin
+    private const float SparkReseed = 0.05f;
+
+    private static readonly Color OuterGlow = new(1f, 0.10f, 0.10f, 0.20f);
+    private static readonly Color InnerGlow = new(1f, 0.15f, 0.15f, 0.30f);
+    private static readonly Color Core = new(1f, 0.30f, 0.30f, 0.95f);
+    private static readonly Color HotCore = new(1f, 0.90f, 0.90f);
+
     private float _topY;
     private float _cooldown;
-    private ColorRect _beam;
 
     public override void _Ready()
     {
@@ -26,29 +33,14 @@ public partial class LaserBeam : Node2D
             top--;
         _topY = top * tile;
 
-        AddChild(new ColorRect   // emitter base
-        {
-            Position = new Vector2(-10, 6),
-            Size = new Vector2(20, 10),
-            Color = new Color(0.55f, 0.20f, 0.20f),
-            MouseFilter = Control.MouseFilterEnum.Ignore,
-        });
-        _beam = new ColorRect
-        {
-            Position = new Vector2(-2, _topY - Position.Y),
-            Size = new Vector2(4, Position.Y - _topY + 6),
-            Color = new Color(1f, 0.25f, 0.25f, 0.85f),
-            MouseFilter = Control.MouseFilterEnum.Ignore,
-        };
-        AddChild(_beam);
+        AddChild(new Sprite2D { Texture = Sprites.Get(ObjectDefs.Laser), ShowBehindParent = true });
+        Material = new CanvasItemMaterial { BlendMode = CanvasItemMaterial.BlendModeEnum.Add };
     }
 
     public override void _PhysicsProcess(double delta)
     {
         _cooldown -= (float)delta;
-        bool active = !Session.IsCircuitOff(Number);
-        _beam.Visible = active;
-        if (!active)
+        if (Session.IsCircuitOff(Number))
             return;
 
         var agent = Session.Agent;
@@ -60,5 +52,43 @@ public partial class LaserBeam : Node2D
             return;
         _cooldown = HitCooldown;
         Session.AgentHit();
+    }
+
+    public override void _Process(double delta) => QueueRedraw();
+
+    // Drawn additively: stacked glow bands round a white-hot core, pulses
+    // running up the beam, a flare at each end and sparks off the ceiling.
+    public override void _Draw()
+    {
+        if (Session.IsCircuitOff(Number))
+            return;
+        float t = Session.Time;
+        float top = _topY - Position.Y;
+        float length = LensY - top;
+        float pulse = 0.8f + 0.2f * Mathf.Sin(t * 25f);
+
+        DrawRect(new Rect2(-6, top, 12, length), OuterGlow * new Color(1, 1, 1, pulse));
+        DrawRect(new Rect2(-4, top, 8, length), InnerGlow * new Color(1, 1, 1, pulse));
+        DrawRect(new Rect2(-2, top, 4, length), Core);
+        DrawRect(new Rect2(-1, top, 2, length), HotCore);
+
+        const float spacing = 18f;
+        float scroll = t * 140f % spacing;
+        for (float y = LensY - scroll; y > top; y -= spacing)
+            DrawRect(new Rect2(-3, Mathf.Max(top, y - 5), 6, Mathf.Min(5, y - top)), Core);
+
+        foreach (float y in new[] { top, LensY })
+        {
+            DrawCircle(new Vector2(0, y), 5f * pulse, InnerGlow);
+            DrawCircle(new Vector2(0, y), 2.5f, Core);
+        }
+
+        var rng = new RandomNumberGenerator { Seed = (ulong)(t / SparkReseed) + GetInstanceId() };
+        for (int i = 0; i < 3; i++)
+        {
+            float angle = rng.RandfRange(0.2f, Mathf.Pi - 0.2f);
+            var from = new Vector2(0, top + 1);
+            DrawLine(from, from + Vector2.FromAngle(angle) * rng.RandfRange(3f, 7f), HotCore, 1f);
+        }
     }
 }
