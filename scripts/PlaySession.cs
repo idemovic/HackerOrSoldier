@@ -702,19 +702,7 @@ public partial class PlaySession : Node2D
         if (Agent != null && center.DistanceTo(Agent.Position) <= ExplosionRadius)
             AgentHit();
 
-        var flash = new ColorRect
-        {
-            Position = center - new Vector2(ExplosionRadius, ExplosionRadius),
-            Size = new Vector2(ExplosionRadius * 2, ExplosionRadius * 2),
-            Color = new Color(1f, 0.8f, 0.4f, 0.5f),
-            MouseFilter = Control.MouseFilterEnum.Ignore,
-        };
-        AddChild(flash);
-        GetTree().CreateTimer(0.25).Timeout += () =>
-        {
-            if (IsInstanceValid(flash))
-                flash.QueueFree();
-        };
+        AddChild(new Explosion { Position = center, Radius = ExplosionRadius, Camera = _camera });
     }
 
     public void ActivateHeldItem()

@@ -184,7 +184,7 @@ The agent uses weapons to kill enemies. The following weapons are available to f
 - Assault rifle (3 bullets shot at once, default 10 ammo)
 - Mini gun (2 bullets shot at once, default 20 ammo)
 - Crossbow (doesn't trigger alarm, default 20 ammo)
-- Dynamite (used to destruct obstacles, kills everything in 5 square radius, explodes in 5 seconds; doesn't apply to objects with infinite lives)
+- Dynamite (used to destruct obstacles, kills everything in 5 square radius, explodes in 2.5 seconds; doesn't apply to objects with infinite lives)
 
 ## Ammo
 - Bullet - (goes to pistol, assault rifle, mini gun) takes a life, moves 2x speed of agent

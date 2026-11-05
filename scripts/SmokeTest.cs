@@ -1747,8 +1747,10 @@ public partial class SmokeTest : Node
         Input.ActionPress("move_left");
         await Frames(40);
         Input.ActionRelease("move_left");
-        await Frames(280);
-        Check(editor.Session.TileAt(8, 10) == TileDefs.Empty, "dynamite destroys destructible walls in its radius");
+        await Frames(60);
+        Check(editor.Session.TileAt(8, 10) == TileDefs.DestructibleWall, "dynamite waits out its fuse");
+        await Frames(70);
+        Check(editor.Session.TileAt(8, 10) == TileDefs.Empty, "dynamite destroys destructible walls after its 2.5s fuse");
         editor.StopPlay();
     }
 

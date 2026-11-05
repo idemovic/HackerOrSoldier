@@ -175,7 +175,7 @@ Known simplifications (tuning constants, not README rules):
 - Weapons as pickups that equip on collection with README default ammo:
   chainsaw (melee sweep, no ammo, no alarm), assault rifle (burst of 3),
   mini gun (burst of 2), crossbow (arrows, does not trigger the alarm),
-  dynamite (placed stick, 5s fuse, reuses the explosion system). Pistol,
+  dynamite (placed stick, 2.5s fuse, reuses the explosion system). Pistol,
   rifle and mini gun share the bullet pool per the README ammo table; the
   weapon resets to pistol at the start of each level
 - Decorations: clock, poster, plant, toilet, pipe, sign, machine (visual

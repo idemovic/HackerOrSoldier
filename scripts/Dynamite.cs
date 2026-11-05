@@ -6,7 +6,7 @@ namespace HackerOrSoldier;
 // runs out and PlaySession handles the explosion.
 public partial class Dynamite : Node2D
 {
-    private const float Fuse = 5f;   // README: dynamite explodes in 5 seconds
+    private const float Fuse = 2.5f;   // README: dynamite explodes in 2.5 seconds
 
     public PlaySession Session { get; set; }
 

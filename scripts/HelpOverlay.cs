@@ -60,7 +60,7 @@ public partial class HelpOverlay : CanvasLayer
         [ObjectDefs.WeaponAssaultRifle] = "3 bullets per shot.",
         [ObjectDefs.WeaponMinigun] = "2 bullets per shot.",
         [ObjectDefs.WeaponCrossbow] = "Arrows don't sound the alarm.",
-        [ObjectDefs.WeaponDynamite] = "Blasts 5 tiles around after 5s.",
+        [ObjectDefs.WeaponDynamite] = "Blasts 5 tiles around after 2.5s.",
         [EnemyDefs.Fighter] = "Punches up close. 2 hits.",
         [EnemyDefs.Soldier] = "Shoots a pistol along its row.",
         [EnemyDefs.SuperSoldier] = "Mini gun. A hit demotes it.",
