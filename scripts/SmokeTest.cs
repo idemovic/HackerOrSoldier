@@ -1572,6 +1572,14 @@ public partial class SmokeTest : Node
         Check(minY < y0 - 20, "elevator moves upward");
         Check(y0 - minY <= 134 && maxY - y0 <= 134, "elevator stays within its range");
         editor.StopPlay();
+
+        // Touching elevators are one body, so they cannot drift apart.
+        editor.PaintCell(new Vector2I(9, 8));
+        editor.PaintCell(new Vector2I(9, 9));
+        Check(editor.StartPlay(), "adjacent elevator level starts");
+        var lifts = editor.Session.GetChildren().OfType<MovingPlatform>().ToList();
+        Check(lifts.Count == 1 && lifts[0].Cells.Count == 3, "adjacent elevators form one platform");
+        editor.StopPlay();
     }
 
     // The assault rifle fires a burst of three bullets from the shared pool.

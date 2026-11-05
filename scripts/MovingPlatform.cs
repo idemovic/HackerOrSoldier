@@ -1,3 +1,4 @@
+using System.Collections.Generic;
 using Godot;
 
 namespace HackerOrSoldier;
@@ -12,6 +13,9 @@ public partial class MovingPlatform : AnimatableBody2D
 
     public PlaySession Session { get; set; }
     public bool Vertical { get; set; }
+    // Offsets of the touching cells that make up this platform, so adjacent
+    // pieces move as one body. Defaults to a single cell.
+    public List<Vector2> Cells { get; set; } = new() { Vector2.Zero };
 
     private Vector2 _origin;
     private int _direction;
@@ -30,17 +34,21 @@ public partial class MovingPlatform : AnimatableBody2D
         var rng = new RandomNumberGenerator { Seed = (ulong)GD.Hash(_origin) };
         _speed = Speed * rng.RandfRange(0.85f, 1.15f);
         _delay = rng.RandfRange(0f, 1.5f);
-        AddChild(new CollisionShape2D
+        foreach (var cell in Cells)
         {
-            Position = new Vector2(0, -4),
-            Shape = new RectangleShape2D { Size = new Vector2(32, 12) },
-        });
-        AddChild(new Sprite2D
-        {
-            Texture = Sprites.Get("platform"),
-            Offset = new Vector2(0, -4),
-            Modulate = Vertical ? new Color(0.85f, 0.9f, 1f) : Colors.White,
-        });
+            AddChild(new CollisionShape2D
+            {
+                Position = cell + new Vector2(0, -4),
+                Shape = new RectangleShape2D { Size = new Vector2(32, 12) },
+            });
+            AddChild(new Sprite2D
+            {
+                Texture = Sprites.Get("platform"),
+                Position = cell,
+                Offset = new Vector2(0, -4),
+                Modulate = Vertical ? new Color(0.85f, 0.9f, 1f) : Colors.White,
+            });
+        }
     }
 
     public override void _PhysicsProcess(double delta)
@@ -53,8 +61,13 @@ public partial class MovingPlatform : AnimatableBody2D
         var axis = Vertical ? Vector2.Down : Vector2.Right;
         var next = Position + axis * (_direction * _speed * (float)delta);
         float offset = (next - _origin).Dot(axis);
-        var probe = next + new Vector2(0, -4) + axis * (_direction * 16);
-        if (Mathf.Abs(offset) > Range || TileDefs.Get(Session.TileAtPosition(probe))?.Solid == true)
+        bool blocked = Mathf.Abs(offset) > Range;
+        foreach (var cell in Cells)
+        {
+            var probe = next + cell + new Vector2(0, -4) + axis * (_direction * 16);
+            blocked |= TileDefs.Get(Session.TileAtPosition(probe))?.Solid == true;
+        }
+        if (blocked)
             _direction = -_direction;
         else
             Position = next;

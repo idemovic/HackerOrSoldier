@@ -110,6 +110,7 @@ public partial class PlaySession : Node2D
     private readonly List<WallSwitch> _switches = new();
     private readonly List<Closet> _closets = new();
     private readonly List<Teleporter> _teleports = new();
+    private readonly HashSet<Vector2I> _platformCells = new();
     private bool _teleportLock;
     private readonly HashSet<string> _usbKeys = new();
     private readonly HashSet<string> _circuitsOff = new();
@@ -235,10 +236,10 @@ public partial class PlaySession : Node2D
                         MoveChild(capsule, Agent.GetIndex());   // the agent stands in front of it
                     break;
                 case ObjectDefs.Elevator:
-                    AddChild(new MovingPlatform { Position = pos, Session = this, Vertical = true });
+                    SpawnPlatform(obj, pos, vertical: true);
                     break;
                 case ObjectDefs.MovingPlatform:
-                    AddChild(new MovingPlatform { Position = pos, Session = this, Vertical = false });
+                    SpawnPlatform(obj, pos, vertical: false);
                     break;
                 case ObjectDefs.ElectricDoor:
                     AddChild(new ElectricDoorField { Position = pos, Session = this });
@@ -551,6 +552,33 @@ public partial class PlaySession : Node2D
                     Color = new Color(0.1f, 0.1f, 0.15f, 0.55f),
                     MouseFilter = Control.MouseFilterEnum.Ignore,
                 });
+    }
+
+    // Touching platforms of the same type (sharing an edge) become one body so
+    // they move together. The group spawns at its first cell in object order;
+    // later cells of the group are skipped.
+    private void SpawnPlatform(LevelObject obj, Vector2 pos, bool vertical)
+    {
+        var start = new Vector2I(obj.X, obj.Y);
+        if (!_platformCells.Add(start))
+            return;
+        var same = new HashSet<Vector2I>();
+        foreach (var other in _level.Objects)
+            if (other.Type == obj.Type)
+                same.Add(new Vector2I(other.X, other.Y));
+        int tile = TileSetBuilder.TileSize;
+        var cells = new List<Vector2>();
+        var queue = new Queue<Vector2I>();
+        queue.Enqueue(start);
+        while (queue.Count > 0)
+        {
+            var cell = queue.Dequeue();
+            cells.Add((Vector2)(cell - start) * tile);
+            foreach (var step in new[] { Vector2I.Left, Vector2I.Right, Vector2I.Up, Vector2I.Down })
+                if (same.Contains(cell + step) && _platformCells.Add(cell + step))
+                    queue.Enqueue(cell + step);
+        }
+        AddChild(new MovingPlatform { Position = pos, Session = this, Vertical = vertical, Cells = cells });
     }
 
     // Flood-fills the 4-connected electric floor region under each marker.
