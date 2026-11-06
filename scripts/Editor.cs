@@ -39,7 +39,7 @@ public partial class Editor : Node2D
     private PlaySession _session;
     private HelpOverlay _help;
 
-    public enum Tool { Brush, Rect, Eraser, Picker }
+    public enum Tool { Brush, Fill, Rect, Eraser, Picker }
 
     // What a held mouse button is doing, decided on press.
     private enum Drag { None, Paint, Erase, Rect, Select, Pan }
@@ -141,6 +141,7 @@ public partial class Editor : Node2D
         new("Copy", "Edit", CopySelection, new Chord(Key.C, Ctrl: true)),
         new("Paste", "Edit", () => PasteAt(MouseCell()), new Chord(Key.V, Ctrl: true)),
         new("Brush", "Tools", () => SetTool(Tool.Brush), new Chord(Key.B)),
+        new("Fill", "Tools", () => SetTool(Tool.Fill), new Chord(Key.F)),
         new("Select", "Tools", () => SetTool(Tool.Rect), new Chord(Key.R)),
         new("Eraser", "Tools", () => SetTool(Tool.Eraser), new Chord(Key.E)),
         new("Picker", "Tools", () => SetTool(Tool.Picker), new Chord(Key.Q)),
@@ -259,7 +260,7 @@ public partial class Editor : Node2D
         var cell = MouseCell();
         bool overUi = GetViewport().GuiGetHoveredControl() != null;
         bool inLevel = _level.InBounds(cell.X, cell.Y) && !overUi;
-        _ghost.Visible = inLevel && _drag != Drag.Rect && _tool == Tool.Brush && !AltHeld();
+        _ghost.Visible = inLevel && _drag != Drag.Rect && _tool is (Tool.Brush or Tool.Fill) && !AltHeld();
         _ghost.Position = CellCenter(cell);
         _cellLabel.Text = inLevel ? $"{cell.X},{cell.Y}" : "";
         _overlay.QueueRedraw();
@@ -401,6 +402,9 @@ public partial class Editor : Node2D
             case MouseButton.Left when button.ShiftPressed:
                 _drag = Drag.Rect;
                 _rectErase = _tool == Tool.Eraser;
+                break;
+            case MouseButton.Left when _tool == Tool.Fill:
+                FillAt(cell);
                 break;
             case MouseButton.Left when _tool == Tool.Rect:
                 _drag = Drag.Select;
@@ -640,10 +644,11 @@ public partial class Editor : Node2D
             : new PaletteEntry(objectType ?? TileDefs.Get(tileId)?.Name ?? $"Tile {tileId}", tileId, objectType);
     }
 
+    // Choosing a tile keeps the Fill tool; anything else goes back to the brush.
     private void SelectBrush(PaletteEntry entry)
     {
         _brush = entry;
-        ChangeTool(Tool.Brush);
+        ChangeTool(_tool == Tool.Fill && entry.IsTile ? Tool.Fill : Tool.Brush);
         var (category, _) = EditorPalette.Find(entry.TileId, entry.ObjectType);
         if (category >= 0 && category != _category)
             ShowCategory(category);
@@ -734,6 +739,32 @@ public partial class Editor : Node2D
         }
         else
             PlaceObject(cell, _brush.ObjectType);
+    }
+
+    // Paint bucket: the brush tile replaces the clicked cell and every
+    // connected cell of the same tile (empty included), as one undo step.
+    public void FillAt(Vector2I cell)
+    {
+        if (!_level.InBounds(cell.X, cell.Y))
+            return;
+        if (!_brush.IsTile)
+        {
+            SetStatus("Fill paints tiles. Pick a wall or other tile first.", warn: true);
+            return;
+        }
+        int tile = PaintedTile();
+        if (_level.GetTile(cell.X, cell.Y) == tile)
+            return;
+        var region = _level.FillRegion(cell);
+        if (region.Count == 0)
+            return;
+        RecordUndo();
+        foreach (var c in region)
+        {
+            _level.SetTile(c.X, c.Y, tile);
+            _grids.SetCell(c, tile);
+        }
+        SetStatus($"Filled {region.Count} cells with {_brush.Name}.");
     }
 
     public void EraseCell(Vector2I cell)

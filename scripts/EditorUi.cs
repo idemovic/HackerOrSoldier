@@ -94,13 +94,14 @@ public partial class Editor
         row.AddChild(new VSeparator());
         foreach (var (tool, icon, name) in new[]
                  {
-                     (Tool.Brush, "brush", "Brush"), (Tool.Rect, "rect", "Select"),
+                     (Tool.Brush, "brush", "Brush"), (Tool.Fill, "fill", "Fill"), (Tool.Rect, "rect", "Select"),
                      (Tool.Eraser, "eraser", "Eraser"), (Tool.Picker, "picker", "Picker"),
                  })
         {
             var button = IconButton(icon, Command(name), toggle: true);
             button.TooltipText += tool switch
             {
+                Tool.Fill => "\nClick fills the connected area of the same tile\n(or of empty cells) with the brush tile",
                 Tool.Rect => "\nCtrl+C copies, Ctrl+V pastes at the cursor\nEsc, right click or another tool clears it\nShift+drag still fills a rectangle",
                 Tool.Eraser => "\nor right mouse button",
                 Tool.Picker => "\nor Alt+click",
@@ -499,7 +500,7 @@ public partial class Editor
         if (_brush == null)
             return;
         var entries = EditorPalette.Categories[_category].Entries;
-        bool painting = _tool == Tool.Brush;
+        bool painting = _tool is Tool.Brush or Tool.Fill;
         for (int i = 0; i < _slots.Count; i++)
             _slots[i].SetPressedNoSignal(painting && entries[i] == _brush);
         foreach (var (tool, button) in _toolButtons)
@@ -517,6 +518,7 @@ public partial class Editor
             Tool.Eraser => "Eraser",
             Tool.Picker => "Picker",
             Tool.Rect => "Select",
+            Tool.Fill => $"Fill: {_brush.Name}",
             _ => _brush.Name,
         };
         bool hasColor = painting && _brush.ObjectType != null && ObjectDefs.HasColorProperty(_brush.ObjectType);

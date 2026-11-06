@@ -359,6 +359,8 @@ public partial class SmokeTest : Node
         Check(editor.Level.GetTile(6, 4) == TileDefs.Empty && editor.Level.GetTile(8, 5) == TileDefs.Empty,
             "one undo reverts the whole rectangle");
 
+        FillCheck(editor);
+
         editor.SetBrushObject(ObjectDefs.Door, "red");
         editor._UnhandledInput(KeyEvent(Key.Bracketright));
         Check(editor.BrushColor == "blue", "] steps the door color");
@@ -376,6 +378,55 @@ public partial class SmokeTest : Node
         editor._UnhandledInput(KeyEvent(Key.Minus));
         editor._UnhandledInput(KeyEvent(Key.Equal));
         Check(editor.ViewCenter.DistanceTo(center) < 1f, "zooming out and back in keeps the view");
+    }
+
+    // The Fill tool floods the clicked tile's connected area with the brush tile.
+    private void FillCheck(Editor editor)
+    {
+        // A 5x4 box of walls with a red brick inside and a health kit inside.
+        var level = LevelData.NewDefault(20, 20);
+        for (int x = 2; x <= 6; x++)
+        {
+            level.SetTile(x, 2, TileDefs.Wall);
+            level.SetTile(x, 5, TileDefs.Wall);
+        }
+        for (int y = 2; y <= 5; y++)
+        {
+            level.SetTile(2, y, TileDefs.Wall);
+            level.SetTile(6, y, TileDefs.Wall);
+        }
+        level.SetTile(3, 3, TileDefs.RedBrick);
+        level.Objects.Add(new LevelObject { Type = ObjectDefs.HealthKit, X = 5, Y = 4 });
+        editor.SetLevel(level);
+
+        editor._UnhandledInput(KeyEvent(Key.F));
+        Check(editor.CurrentTool == Editor.Tool.Fill, "F picks the Fill tool");
+        editor.SetBrushTile(TileDefs.Lava);
+        Check(editor.CurrentTool == Editor.Tool.Fill, "choosing a tile keeps the Fill tool");
+
+        editor.FillAt(new Vector2I(4, 3));
+        Check(editor.Level.GetTile(4, 3) == TileDefs.Lava && editor.Level.GetTile(3, 4) == TileDefs.Lava
+                && editor.Level.GetTile(4, 4) == TileDefs.Lava,
+            "fill covers the empty cells inside the box");
+        Check(editor.Level.GetTile(3, 3) == TileDefs.RedBrick, "fill skips cells of another tile");
+        Check(editor.Level.GetTile(5, 4) == TileDefs.Empty, "fill leaves a cell holding an object alone");
+        Check(editor.Level.GetTile(2, 3) == TileDefs.Wall && editor.Level.GetTile(1, 1) == TileDefs.Empty,
+            "fill stops at the walls");
+
+        editor.SetBrushTile(TileDefs.RedBrick);
+        editor.FillAt(new Vector2I(2, 2));
+        int bricks = 0;
+        for (int x = 2; x <= 6; x++)
+            for (int y = 2; y <= 5; y++)
+                bricks += editor.Level.GetTile(x, y) == TileDefs.RedBrick ? 1 : 0;
+        Check(bricks == 15, "filling a wall repaints the whole connected wall");
+        editor.Undo();
+        Check(editor.Level.GetTile(2, 2) == TileDefs.Wall && editor.Level.GetTile(6, 5) == TileDefs.Wall,
+            "one undo reverts the whole fill");
+
+        editor.SetBrushObject(ObjectDefs.Door, "red");
+        Check(editor.CurrentTool == Editor.Tool.Brush, "choosing an object leaves the Fill tool");
+        editor.SetTool(Editor.Tool.Brush);
     }
 
     // The Select tool picks an area; Ctrl+C / Ctrl+V move it around.

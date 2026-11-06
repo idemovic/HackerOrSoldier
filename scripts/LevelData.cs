@@ -45,6 +45,32 @@ public class LevelData
             Tiles[y * Width + x] = tileId;
     }
 
+    // The cells a paint bucket fills from start: every cell reachable through
+    // edge neighbours that holds the same tile. Cells holding an object are
+    // left out, so a fill never buries one.
+    public List<Vector2I> FillRegion(Vector2I start)
+    {
+        var region = new List<Vector2I>();
+        if (!InBounds(start.X, start.Y))
+            return region;
+        int target = GetTile(start.X, start.Y);
+        var occupied = Objects.Select(o => new Vector2I(o.X, o.Y)).ToHashSet();
+        var seen = new HashSet<Vector2I> { start };
+        var open = new Stack<Vector2I>();
+        open.Push(start);
+        while (open.Count > 0)
+        {
+            var cell = open.Pop();
+            if (GetTile(cell.X, cell.Y) != target || occupied.Contains(cell))
+                continue;
+            region.Add(cell);
+            foreach (var next in new[] { cell + Vector2I.Left, cell + Vector2I.Right, cell + Vector2I.Up, cell + Vector2I.Down })
+                if (InBounds(next.X, next.Y) && seen.Add(next))
+                    open.Push(next);
+        }
+        return region;
+    }
+
     public LevelData Clone() => new()
     {
         FormatVersion = FormatVersion,
