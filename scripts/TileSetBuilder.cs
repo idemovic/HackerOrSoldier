@@ -696,12 +696,14 @@ public static class TileSetBuilder
     private const int BoxLo = 6, BoxSize = 20;
     private const int Far = 1000;   // a run that carries on into the neighbour
     private static readonly Vector3 PipeLight = new Vector3(-0.45f, -0.6f, 0.66f).Normalized();
+    private static readonly Color PipeShadow = new(0f, 0f, 0f, 0.45f);
 
     // One thick pipe per tile that runs on into every neighbouring pipe:
     // straight through a line (capped where a run ends), a curved elbow at a
     // bend, a riveted junction box at a tee or cross. Each linked side ends
     // in half a flange, so two tiles meet in one whole coupling at their
-    // seam. The pipe casts a short shadow down-right onto a dark backplate.
+    // seam. The tile is see-through around the pipe, apart from a short
+    // translucent shadow cast down-right onto whatever lies behind.
     private static Image BuildPipeImage(PipeLinks links)
     {
         bool up = links.HasFlag(PipeLinks.Up), right = links.HasFlag(PipeLinks.Right);
@@ -725,7 +727,7 @@ public static class TileSetBuilder
             if (vertical ? !down : !right) flanges.Add((vertical, 26, 28));
         }
 
-        // The pipe colour at a pixel, or null for backplate. Pixels just
+        // The pipe colour at a pixel, or null where it is see-through. Pixels just
         // outside the tile resolve too, so shadows cross the seam.
         Color? Pipe(int x, int y)
         {
@@ -767,8 +769,10 @@ public static class TileSetBuilder
             for (int x = 0; x < TileSize; x++)
             {
                 bool shadow = Pipe(x - 1, y - 1) != null || Pipe(x - 2, y - 2) != null;
-                img.SetPixel(x, y, Pipe(x, y)
-                    ?? (shadow ? PlateRamp[0] : Tone(PlateRamp, 1.4f + 0.8f * (Smooth(x, y, 8, 104) - 0.5f), x, y)));
+                if (Pipe(x, y) is Color pipe)
+                    img.SetPixel(x, y, pipe);
+                else if (shadow)
+                    img.SetPixel(x, y, PipeShadow);
             }
         if (box)
         {
