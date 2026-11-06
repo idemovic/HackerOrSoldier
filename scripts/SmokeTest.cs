@@ -1674,9 +1674,27 @@ public partial class SmokeTest : Node
         editor.SetBrushObject(CollectibleDefs.BusinessCard);
         editor.PaintCell(new Vector2I(12, 10));
         Check(editor.StartPlay(), "collectible level starts");
+        var scoreLabel = editor.Session.FindChildren("*", "", true, false).OfType<RollingLabel>().Last();
+        var shownScores = new HashSet<string>();
+        bool popupSeen = false;
         Input.ActionPress("move_right");
-        await Frames(40);
+        for (int i = 0; i < 40; i++)
+        {
+            await Frames(1);
+            shownScores.Add(scoreLabel.Text);
+            popupSeen |= editor.Session.GetChildren().OfType<FloatingNumber>().Any(p => p.Amount == 25000);
+        }
         Input.ActionRelease("move_right");
+        Check(popupSeen, "the diamond's +25000 rises off the agent");
+        for (int i = 0; i < 80; i++)
+        {
+            await Frames(1);
+            shownScores.Add(scoreLabel.Text);
+        }
+        Check(shownScores.Any(s => int.TryParse(s, out int n) && n > 0 && n < 25000),
+            "the HUD score ticks up through the values in between");
+        Check(scoreLabel.Text == "25000", "the HUD score settles on the new total");
+        Check(!editor.Session.GetChildren().OfType<FloatingNumber>().Any(), "the score popup goes away");
         Check(editor.Session.Score == 25000, "diamond is worth 25k score");
         Check(editor.Session.CoinsCollected == 7, "diamond is worth 7 coins");
         Check(editor.Session.CompletenessPercent == 50, "completeness counts collected collectibles");

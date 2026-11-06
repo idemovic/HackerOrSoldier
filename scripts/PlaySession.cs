@@ -129,11 +129,12 @@ public partial class PlaySession : Node2D
     private Vector2I _spikeCoords = new(-1, -1);
     private readonly List<Vector2I> _spearCells = new();
     private int _spearFrame = -1;
-    private HBoxContainer _hearts;
+    private HeartRow _hearts;
     private TextureRect _weaponIcon;
-    private Label _weaponCount;
+    private RollingLabel _weaponCount;
+    private string _hudWeapon;
     private HBoxContainer _scoreStat;
-    private Label _scoreCount;
+    private RollingLabel _scoreCount;
     private Label _hud;
     private Label _activatePrompt;
     private readonly string _activateKey = HelpOverlay.KeysFor("activate");   // keys are rebound only in the main menu
@@ -304,12 +305,12 @@ public partial class PlaySession : Node2D
         };
         hudRow.AddThemeConstantOverride("separation", 8);
         canvas.AddChild(hudRow);
-        _hearts = new HBoxContainer();
+        _hearts = new HeartRow();
         hudRow.AddChild(_hearts);
         _weaponIcon = new TextureRect { StretchMode = TextureRect.StretchModeEnum.KeepCentered };
-        _weaponCount = new Label { VerticalAlignment = VerticalAlignment.Center };
+        _weaponCount = new RollingLabel { VerticalAlignment = VerticalAlignment.Center };
         hudRow.AddChild(HudStat(_weaponIcon, _weaponCount));
-        _scoreCount = new Label { VerticalAlignment = VerticalAlignment.Center };
+        _scoreCount = new RollingLabel { VerticalAlignment = VerticalAlignment.Center };
         _scoreStat = HudStat(new TextureRect
         {
             Texture = Sprites.Get("score"),
@@ -861,6 +862,7 @@ public partial class PlaySession : Node2D
         // The life is gone the moment the hit lands; only the respawn waits
         // for the death sequence to play out.
         Lives--;
+        ShowChange(Sprites.Get("heart"), -1, LossColor);
         _agentDown = true;
         _failAfterDeath = Lives <= 0;
         Sfx.Play(_failAfterDeath ? Sound.Death : Sound.Hurt);
@@ -918,10 +920,12 @@ public partial class PlaySession : Node2D
                 break;
             case ObjectDefs.HealthKit:
                 Lives++;
+                ShowChange(Sprites.Get("heart"), 1, LifeColor);
                 Sfx.Play(Sound.PickupHealth);
                 break;
             case ObjectDefs.AmmoPack:
                 Ammo += 10;
+                ShowChange(Sprites.Trimmed(ObjectDefs.AmmoPack), 10, AmmoColor);
                 Sfx.Play(Sound.PickupAmmo);
                 break;
             case ObjectDefs.Vest:
@@ -945,21 +949,25 @@ public partial class PlaySession : Node2D
             case ObjectDefs.WeaponAssaultRifle:
                 Weapon = "assault_rifle";
                 Ammo += 10;
+                ShowChange(Sprites.Trimmed(ObjectDefs.WeaponAssaultRifle), 10, AmmoColor);
                 Sfx.Play(Sound.PickupWeapon);
                 break;
             case ObjectDefs.WeaponMinigun:
                 Weapon = "minigun";
                 Ammo += 20;
+                ShowChange(Sprites.Trimmed(ObjectDefs.WeaponMinigun), 20, AmmoColor);
                 Sfx.Play(Sound.PickupWeapon);
                 break;
             case ObjectDefs.WeaponCrossbow:
                 Weapon = "crossbow";
                 Arrows += 20;
+                ShowChange(Sprites.Trimmed(ObjectDefs.WeaponCrossbow), 20, AmmoColor);
                 Sfx.Play(Sound.PickupWeapon);
                 break;
             case ObjectDefs.WeaponDynamite:
                 Weapon = "dynamite";
                 DynamiteSticks += 3;
+                ShowChange(Sprites.Trimmed(ObjectDefs.WeaponDynamite), 3, AmmoColor);
                 Sfx.Play(Sound.PickupWeapon);
                 break;
             default:
@@ -968,6 +976,7 @@ public partial class PlaySession : Node2D
                 {
                     var jingle = Sound.Coin;
                     Score += collectible.Score;
+                    ShowChange(Sprites.Get("score"), collectible.Score, ScoreColor);
                     CoinsCollected += collectible.Coins;
                     if (pickup.FromLevel)
                         _collectibleGot++;
@@ -977,6 +986,7 @@ public partial class PlaySession : Node2D
                         if (_letters.Count == CollectibleDefs.LetterTypes.Length)
                         {
                             Score += CollectibleDefs.LetterSetBonusScore;
+                            ShowChange(Sprites.Get("score"), CollectibleDefs.LetterSetBonusScore, ScoreColor);
                             CoinsCollected += CollectibleDefs.LetterSetBonusCoins;
                             jingle = Sound.LetterBonus;
                         }
@@ -987,6 +997,30 @@ public partial class PlaySession : Node2D
         }
         pickup.QueueFree();
         UpdateHud();
+    }
+
+    private static readonly Color ScoreColor = new(1f, 0.85f, 0.3f);
+    private static readonly Color AmmoColor = new(0.95f, 0.95f, 0.85f);
+    private static readonly Color LifeColor = new(0.5f, 1f, 0.5f);
+    private static readonly Color LossColor = new(1f, 0.35f, 0.3f);
+
+    // A number rises off the agent's head for each change to score, ammo or
+    // lives; the ones already up step aside for it.
+    private void ShowChange(Texture2D icon, int amount, Color color)
+    {
+        if (Agent == null)
+            return;
+        foreach (var child in GetChildren())
+            if (child is FloatingNumber older)
+                older.MakeRoom();
+        AddChild(new FloatingNumber
+        {
+            Follow = Agent,
+            Position = Agent.Position,
+            Icon = icon,
+            Amount = amount,
+            Color = color,
+        });
     }
 
     private static string ColorOf(LevelObject obj) =>
@@ -1008,23 +1042,14 @@ public partial class PlaySession : Node2D
         };
         _weaponIcon.Texture = Sprites.Trimmed(weaponSprite);
         _weaponCount.Visible = weaponCount != null;
-        _weaponCount.Text = weaponCount.ToString();
+        if (weaponSprite != _hudWeapon)
+            _weaponCount.Snap(weaponCount ?? 0);   // another pool: no roll up from the old one
+        else
+            _weaponCount.Value = weaponCount ?? 0;
+        _hudWeapon = weaponSprite;
         _scoreStat.Visible = Score > 0;
-        _scoreCount.Text = Score.ToString();
-
-        int hearts = Mathf.Max(Lives, 0);
-        while (_hearts.GetChildCount() > hearts)
-        {
-            var heart = _hearts.GetChild(_hearts.GetChildCount() - 1);
-            _hearts.RemoveChild(heart);
-            heart.QueueFree();
-        }
-        while (_hearts.GetChildCount() < hearts)
-            _hearts.AddChild(new TextureRect
-            {
-                Texture = Sprites.Get("heart"),
-                StretchMode = TextureRect.StretchModeEnum.KeepCentered,
-            });
+        _scoreCount.Value = Score;
+        _hearts.Count = Mathf.Max(Lives, 0);
 
         var parts = new List<string>();
         if (_keys.Count > 0)
