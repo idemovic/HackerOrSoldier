@@ -1493,6 +1493,12 @@ public partial class SmokeTest : Node
         await Frames(2);
         Check(editor.Session.TileAt(stone.X, stone.Y) == TileDefs.Empty && editor.Session.TileAt(red.X, red.Y) == TileDefs.Empty,
             "explosions break colored destructible walls");
+        var debris = editor.Session.GetChildren().OfType<WallDebris>().ToArray();
+        Check(debris.Length == 2 && debris.Select(d => d.TileId).OrderBy(id => id)
+                .SequenceEqual(new[] { TileDefs.DestructibleRed, TileDefs.DestructibleStone }.OrderBy(id => id)),
+            "each broken wall throws debris made from its own tile");
+        await Frames(Mathf.CeilToInt(debris[0].Lifetime * 60) + 10);
+        Check(!editor.Session.GetChildren().OfType<WallDebris>().Any(), "wall debris clears itself away");
         editor.StopPlay();
     }
 

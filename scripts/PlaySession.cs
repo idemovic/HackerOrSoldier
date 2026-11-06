@@ -479,7 +479,9 @@ public partial class PlaySession : Node2D
     public void DestroyTile(Vector2I cell)
     {
         int tile = TileSetBuilder.TileSize;
-        Sfx.PlayAt(Sound.WallCrumble, new Vector2(cell.X * tile + tile / 2f, cell.Y * tile + tile / 2f));
+        var center = new Vector2(cell.X * tile + tile / 2f, cell.Y * tile + tile / 2f);
+        Sfx.PlayAt(Sound.WallCrumble, center);
+        AddChild(new WallDebris { Position = center, TileId = TileAt(cell.X, cell.Y) });
         _destroyed.Add(cell);
         _grids.EraseCell(cell);
     }
