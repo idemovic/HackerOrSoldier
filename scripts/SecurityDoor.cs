@@ -9,21 +9,16 @@ public partial class SecurityDoor : SlidingDoor
 {
     public string Number { get; set; } = "1";
 
-    private Label _label;
+    private CircuitMark _mark;
 
     protected override Texture2D PanelTexture => Sprites.Get(ObjectDefs.SecurityDoor);
 
     public override void _Ready()
     {
         base._Ready();
-        _label = new Label
-        {
-            Text = Number,
-            Position = new Vector2(-4, -30),
-            Theme = new Theme { DefaultFontSize = 10 },
-        };
-        AddChild(_label);
+        _mark = new CircuitMark { Number = Number };
+        AddChild(_mark);
     }
 
-    protected override void OnOpened() => _label.Visible = false;
+    protected override void OnOpened() => _mark.Visible = false;
 }

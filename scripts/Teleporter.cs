@@ -4,8 +4,9 @@ namespace HackerOrSoldier;
 
 // One teleport of a pair (README: entering one makes the agent appear in the
 // other): a floor pad with an emitter over the agent's head. Teleports pair
-// by number property; PlaySession handles the actual teleporting and calls
-// Open on both ends, which swirls a portal between the two platforms.
+// by number, shown as a colored line under the pad; PlaySession handles the
+// actual teleporting and calls Open on both ends, which swirls a portal
+// between the two platforms.
 public partial class Teleporter : Node2D
 {
     private const float PortalTime = 0.7f;
@@ -26,12 +27,7 @@ public partial class Teleporter : Node2D
             Texture = texture,
             Offset = new Vector2(0, 16 - texture.GetHeight() / 2f),
         });
-        AddChild(new Label
-        {
-            Text = Number,
-            Position = new Vector2(-4, -46),
-            Theme = new Theme { DefaultFontSize = 10 },
-        });
+        AddChild(new CircuitMark { Number = Number });
     }
 
     public void Open()

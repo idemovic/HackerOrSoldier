@@ -1577,6 +1577,10 @@ public static class Sprites
             "................",
             "................",
             "................",
+            "................",
+            "................",
+            "................",
+            "................",
             ".....gggggg.....",
             "....gggggggg....",
             "....gggggggg....",
@@ -1585,10 +1589,6 @@ public static class Sprites
             "....gggggggg....",
             "....gggggggg....",
             "...dddddddddd...",
-            "................",
-            "................",
-            "................",
-            "................",
         }),
         // Decorations. The clock and poster hang on the wall and are drawn at
         // native 32x32 for the digits and the lettering; the rest stand on

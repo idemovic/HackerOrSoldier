@@ -2149,7 +2149,10 @@ public partial class SmokeTest : Node
         await Frames(60);
         Input.ActionRelease("move_right");
         float x = editor.PlayerAgent.Position.X;
-        Check(x > 150 && x < 185, "plant is walk-through, crate is solid");
+        Check(x > 6 * 32 + 32, $"plant and crate are walk-through (agent x {x})");
+        var layer = editor.Session.GetNode<Node2D>("Decorations");
+        Check(layer.GetChildCount() == 2 && layer.GetIndex() < editor.PlayerAgent.GetIndex() && layer.ZIndex == editor.PlayerAgent.ZIndex,
+            "decorations draw behind the agent");
         Check(editor.Session.GetChildren().OfType<LevelLight>().Any(), "light spawns in play mode");
         editor.StopPlay();
     }

@@ -214,6 +214,21 @@ public static class ObjectDefs
     // computer with the matching number. Teleports pair by number too.
     public static readonly string[] Numbers = { "1", "2", "3", "4", "5", "6", "7", "8" };
 
+    // In the world a circuit or teleport pair shows as a colored line along
+    // the bottom of each member, one color per number.
+    private static readonly (string Name, Color Color)[] CircuitColors =
+    {
+        ("red", new Color("e83b3b")), ("orange", new Color("f08a24")), ("yellow", new Color("f2e03a")),
+        ("green", new Color("3bd45a")), ("cyan", new Color("3fd8e8")), ("blue", new Color("3b6ef0")),
+        ("purple", new Color("b04be8")), ("white", new Color("f0f0f0")),
+    };
+
+    public static Color CircuitColor(string number) => CircuitColors[CircuitIndex(number)].Color;
+
+    public static string CircuitColorName(string number) => CircuitColors[CircuitIndex(number)].Name;
+
+    private static int CircuitIndex(string number) => Mathf.Max(0, System.Array.IndexOf(Numbers, number));
+
     public static bool HasNumberProperty(string type) =>
         type is Computer or UsbKey or Switch or Laser or Teleport or SecurityDoor or FloorCircuit;
 

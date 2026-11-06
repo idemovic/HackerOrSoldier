@@ -1,4 +1,5 @@
 using System.Collections.Generic;
+using System.Linq;
 using Godot;
 
 namespace HackerOrSoldier;
@@ -160,6 +161,8 @@ public partial class PlaySession : Node2D
         for (int i = 0; i < (_run?.Briefcases ?? 0); i++)
             _heldItems.Add(ObjectDefs.Briefcase);
 
+        var decorations = new Node2D { Name = "Decorations" };
+        AddChild(decorations);   // first child, so everything that moves draws over it
         foreach (var obj in _level.Objects)
         {
             var pos = new Vector2(obj.X * tile + tile / 2f, obj.Y * tile + tile / 2f);
@@ -267,7 +270,7 @@ public partial class PlaySession : Node2D
                     var decoDef = DecorationDefs.Get(obj.Type);
                     if (decoDef != null)
                     {
-                        AddChild(new Decoration { Position = pos, Def = decoDef });
+                        decorations.AddChild(new Decoration { Position = pos, Def = decoDef });
                         break;
                     }
                     var pickup = new Pickup { Position = pos, Source = obj, FromLevel = true };
@@ -755,11 +758,18 @@ public partial class PlaySession : Node2D
     }
 
     // README: tombstones are collectibles worth 1k score.
+    // The stone rests on the floor below the body, even if the soldier died
+    // mid-fall: it takes the bottom of the first cell above solid ground.
     public void SpawnTombstone(Vector2 at)
     {
+        int tile = TileSetBuilder.TileSize;
+        int x = (int)Mathf.Floor(at.X / tile);
+        int y = (int)Mathf.Floor(at.Y / tile);
+        while (y < _level.Height - 1 && TileDefs.Get(TileAt(x, y + 1))?.Solid != true)
+            y++;
         var pickup = new Pickup
         {
-            Position = at,
+            Position = new Vector2(at.X, y * tile + tile / 2f),
             Source = new LevelObject { Type = CollectibleDefs.Tombstone },
         };
         pickup.Collected += OnPickup;
@@ -1020,15 +1030,21 @@ public partial class PlaySession : Node2D
         if (_keys.Count > 0)
             parts.Add("Keys: " + string.Join(" ", _keys));
         if (_usbKeys.Count > 0)
-            parts.Add("USB: " + string.Join(" ", _usbKeys));
+            parts.Add("USB: " + string.Join(" ", _usbKeys.Select(ObjectDefs.CircuitColorName)));
         if (Agent != null && Agent.IsHiding)
             parts.Add("Hidden");
         if (CoinsCollected > 0)
             parts.Add($"Coins +{CoinsCollected}");
         if (HasVest)
             parts.Add("Vest");
-        foreach (var item in _heldItems)
-            parts.Add((item == ObjectDefs.InfraGoggles ? "Goggles" : "Briefcase") + $" (press {_activateKey})");
+        string manual = HeldManualItem();
+        foreach (var (item, name) in new[] { (ObjectDefs.InfraGoggles, "Goggles"), (ObjectDefs.Briefcase, "Briefcase") })
+        {
+            int count = _heldItems.FindAll(held => held == item).Count;
+            if (count == 0)
+                continue;
+            parts.Add(name + (count > 1 ? $" x{count}" : "") + (item == manual ? $" (press {_activateKey})" : ""));
+        }
         if (GogglesActive)
             parts.Add($"Infra {Mathf.CeilToInt(_gogglesTime)}s");
         if (_disguiseTime > 0)

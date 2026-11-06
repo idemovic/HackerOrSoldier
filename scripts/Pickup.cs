@@ -24,6 +24,8 @@ public partial class Pickup : Area2D
         });
         Source.Properties.TryGetValue("color", out var colorName);
         AddChild(new Sprite2D { Texture = Sprites.ForObject(Source.Type, colorName) });
+        if (ObjectDefs.HasNumberProperty(Source.Type) && Source.Properties.TryGetValue("number", out var number))
+            AddChild(new CircuitMark { Number = number });
         BodyEntered += body =>
         {
             if (body is Agent)

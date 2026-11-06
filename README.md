@@ -87,8 +87,8 @@ Fulfill strictly decorative / visual aspect of the game.
 - Toilet
 - Pipes
 - Signs (Beware the dogs, Server room, WC, Biohazard, Fire danger, Pointing arrows)
-- Tables and stools - can be jumped on
-- Crates (wooden / steel) - can be jumped on
+- Tables and stools
+- Crates (wooden / steel)
 
 #### Killing terrain
 - Water floor - allows slower movement horizontally, contains electric eels

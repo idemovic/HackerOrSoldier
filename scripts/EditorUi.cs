@@ -238,9 +238,12 @@ public partial class Editor
                 ThemeTypeVariation = EditorTheme.Chip,
                 ToggleMode = true,
                 FocusMode = Control.FocusModeEnum.None,
-                TooltipText = $"Circuit {number}  ([ / ])",
+                TooltipText = $"Circuit {number}, {ObjectDefs.CircuitColorName(number)} line  ([ / ])",
                 CustomMinimumSize = new Vector2(10, 0),
             };
+            var color = ObjectDefs.CircuitColor(number);
+            foreach (var state in new[] { "font_color", "font_hover_color", "font_pressed_color", "font_hover_pressed_color" })
+                chip.AddThemeColorOverride(state, color);
             chip.Pressed += () =>
             {
                 _brushNumber = captured;

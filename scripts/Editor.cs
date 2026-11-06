@@ -906,14 +906,7 @@ public partial class Editor : Node2D
                 FlipH = ObjectDefs.FacesLeft(obj),
             };
             if (ObjectDefs.HasNumberProperty(obj.Type) && obj.Properties.TryGetValue("number", out var number))
-                marker.AddChild(new Label
-                {
-                    Text = number,
-                    Position = new Vector2(-14, -16),
-                    Theme = _theme,
-                    ThemeTypeVariation = EditorTheme.ShiftBadge,
-                    MouseFilter = Control.MouseFilterEnum.Ignore,
-                });
+                marker.AddChild(new CircuitMark { Number = number });
             _markers.AddChild(marker);
         }
     }

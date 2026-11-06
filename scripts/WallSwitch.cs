@@ -15,12 +15,7 @@ public partial class WallSwitch : Node2D
     {
         _sprite = new Sprite2D { Texture = Sprites.Get(ObjectDefs.Switch) };
         AddChild(_sprite);
-        AddChild(new Label
-        {
-            Text = Number,
-            Position = new Vector2(-4, -28),
-            Theme = new Theme { DefaultFontSize = 10 },
-        });
+        AddChild(new CircuitMark { Number = Number });
     }
 
     public void Activate()
