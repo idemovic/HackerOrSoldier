@@ -37,6 +37,7 @@ public partial class Editor : Node2D
     private Sprite2D _ghost;
     private Camera2D _camera;
     private PlaySession _session;
+    private HelpOverlay _help;
 
     public enum Tool { Brush, Rect, Eraser, Picker }
 
@@ -240,6 +241,7 @@ public partial class Editor : Node2D
 
     public override void _Process(double delta)
     {
+        UpdatePlayHelp();
         if (IsPlaying)
             return;
         if (!DialogOpen && !Input.IsKeyPressed(Key.Ctrl) && !Input.IsKeyPressed(Key.Alt))
@@ -261,6 +263,28 @@ public partial class Editor : Node2D
         _ghost.Position = CellCenter(cell);
         _cellLabel.Text = inLevel ? $"{cell.X},{cell.Y}" : "";
         _overlay.QueueRedraw();
+    }
+
+    // Holding the help key in a playtest shows the game's help screen and
+    // freezes only the session, so the editor's own input keeps working.
+    // Polled like GameFlow's, so a release lost to a focus change still closes it.
+    private void UpdatePlayHelp()
+    {
+        bool held = IsPlaying && Input.IsActionPressed(HelpOverlay.Action);
+        if (held == (_help != null))
+            return;
+        if (held)
+        {
+            _help = new HelpOverlay(_level);
+            AddChild(_help);
+        }
+        else
+        {
+            _help.QueueFree();
+            _help = null;
+        }
+        if (IsPlaying)
+            _session.ProcessMode = held ? ProcessModeEnum.Disabled : ProcessModeEnum.Inherit;
     }
 
     private static bool AltHeld() => Input.IsKeyPressed(Key.Alt);

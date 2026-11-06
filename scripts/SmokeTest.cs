@@ -64,6 +64,7 @@ public partial class SmokeTest : Node
         await DisguiseCheck();
         await EnemyDisguiseCheck();
         await ClosetCheck();
+        await PlaytestHelpCheck();
         await BarrelCheck(ObjectDefs.Barrel);
         await BarrelCheck(ObjectDefs.SteelBarrel);
         await CollectibleCheck();
@@ -1562,6 +1563,28 @@ public partial class SmokeTest : Node
             fired = session.GetChildren().OfType<EnemyBullet>().Any();
         }
         Check(fired, "the soldier fires once the disguise ends");
+        editor.StopPlay();
+    }
+
+    // Holding the help key in an editor playtest shows the help screen and
+    // freezes the level; releasing it resumes play.
+    private async Task PlaytestHelpCheck()
+    {
+        var editor = await FreshEditor();
+        Check(editor.StartPlay(), "playtest help level starts");
+        await Frames(10);
+        Input.ActionPress(HelpOverlay.Action);
+        Input.ActionPress("move_right");
+        await Frames(5);
+        float frozenX = editor.PlayerAgent.Position.X;
+        await Frames(20);
+        Check(editor.GetChildren().OfType<HelpOverlay>().Any(), "holding help in a playtest shows the help screen");
+        Check(editor.PlayerAgent.Position.X == frozenX, "the level stays frozen under the help screen");
+        Input.ActionRelease(HelpOverlay.Action);
+        await Frames(20);
+        Input.ActionRelease("move_right");
+        Check(!editor.GetChildren().OfType<HelpOverlay>().Any(), "releasing help closes the help screen");
+        Check(editor.PlayerAgent.Position.X > frozenX, "play resumes after the help screen closes");
         editor.StopPlay();
     }
 
