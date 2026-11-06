@@ -17,6 +17,16 @@ public enum ShadowMask { None = 0, Above = 1, Left = 2, Below = 4 }
 [Flags]
 public enum PipeLinks { None = 0, Up = 1, Right = 2, Down = 4, Left = 8 }
 
+// Which neighbours of a solid cell are solid too. A side without a solid
+// neighbour gets a finished rim; a diagonal only matters when both sides
+// next to it are joined, where a missing one leaves an inner corner.
+[Flags]
+public enum WallJoins
+{
+    None = 0, Up = 1, Right = 2, Down = 4, Left = 8,
+    UpRight = 16, DownRight = 32, DownLeft = 64, UpLeft = 128,
+}
+
 // Builds the TileSet at runtime: pixel-art 32x32 tiles in the README
 // aesthetic (VGA-style saturated colors, ordered dithering, light from the
 // top left), with a collision square on solid tiles. No binary assets.
@@ -61,7 +71,21 @@ public static class TileSetBuilder
     // The circuit board: a Span x Span block of tiles, picked per cell.
     private const int CircuitRow = 7;
     private const int RockRow = CircuitRow + CircuitBoard.Span;
-    private const int AtlasRows = RockRow + RockFace.Span;
+    // Rimmed solid tiles: one row per tile, one column per distinct set of
+    // joins (47 once diagonals that cannot matter are dropped).
+    public const int RimRow = RockRow + RockFace.Span;
+    private static readonly (WallJoins Diagonal, WallJoins Vertical, WallJoins Horizontal)[] Diagonals =
+    {
+        (WallJoins.UpRight, WallJoins.Up, WallJoins.Right),
+        (WallJoins.DownRight, WallJoins.Down, WallJoins.Right),
+        (WallJoins.DownLeft, WallJoins.Down, WallJoins.Left),
+        (WallJoins.UpLeft, WallJoins.Up, WallJoins.Left),
+    };
+    private static readonly int[] RimTiles = TileDefs.All.Select(d => d.Id).Where(TileDefs.HasRim).ToArray();
+    private static readonly WallJoins[] RimVariants =
+        Enumerable.Range(0, 256).Select(m => Significant((WallJoins)m)).Distinct().OrderBy(j => j).ToArray();
+    private static readonly int AtlasRows = RimRow + RimTiles.Length;
+    private static readonly int AtlasColumns = Math.Max(TileDefs.All.Length, RimVariants.Length);
 
     // Custom data layer: every atlas tile carries the level tile id it
     // draws, so a grid cell reads back without inverting GridCoordsFor.
@@ -133,6 +157,19 @@ public static class TileSetBuilder
 
     public static Vector2I PipeCoordsFor(PipeLinks links) => new((int)links, PipeRow);
 
+    public static Vector2I RimCoordsFor(int tileId, WallJoins joins) =>
+        new(Array.IndexOf(RimVariants, Significant(joins)), RimRow + Array.IndexOf(RimTiles, tileId));
+
+    // Drops each diagonal whose two neighbouring sides are not both joined:
+    // an open side already rims that corner.
+    private static WallJoins Significant(WallJoins joins)
+    {
+        foreach (var (diagonal, vertical, horizontal) in Diagonals)
+            if (!joins.HasFlag(vertical) || !joins.HasFlag(horizontal))
+                joins &= ~diagonal;
+        return joins;
+    }
+
     public static Vector2I CircuitCoordsFor(Vector2I cell) => new(
         Mathf.PosMod(cell.X, CircuitBoard.Span), CircuitRow + Mathf.PosMod(cell.Y, CircuitBoard.Span));
 
@@ -148,7 +185,7 @@ public static class TileSetBuilder
     {
         var defs = TileDefs.All;
         var tileRect = new Rect2I(0, 0, TileSize, TileSize);
-        var image = Image.CreateEmpty(TileSize * defs.Length, TileSize * AtlasRows, false, Image.Format.Rgba8);
+        var image = Image.CreateEmpty(TileSize * AtlasColumns, TileSize * AtlasRows, false, Image.Format.Rgba8);
         void Put(Image tile, int column, int row) =>
             image.BlitRect(tile, tileRect, new Vector2I(column * TileSize, row * TileSize));
         for (int i = 0; i < defs.Length; i++)
@@ -192,6 +229,12 @@ public static class TileSetBuilder
         for (int y = 0; y < RockFace.Span; y++)
             for (int x = 0; x < RockFace.Span; x++)
                 Put(RockFace.Tile(x, y), x, RockRow + y);
+        foreach (int id in RimTiles)
+            foreach (var joins in RimVariants)
+            {
+                var at = RimCoordsFor(id, joins);
+                Put(BuildRimImage(id, joins), at.X, at.Y);
+            }
         return image;
     }
 
@@ -261,6 +304,9 @@ public static class TileSetBuilder
         for (int y = 0; y < RockFace.Span; y++)
             for (int x = 0; x < RockFace.Span; x++)
                 Create(new Vector2I(x, RockRow + y), TileDefs.BackgroundRock);
+        foreach (int id in RimTiles)
+            foreach (var joins in RimVariants)
+                Solid(Create(RimCoordsFor(id, joins), id));
         return tileSet;
     }
 
@@ -1107,6 +1153,70 @@ public static class TileSetBuilder
 
         static float Fade(int distance, int length) =>
             distance < length ? (length - distance) / (float)length : 0f;
+    }
+
+    // A solid tile finished on every side without a solid neighbour, so a
+    // wall ends instead of being cut off: a dark outline on the open edge,
+    // lit just inside it on the top and left, shaded on the bottom and
+    // right. An outer corner is rounded off; an inner corner, where both
+    // sides join but the diagonal is open, closes the outline round it.
+    private static Image BuildRimImage(int tileId, WallJoins joins)
+    {
+        var img = BuildTileImage(tileId);
+        const int Last = TileSize - 1;
+        bool up = !joins.HasFlag(WallJoins.Up), down = !joins.HasFlag(WallJoins.Down);
+        bool left = !joins.HasFlag(WallJoins.Left), right = !joins.HasFlag(WallJoins.Right);
+
+        // The rim is drawn in flat tones of the tile's face colour, so it
+        // runs unbroken across mortar and seams.
+        var face = FaceColor(img);
+        Color outline = face.Darkened(0.7f), lit = face.Lightened(0.4f), shade = face.Darkened(0.45f);
+        void Outline(int x, int y) => img.SetPixel(x, y, outline);
+
+        for (int i = 0; i < TileSize; i++)
+        {
+            if (left) img.SetPixel(1, i, face.Lightened(0.2f));
+            if (up)
+            {
+                img.SetPixel(i, 1, lit);
+                img.SetPixel(i, 2, img.GetPixel(i, 2).Lightened(0.15f));
+            }
+            if (down) img.SetPixel(i, Last - 1, shade);
+            if (right) img.SetPixel(Last - 1, i, shade);
+        }
+        for (int i = 0; i < TileSize; i++)
+        {
+            if (up) Outline(i, 0);
+            if (left) Outline(0, i);
+            if (down) Outline(i, Last);
+            if (right) Outline(Last, i);
+        }
+        foreach (var (diagonal, vertical, horizontal) in Diagonals)
+        {
+            int cx = horizontal == WallJoins.Left ? 0 : Last, cy = vertical == WallJoins.Up ? 0 : Last;
+            bool openV = !joins.HasFlag(vertical), openH = !joins.HasFlag(horizontal);
+            if (openV && openH)
+            {
+                img.SetPixel(cx, cy, Colors.Transparent);
+                Outline(cx == 0 ? 1 : Last - 1, cy == 0 ? 1 : Last - 1);
+            }
+            else if (!openV && !openH && !joins.HasFlag(diagonal))
+                Outline(cx, cy);
+        }
+        return img;
+    }
+
+    // The mean of the tile's brighter half: the faces of its bricks or
+    // plates, without the mortar between them.
+    private static Color FaceColor(Image img)
+    {
+        var pixels = new List<Color>();
+        for (int y = 0; y < TileSize; y++)
+            for (int x = 0; x < TileSize; x++)
+                pixels.Add(img.GetPixel(x, y));
+        float mean = pixels.Average(c => c.Luminance);
+        var faces = pixels.Where(c => c.Luminance >= mean).ToList();
+        return new Color(faces.Average(c => c.R), faces.Average(c => c.G), faces.Average(c => c.B));
     }
 
     private static Color[] Ramp(params string[] hex) => hex.Select(h => new Color(h)).ToArray();

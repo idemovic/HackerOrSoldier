@@ -26,6 +26,7 @@ public sealed class LevelGrids
         RefreshElectricJoinsAround(cell);
         RefreshPipesAround(cell);
         RefreshWaterAround(cell);
+        RefreshRimsAround(cell);
     }
 
     public void EraseCell(Vector2I cell)
@@ -36,6 +37,7 @@ public sealed class LevelGrids
         RefreshElectricJoinsAround(cell);
         RefreshPipesAround(cell);
         RefreshWaterAround(cell);
+        RefreshRimsAround(cell);
     }
 
     public void Clear()
@@ -62,6 +64,7 @@ public sealed class LevelGrids
                 RefreshElectricJoin(new Vector2I(x, y));
                 RefreshPipe(new Vector2I(x, y));
                 RefreshWater(new Vector2I(x, y));
+                RefreshRim(new Vector2I(x, y));
             }
     }
 
@@ -166,5 +169,38 @@ public sealed class LevelGrids
         Main.SetCell(cell, TileSetBuilder.SourceId, id == TileDefs.Water
             ? TileSetBuilder.WaterCoordsFor(sameAbove)
             : TileSetBuilder.LavaCoordsFor(sameAbove));
+    }
+
+    private static readonly (Vector2I Offset, WallJoins Join)[] RimSides =
+    {
+        (Vector2I.Up, WallJoins.Up),
+        (Vector2I.Right, WallJoins.Right),
+        (Vector2I.Down, WallJoins.Down),
+        (Vector2I.Left, WallJoins.Left),
+        (new Vector2I(1, -1), WallJoins.UpRight),
+        (new Vector2I(1, 1), WallJoins.DownRight),
+        (new Vector2I(-1, 1), WallJoins.DownLeft),
+        (new Vector2I(-1, -1), WallJoins.UpLeft),
+    };
+
+    private void RefreshRimsAround(Vector2I cell)
+    {
+        RefreshRim(cell);
+        foreach (var (offset, _) in RimSides)
+            RefreshRim(cell + offset);
+    }
+
+    // A wall finishes every side that does not touch another solid tile, so
+    // painting or erasing a cell redraws the walls around it.
+    private void RefreshRim(Vector2I cell)
+    {
+        int id = TileIdAt(cell);
+        if (!TileDefs.HasRim(id))
+            return;
+        var joins = WallJoins.None;
+        foreach (var (offset, join) in RimSides)
+            if (TileDefs.Get(TileIdAt(cell + offset)) is { Solid: true })
+                joins |= join;
+        Main.SetCell(cell, TileSetBuilder.SourceId, TileSetBuilder.RimCoordsFor(id, joins));
     }
 }

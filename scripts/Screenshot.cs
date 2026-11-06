@@ -113,9 +113,12 @@ public partial class Screenshot : Node
         const int PerRow = 8, Scale = 4, Size = TileSetBuilder.TileSize, Pitch = Size + 2;
         var atlas = TileSetBuilder.AtlasImage();
         var tiles = new List<Rect2I>();
+        int loneRim = TileSetBuilder.RimCoordsFor(TileDefs.Wall, WallJoins.None).X;
         for (int row = 0; row < atlas.GetHeight() / Size; row++)
             for (int col = 0; col < atlas.GetWidth() / Size; col++)
             {
+                if (row >= TileSetBuilder.RimRow && col != loneRim)
+                    continue;   // one rimmed tile per wall, not all 47 joins
                 var rect = new Rect2I(col * Size, row * Size, Size, Size);
                 if (!atlas.GetRegion(rect).IsInvisible())
                     tiles.Add(rect);

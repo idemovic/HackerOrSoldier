@@ -234,6 +234,14 @@ Known simplifications (tuning constants, not README rules):
   sky with stars for the outdoor top of tall levels
 - Smoke test: agent walks through a background wall and is stopped by a
   stone block wall (both negative-verified by flipping the Solid flags)
+- Wall ends are finished, not cut off: every side of a solid tile without a
+  solid neighbour (empty or a background wall) gets a rim in flat tones of
+  the tile's face colour (dark outline, lit cap on top and left, shade on
+  bottom and right), outer corners rounded, inner corners closed. Any two
+  solid tiles join seamlessly, whatever their material. Pre-baked per wall
+  in the atlas, one tile per set of 8-neighbour joins (47);
+  LevelGrids.RefreshRim picks it like pipes pick their links. Electric
+  floor, pipes and the hidden platform keep their own ends
 
 ### Outdoor sky
 - Cells with no tile are the outdoors: a per-level sky fills the whole

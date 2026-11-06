@@ -94,6 +94,12 @@ public static class TileDefs
 
     public static bool ReceivesShadow(int id) =>
         id is not (Empty or Water or Lava) && Get(id) is { Solid: false };
+
+    // Solid tiles that finish their open sides with a rim. Electric floor
+    // and pipes draw their own ends; the hidden platform sits on its own
+    // layer and stays plain.
+    public static bool HasRim(int id) =>
+        id is not (ElectricFloor or PipeWall or HiddenPlatform) && Get(id) is { Solid: true };
 }
 
 public static class ObjectDefs

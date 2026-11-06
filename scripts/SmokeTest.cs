@@ -31,6 +31,7 @@ public partial class SmokeTest : Node
         await WallTilesCheck();
         await ShadowCheck();
         await PipeCheck();
+        await RimCheck();
         await SkyCheck();
         await LivesAndFailCheck();
         await VestCheck();
@@ -743,6 +744,44 @@ public partial class SmokeTest : Node
         editor.PaintCell(b);
         editor.SetLevel(editor.Level);
         Check(PipeAt(editor, b) == (PipeLinks.Left | PipeLinks.Down), "redrawing a whole level joins pipes too");
+    }
+
+    // A wall rims every side without a solid neighbour; any solid tile
+    // joins it, a background tile does not.
+    private async Task RimCheck()
+    {
+        var editor = await FreshEditor();
+        var a = new Vector2I(6, 5);
+        var b = a + Vector2I.Right;
+        var c = a + Vector2I.Down;
+        var d = b + Vector2I.Down;
+        Vector2I At(Vector2I cell) => editor.Grids.Main.GetCellAtlasCoords(cell);
+        editor.SetBrushTile(TileDefs.Wall);
+        editor.PaintCell(a);
+        Check(At(a) == TileSetBuilder.RimCoordsFor(TileDefs.Wall, WallJoins.None), "a lone wall is rimmed all round");
+        editor.PaintCell(b);
+        Check(At(a) == TileSetBuilder.RimCoordsFor(TileDefs.Wall, WallJoins.Right)
+            && At(b) == TileSetBuilder.RimCoordsFor(TileDefs.Wall, WallJoins.Left),
+            "two walls side by side drop the rim between them");
+        Check(editor.Grids.TileIdAt(b) == TileDefs.Wall, "a rimmed wall still reads back as a wall");
+        editor.SetBrushTile(TileDefs.RedBrick);
+        editor.PaintCell(c);
+        Check(At(a) == TileSetBuilder.RimCoordsFor(TileDefs.Wall, WallJoins.Right | WallJoins.Down)
+            && At(c) == TileSetBuilder.RimCoordsFor(TileDefs.RedBrick, WallJoins.Up),
+            "a different solid tile joins the wall too");
+        Check(At(a) != TileSetBuilder.RimCoordsFor(TileDefs.Wall, WallJoins.Right | WallJoins.Down | WallJoins.DownRight)
+            && TileSetBuilder.RimCoordsFor(TileDefs.Wall, WallJoins.Right) == TileSetBuilder.RimCoordsFor(TileDefs.Wall, WallJoins.Right | WallJoins.DownRight),
+            "an open diagonal is an inner corner, one beside an open side changes nothing");
+        editor.PaintCell(d);
+        Check(At(a) == TileSetBuilder.RimCoordsFor(TileDefs.Wall, WallJoins.Right | WallJoins.Down | WallJoins.DownRight),
+            "filling the diagonal closes the inner corner");
+        editor.EraseCell(b);
+        Check(At(a) == TileSetBuilder.RimCoordsFor(TileDefs.Wall, WallJoins.Down), "erasing a wall rims its neighbour");
+        editor.SetBrushTile(TileDefs.BackgroundBrick);
+        editor.PaintCell(b);
+        Check(At(a) == TileSetBuilder.RimCoordsFor(TileDefs.Wall, WallJoins.Down), "a background tile leaves the rim on");
+        editor.SetLevel(editor.Level);
+        Check(At(a) == TileSetBuilder.RimCoordsFor(TileDefs.Wall, WallJoins.Down), "redrawing a whole level rims walls too");
     }
 
     // The links a pipe cell is drawn with, or -1 when it shows something else.
