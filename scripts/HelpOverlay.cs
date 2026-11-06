@@ -90,7 +90,7 @@ public partial class HelpOverlay : CanvasLayer
     private static readonly string[] Tips =
     {
         "Keys, USB keys, health, ammo and vests work on their own.",
-        "The alarm lasts 30s. Enemies move twice as fast.",
+        "The alarm lasts 20s. Enemies move twice as fast.",
         "Finish without a kill to earn the Hacker tag.",
     };
 

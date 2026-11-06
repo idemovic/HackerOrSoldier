@@ -104,7 +104,7 @@ Rooms are areas enclosed with terrain populated with enemies, machines and items
 
 #### Alarm
 Alarm is triggered upon explosion, gun shot, when a camera spots the agent or when agent steps on a certain floor.
-The alarm is on for 30 seconds from last trigger time, when on, the room changes its appearance and enemies start to move
+The alarm is on for 20 seconds from last trigger time, when on, the room changes its appearance and enemies start to move
 twice as quickly. 
 
 #### Closet

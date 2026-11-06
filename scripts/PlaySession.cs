@@ -25,7 +25,7 @@ public partial class PlaySession : Node2D
     private const float ItemDuration = 30f; // README: briefcase and goggles last 30s
     private const float RobotCycle = 10f;   // README: robots stop and turn off every 10s
     private const float RobotOffTime = 1f;
-    private const float AlarmDuration = 30f;         // README: alarm stays on 30s from the last trigger
+    private const float AlarmDuration = 20f;         // README: alarm stays on 20s from the last trigger
     private const float ExplosionRadius = 5 * 32f;   // README: dynamite kills in a 5 square radius
     // How long a lost life holds the screen: the agent crumples, the death
     // effect dissolves the screen to black, and only then does the respawn

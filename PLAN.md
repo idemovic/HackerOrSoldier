@@ -75,7 +75,7 @@ Known simplifications (revisit with milestone 3):
 - Soldier degradation chain: Ultimate -> Super -> Soldier -> dead with a
   tombstone (decoration until the milestone 5 score collectible)
 - Robot is invulnerable except during its 1s off-window every 10s
-- Alarm: triggered by gunshots, explosions and alarm floor tiles; 30s from
+- Alarm: triggered by gunshots, explosions and alarm floor tiles; 20s from
   the last trigger, doubles enemy movement speed, tints the level red, shows
   in the HUD (camera trigger arrives with milestone 4)
 - Explosions (dynamite, landmines): 5-tile radius, destroy destructible

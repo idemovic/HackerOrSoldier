@@ -2,7 +2,7 @@ using Godot;
 
 namespace HackerOrSoldier;
 
-// Raises the alarm while it sees the agent (README: 30s from the last
+// Raises the alarm while it sees the agent (README: 20s from the last
 // trigger). A hidden agent or an active briefcase disguise is not detected.
 public partial class SecurityCamera : Node2D
 {
