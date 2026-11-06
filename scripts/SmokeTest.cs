@@ -812,7 +812,11 @@ public partial class SmokeTest : Node
         Check(editor.StartPlay(), "item course starts");
         var agent = editor.PlayerAgent;
         Input.ActionPress("move_right");
-        await Frames(70);
+        var keyDoors = editor.Session.GetChildren().OfType<LockedDoor>().ToList();
+        for (int i = 0; i < 200 && !keyDoors.Any(d => d.IsOpen); i++)
+            await Frames(1);
+        await CheckDoorSlide(keyDoors, "key door");
+        await Frames(10);
         Input.ActionPress("shoot");
         await Frames(2);
         Input.ActionRelease("shoot");
@@ -1261,9 +1265,12 @@ public partial class SmokeTest : Node
         editor.PaintCell(new Vector2I(5, 10));
         Check(editor.StartPlay(), "security door hack level starts");
         Input.ActionPress("move_right");
-        await Frames(150);
-        Input.ActionRelease("move_right");
+        for (int i = 0; i < 300 && !OpenDoor(editor); i++)
+            await Frames(1);
         Check(OpenDoor(editor), "hacking its computer opens the security door");
+        await CheckDoorSlide(editor.Session.GetChildren().OfType<SlidingDoor>().ToList(), "security door");
+        await Frames(60);
+        Input.ActionRelease("move_right");
         Check(editor.PlayerAgent.Position.X > 10 * 32, "the agent walks through the opened security door");
         editor.StopPlay();
 
@@ -1331,6 +1338,18 @@ public partial class SmokeTest : Node
         editor.Session.GetChildren().OfType<CanvasLayer>()
             .SelectMany(c => c.GetChildren().OfType<Label>())
             .FirstOrDefault(l => l.Visible && l.Text.StartsWith("Press "))?.Text;
+
+    // An opened door sinks into the floor over a few frames instead of vanishing,
+    // and the agent is not blocked while it does.
+    private async Task CheckDoorSlide(IReadOnlyCollection<SlidingDoor> doors, string kind)
+    {
+        Check(doors.Count > 0 && doors.All(d => d.IsOpen), $"the {kind} opened");
+        await Frames(5);
+        Check(doors.All(d => d.Drop > 0 && d.Drop < TileSetBuilder.TileSize), $"the {kind} is sliding into the floor");
+        Check(doors.All(d => d.GetChildren().OfType<CollisionShape2D>().All(c => c.Disabled)), $"the {kind} no longer blocks mid-slide");
+        await Frames(40);
+        Check(doors.All(d => d.Drop == TileSetBuilder.TileSize), $"the {kind} is fully down");
+    }
 
     // Four tiles tall so the agent cannot jump over it.
     private static void PaintDoorColumn(Editor editor, int x, string number)

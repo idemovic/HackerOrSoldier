@@ -386,9 +386,8 @@ public partial class PlaySession : Node2D
             var offset = (door.Position - Agent.Position).Abs();
             if (_keys.Contains(door.ColorName) && offset.X < 36 && offset.Y < 36)
             {
-                door.QueueFree();
+                door.Open();
                 _doors.RemoveAt(i);
-                Sfx.PlayAt(Sound.DoorOpen, door.Position);
             }
         }
 

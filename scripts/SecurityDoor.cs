@@ -5,22 +5,17 @@ namespace HackerOrSoldier;
 // A steel door wired to a circuit: closed and solid while the circuit is on,
 // open for good once it goes off. Colored keys do not open it. PlaySession
 // calls Open when the circuit turns off.
-public partial class SecurityDoor : StaticBody2D
+public partial class SecurityDoor : SlidingDoor
 {
     public string Number { get; set; } = "1";
-    public bool IsOpen { get; private set; }
 
-    private CollisionShape2D _shape;
-    private Sprite2D _sprite;
     private Label _label;
+
+    protected override Texture2D PanelTexture => Sprites.Get(ObjectDefs.SecurityDoor);
 
     public override void _Ready()
     {
-        int tile = TileSetBuilder.TileSize;
-        _shape = new CollisionShape2D { Shape = new RectangleShape2D { Size = new Vector2(tile, tile) } };
-        AddChild(_shape);
-        _sprite = new Sprite2D { Texture = Sprites.Get(ObjectDefs.SecurityDoor) };
-        AddChild(_sprite);
+        base._Ready();
         _label = new Label
         {
             Text = Number,
@@ -30,12 +25,10 @@ public partial class SecurityDoor : StaticBody2D
         AddChild(_label);
     }
 
-    public void Open()
+    protected override void OnOpened()
     {
-        IsOpen = true;
-        Sfx.PlayAt(Sound.SecurityDoor, Position);
-        _shape.SetDeferred(CollisionShape2D.PropertyName.Disabled, true);
         _label.Visible = false;
-        _sprite.Modulate = new Color(1, 1, 1, 0.25f);   // a faint frame stays so the route reads
+        // A faint frame stays so the route reads once the panel is gone.
+        AddBehindPanel(new Sprite2D { Texture = PanelTexture, Modulate = new Color(1, 1, 1, 0.25f) });
     }
 }

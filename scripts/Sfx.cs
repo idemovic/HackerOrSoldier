@@ -11,7 +11,7 @@ public enum Sound
     ShotPistol, ShotRifle, ShotMinigun, Crossbow, Chainsaw, DynamiteThrow, EmptyClick,
     EnemyShot, EnemyMinigun, EnemyPlasma, EnemyHit, EnemyDie, RocketLaunch,
     BulletHit, Switch, Explosion, Alarm,
-    DoorOpen, SecurityDoor, Teleport, ComputerHack, PowerDown, Checkpoint,
+    DoorOpen, Teleport, ComputerHack, PowerDown, Checkpoint,
     Hide, Unhide, GogglesOn, DisguiseOn, WallCrumble, FlameBurst, ElectricZap,
     Hurt, Death, VestBreak, MissionFailed, LevelComplete,
     PickupKey, PickupHealth, PickupAmmo, PickupVest, PickupItem, PickupWeapon, Coin, LetterBonus,
@@ -188,8 +188,11 @@ public partial class Sfx : Node
             Note(Wave.Square, 880, 0.32f, 0.15f, 0.25f), Note(Wave.Square, 660, 0.48f, 0.15f, 0.25f),
         },
 
-        [Sound.DoorOpen] = new[] { Saw(150, 90, 0, 0.12f, 0.25f), Noise(1200, 500, 0, 0.15f, 0.18f), Tri(300, 600, 0.1f, 0.1f, 0.22f) },
-        [Sound.SecurityDoor] = new[] { Saw(80, 160, 0, 0.4f, 0.25f), Noise(600, 300, 0, 0.4f, 0.14f, 0.6f) },
+        [Sound.DoorOpen] = new[]
+        {
+            Noise(9000, 2500, 0, 0.18f, 0.25f, 2f), Saw(260, 70, 0.02f, 0.36f, 0.2f, decay: 0.8f),
+            Noise(300, 120, 0.38f, 0.07f, 0.28f, 2f), Sq(90, 50, 0.38f, 0.07f, 0.25f, decay: 2f),
+        },
         [Sound.Teleport] = new[] { Sq(300, 1500, 0, 0.35f, 0.2f, 0.25f, 0.03f), Tri(1500, 300, 0.15f, 0.3f, 0.22f) },
         [Sound.ComputerHack] = new[]
         {
