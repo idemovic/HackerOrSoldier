@@ -2000,7 +2000,7 @@ public partial class SmokeTest : Node
         Input.ActionPress("move_right");
         await Frames(20);
         Input.ActionRelease("move_right");
-        Check(editor.Session.Weapon == "assault_rifle", "weapon pickup equips the assault rifle");
+        Check(editor.Session.Weapon == Weapon.AssaultRifle, "weapon pickup equips the assault rifle");
         Input.ActionPress("shoot");
         await Frames(2);
         Input.ActionRelease("shoot");
@@ -2023,6 +2023,8 @@ public partial class SmokeTest : Node
         Input.ActionRelease("shoot");
         Check(editor.Session.Arrows == 19, "crossbow spends an arrow");
         Check(!editor.Session.AlarmActive, "crossbow does not trigger the alarm");
+        Check(editor.PlayerAgent.AnimationFrame?.Contains("_crossbow_") == true, "the agent aims the crossbow it picked up");
+        Check(editor.Session.GetChildren().OfType<Bullet>().Any(b => b.SpriteKey == "bolt"), "the crossbow shoots a bolt, not a bullet");
         editor.StopPlay();
     }
 
@@ -2038,7 +2040,7 @@ public partial class SmokeTest : Node
         Input.ActionPress("move_right");
         await Frames(12);
         Input.ActionRelease("move_right");
-        Check(editor.Session.Weapon == "chainsaw", "weapon pickup equips the chainsaw");
+        Check(editor.Session.Weapon == Weapon.Chainsaw, "weapon pickup equips the chainsaw");
         // Swinging as fast as the input allows. The chainsaw reaches 44px and
         // the fighter closes to 28px before it can touch the agent, so the
         // kill has to land inside that window - swinging on a slower cadence

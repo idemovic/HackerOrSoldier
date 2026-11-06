@@ -36,6 +36,7 @@ public sealed class AgentAnimator
     private BodyClip _clip = BodyClip.Idle;
     private float _phase;
     private float _shootTime;
+    private Weapon _gun;
     private float _airTime;
     private float _landTime;
     private bool _dying;
@@ -47,7 +48,11 @@ public sealed class AgentAnimator
     public AgentAnimator(Sprite2D sprite) => _sprite = sprite;
 
     // Restarts the gun pose from the flash, so holding fire keeps flashing.
-    public void Shoot() => _shootTime = ShootPoseTime;
+    public void Shoot(Weapon gun)
+    {
+        _gun = gun;
+        _shootTime = ShootPoseTime;
+    }
 
     // Takes over from every other clip until Reset; the session decides when
     // the body gets up again.
@@ -109,7 +114,8 @@ public sealed class AgentAnimator
             BodyClip.Land => Mathf.Min((int)((LandTime - _landTime) / LandFrameTime), count - 1),
             _ => 0,
         };
-        Show(new BodyFrame(BodyPoses.Agent, clip, index, CurrentShot(), left));
+        var shot = CurrentShot();
+        Show(new BodyFrame(BodyPoses.Agent, clip, index, shot, left, shot == Shot.None ? Weapon.None : _gun));
     }
 
     private int Cycle(float step, int count)

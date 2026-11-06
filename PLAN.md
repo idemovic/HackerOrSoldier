@@ -186,6 +186,14 @@ Known simplifications (tuning constants, not README rules):
   dynamite (placed stick, 2.5s fuse, reuses the explosion system). Pistol,
   rifle and mini gun share the bullet pool per the README ammo table; the
   weapon resets to pistol at the start of each level
+- Weapon look (scripts/WeaponDefs.cs is the table): the agent holds the
+  weapon it has equipped, each drawn by the rig from steel, gunmetal, wood
+  and paint pieces with its own stance (pistol out at arm's length, rifle
+  and crossbow shouldered, mini gun and chainsaw at the hip, dynamite set
+  down). Each gun fires its own projectile: pistol and rifle share a brass
+  bullet (the burst tells them apart), the mini gun fires red-hot tracers
+  (the super soldier's too) and the crossbow fires bolts. The
+  weapons_preview scene renders every weapon to one contact sheet
 - Decorations: clock, poster, plant, toilet, pipe, sign, machine (visual
   only) plus table, wooden crate and steel crate (solid, jump-on-able;
   tables at 18px height)

@@ -206,7 +206,7 @@ public partial class Enemy : CharacterBody2D
             case EnemyAttack.MiniGun:
                 _shootCooldown = 0.6f;
                 Sfx.PlayAt(Sound.EnemyMinigun, Position);
-                Session.SpawnEnemyBullet(Position, new Vector2(_facing, 0), "bullet");
+                Session.SpawnEnemyBullet(Position, new Vector2(_facing, 0), "tracer");
                 break;
             case EnemyAttack.Plasma:
                 _shootCooldown = 2f;

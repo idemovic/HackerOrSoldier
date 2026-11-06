@@ -169,7 +169,7 @@ public partial class Agent : CharacterBody2D
         // The shoot pose only plays when a shot actually left the weapon, so
         // an empty magazine never flashes a muzzle.
         if (Session != null && Input.IsActionJustPressed("shoot") && Session.TryShoot(this))
-            _animator.Shoot();
+            _animator.Shoot(Session.Weapon);
 
         _animator.Update(dt, Velocity, IsOnFloor(), submerged, Facing, pushing);
 

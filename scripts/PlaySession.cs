@@ -35,7 +35,7 @@ public partial class PlaySession : Node2D
     public Agent Agent { get; private set; }
     public int Lives { get; private set; } = 3;   // README: default 3 lives
     public int Ammo { get; private set; } = 10;   // README: pistol, default 10 ammo
-    public string Weapon { get; private set; } = "pistol";
+    public Weapon Weapon { get; private set; } = Weapon.Pistol;
     public int Arrows { get; private set; }          // crossbow ammo, separate pool
     public int DynamiteSticks { get; private set; }
     public bool HasVest { get; private set; }
@@ -493,9 +493,10 @@ public partial class PlaySession : Node2D
     // the shoot animation only for a real shot.
     public bool TryShoot(Agent agent)
     {
+        var def = WeaponDefs.Get(Weapon);
         switch (Weapon)
         {
-            case "chainsaw":
+            case Weapon.Chainsaw:
                 // Melee sweep in front of the agent; no ammo, no alarm.
                 foreach (var enemy in _enemies.ToArray())
                 {
@@ -505,38 +506,31 @@ public partial class PlaySession : Node2D
                 }
                 Sfx.Play(Sound.Chainsaw);
                 return true;
-            case "crossbow":
+            case Weapon.Crossbow:
                 if (Arrows <= 0)
                     return Misfire();
                 Arrows--;
                 ShotsFired++;
                 Sfx.Play(Sound.Crossbow);
-                SpawnAgentBullet(agent, 0);   // README: the crossbow does not trigger the alarm
+                SpawnAgentBullet(agent, def.Projectile, 0);   // README: the crossbow does not trigger the alarm
                 return true;
-            case "dynamite":
+            case Weapon.Dynamite:
                 if (DynamiteSticks <= 0)
                     return Misfire();
                 DynamiteSticks--;
                 SpawnDynamite(agent.Position);
                 return true;
             default:
-                // README: pistol 1 bullet, mini gun 2, assault rifle 3 per shot,
-                // all feeding on the shared bullet pool.
-                int burst = Weapon == "assault_rifle" ? 3 : Weapon == "minigun" ? 2 : 1;
-                burst = Mathf.Min(burst, Ammo);
+                // Pistol, rifle and mini gun feed on the shared bullet pool.
+                int burst = Mathf.Min(def.Burst, Ammo);
                 if (burst <= 0)
                     return Misfire();
                 Ammo -= burst;
                 ShotsFired += burst;
                 TriggerAlarm();   // README: a gun shot triggers the alarm
-                Sfx.Play(Weapon switch
-                {
-                    "assault_rifle" => Sound.ShotRifle,
-                    "minigun" => Sound.ShotMinigun,
-                    _ => Sound.ShotPistol,
-                });
+                Sfx.Play(def.Shot.Value);
                 for (int i = 0; i < burst; i++)
-                    SpawnAgentBullet(agent, (i - (burst - 1) / 2f) * 6f);
+                    SpawnAgentBullet(agent, def.Projectile, (i - (burst - 1) / 2f) * 6f);
                 return true;
         }
     }
@@ -547,10 +541,11 @@ public partial class PlaySession : Node2D
         return false;
     }
 
-    private void SpawnAgentBullet(Agent agent, float offsetY) =>
+    private void SpawnAgentBullet(Agent agent, string spriteKey, float offsetY) =>
         AddChild(new Bullet
         {
             Session = this,
+            SpriteKey = spriteKey,
             Direction = agent.Facing,
             Position = agent.Position + new Vector2(agent.Facing * 20, -2 + offsetY),
             FromX = agent.Position.X,
@@ -941,33 +936,24 @@ public partial class PlaySession : Node2D
                 _usbKeys.Add(NumberOf(pickup.Source));
                 Sfx.Play(Sound.PickupKey);
                 break;
-            // Weapon pickups equip the weapon and grant its README default ammo.
-            case ObjectDefs.WeaponChainsaw:
-                Weapon = "chainsaw";
-                Sfx.Play(Sound.PickupWeapon);
-                break;
-            case ObjectDefs.WeaponAssaultRifle:
-                Weapon = "assault_rifle";
-                Ammo += 10;
-                ShowChange(Sprites.Trimmed(ObjectDefs.WeaponAssaultRifle), 10, AmmoColor);
-                Sfx.Play(Sound.PickupWeapon);
-                break;
-            case ObjectDefs.WeaponMinigun:
-                Weapon = "minigun";
-                Ammo += 20;
-                ShowChange(Sprites.Trimmed(ObjectDefs.WeaponMinigun), 20, AmmoColor);
-                Sfx.Play(Sound.PickupWeapon);
-                break;
-            case ObjectDefs.WeaponCrossbow:
-                Weapon = "crossbow";
-                Arrows += 20;
-                ShowChange(Sprites.Trimmed(ObjectDefs.WeaponCrossbow), 20, AmmoColor);
-                Sfx.Play(Sound.PickupWeapon);
-                break;
-            case ObjectDefs.WeaponDynamite:
-                Weapon = "dynamite";
-                DynamiteSticks += 3;
-                ShowChange(Sprites.Trimmed(ObjectDefs.WeaponDynamite), 3, AmmoColor);
+            case var type when WeaponDefs.ForPickup(type) is { } weapon:
+                // Weapon pickups equip the weapon and grant its README default ammo.
+                Weapon = weapon.Kind;
+                int granted = weapon.Kind switch
+                {
+                    Weapon.AssaultRifle => 10,
+                    Weapon.Minigun or Weapon.Crossbow => 20,
+                    Weapon.Dynamite => 3,
+                    _ => 0,
+                };
+                switch (weapon.Kind)
+                {
+                    case Weapon.Crossbow: Arrows += granted; break;
+                    case Weapon.Dynamite: DynamiteSticks += granted; break;
+                    default: Ammo += granted; break;
+                }
+                if (granted > 0)
+                    ShowChange(Sprites.Trimmed(weapon.Icon), granted, AmmoColor);
                 Sfx.Play(Sound.PickupWeapon);
                 break;
             default:
@@ -1031,15 +1017,14 @@ public partial class PlaySession : Node2D
 
     private void UpdateHud()
     {
-        var (weaponSprite, weaponCount) = Weapon switch
+        int? weaponCount = Weapon switch
         {
-            "chainsaw" => (ObjectDefs.WeaponChainsaw, (int?)null),
-            "crossbow" => (ObjectDefs.WeaponCrossbow, Arrows),
-            "dynamite" => (ObjectDefs.WeaponDynamite, DynamiteSticks),
-            "assault_rifle" => (ObjectDefs.WeaponAssaultRifle, Ammo),
-            "minigun" => (ObjectDefs.WeaponMinigun, Ammo),
-            _ => ("pistol", Ammo),
+            Weapon.Chainsaw => null,
+            Weapon.Crossbow => Arrows,
+            Weapon.Dynamite => DynamiteSticks,
+            _ => Ammo,
         };
+        string weaponSprite = WeaponDefs.Get(Weapon).Icon;
         _weaponIcon.Texture = Sprites.Trimmed(weaponSprite);
         _weaponCount.Visible = weaponCount != null;
         if (weaponSprite != _hudWeapon)

@@ -115,7 +115,8 @@ public sealed class EnemyAnimator
             float elapsed = AttackPoseTime - _attackTime;
             shot = elapsed < FlashTime ? Shot.Fire : elapsed < RecoilTime ? Shot.Recoil : Shot.Aim;
         }
-        var frame = new BodyFrame(_type, clip, (int)(_phase / step), shot, facing < 0);
+        var gun = shot == Shot.None ? Weapon.None : BodyPoses.GunOf(_type);
+        var frame = new BodyFrame(_type, clip, (int)(_phase / step), shot, facing < 0, gun);
         if (frame == _bodyFrame)
             return;
         _bodyFrame = frame;

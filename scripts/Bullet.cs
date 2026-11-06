@@ -8,6 +8,7 @@ public partial class Bullet : Node2D
 
     public PlaySession Session { get; set; }
     public int Direction { get; set; } = 1;
+    public string SpriteKey { get; set; } = "bullet";
     // Where the shot came from. The bullet spawns at the muzzle, ahead of the
     // shooter, so its first step sweeps back to here: a switch the agent
     // stands on is still hit. Defaults to the spawn position.
@@ -17,7 +18,7 @@ public partial class Bullet : Node2D
     {
         if (float.IsNaN(FromX))
             FromX = Position.X;
-        AddChild(new Sprite2D { Texture = Sprites.Get("bullet") });
+        AddChild(new Sprite2D { Texture = Sprites.Get(SpriteKey), FlipH = Direction < 0 });
     }
 
     public override void _PhysicsProcess(double delta)

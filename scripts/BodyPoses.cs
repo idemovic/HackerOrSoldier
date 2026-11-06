@@ -13,12 +13,14 @@ public enum Shot { None, Fire, Recoil, Aim }
 // One rendered frame of a rigged character. Key names the pose for tests and
 // debugging and starts with the character's type, so the first idle frame
 // is the bare type key the editor marker and palette icon use. The facing
-// is not part of it because both facings show the same pose.
-public readonly record struct BodyFrame(string Who, BodyClip Clip, int Index, Shot Shot = Shot.None, bool Left = false)
+// is not part of it because both facings show the same pose. Gun is the
+// weapon in hand while a Shot overlay plays; without one it is ignored.
+public readonly record struct BodyFrame(string Who, BodyClip Clip, int Index, Shot Shot = Shot.None, bool Left = false, Weapon Gun = Weapon.None)
 {
     public string Key => Clip == BodyClip.Idle && Index == 0 && Shot == Shot.None
         ? Who
-        : $"{Who}_{Clip.ToString().ToLowerInvariant()}{Index}" + (Shot == Shot.None ? "" : $"_{Shot.ToString().ToLowerInvariant()}");
+        : $"{Who}_{Clip.ToString().ToLowerInvariant()}{Index}"
+          + (Shot == Shot.None ? "" : $"_{Gun.ToString().ToLowerInvariant()}_{Shot.ToString().ToLowerInvariant()}");
 }
 
 // Human motion, authored as key poses and sampled into many frames so every
@@ -42,7 +44,12 @@ public static class BodyPoses
         [BodyClip.Die] = 9,
     };
 
-    private sealed record Body(Look Look, Weapon Gun, BodyClip[] Clips);
+    // Guns lists every weapon the character can be seen holding; soldiers
+    // carry one, the agent whatever it picked up.
+    private sealed record Body(Look Look, Weapon[] Guns, BodyClip[] Clips);
+
+    private static readonly Weapon[] Unarmed = { };
+    private static readonly Weapon[] AgentGuns = WeaponDefs.All.Select(def => def.Kind).ToArray();
 
     private static readonly BodyClip[] EnemyClips = { BodyClip.Idle, BodyClip.Walk, BodyClip.Run };
 
@@ -114,7 +121,7 @@ public static class BodyPoses
                 "...z^...",
             },
             HeadColors: Tones(('H', "6e5238"), ('h', "402d1d"), ('j', "1f150d"), ('c', "3e5a78"))),
-            Weapon.Pistol,
+            AgentGuns,
             new[] { BodyClip.Idle, BodyClip.Run, BodyClip.Push, BodyClip.Jump, BodyClip.Fall, BodyClip.Land, BodyClip.Swim, BodyClip.Die }),
         // Bare-knuckle brawler: orange tee, black trousers, no gun.
         [EnemyDefs.Fighter] = new(new Look(
@@ -136,7 +143,7 @@ public static class BodyPoses
                 "...z^...",
             },
             HeadColors: Tones(('H', "4a3626"), ('h', "2b1f14"))),
-            Weapon.None, EnemyClips),
+            Unarmed, EnemyClips),
         [EnemyDefs.Soldier] = new(new Look(
             Skin: Skin,
             Jacket: new("6fbf5a", "3d8a34", "1f4a1c"),
@@ -145,7 +152,7 @@ public static class BodyPoses
             Shirt: null, Tie: null,
             HeadMap: HelmetFace,
             HeadColors: Tones(('G', "6fbf5a"), ('g', "3d7d34"), ('j', "1f4a1c"))),
-            Weapon.Rifle, EnemyClips),
+            new[] { Weapon.AssaultRifle }, EnemyClips),
         // Armoured troopers: same build, plated and visored.
         [EnemyDefs.SuperSoldier] = new(new Look(
             Skin: new("b6c0d6", "6f7a95", "3a4258"),
@@ -155,7 +162,7 @@ public static class BodyPoses
             Shirt: null, Tie: null,
             HeadMap: HelmetVisor,
             HeadColors: Tones(('G', "c2cce0"), ('g', "7a87a5"), ('j', "3a4258"), ('v', "9af2ff"), ('V', "35c8dc"))),
-            Weapon.Rifle, EnemyClips),
+            new[] { Weapon.Minigun }, EnemyClips),
         [EnemyDefs.UltimateSoldier] = new(new Look(
             Skin: new("b48af5", "7a3be0", "3c1d78"),
             Jacket: new("a77af5", "7034d6", "35186e"),
@@ -164,13 +171,16 @@ public static class BodyPoses
             Shirt: null, Tie: null,
             HeadMap: HelmetVisor,
             HeadColors: Tones(('G', "a77af5"), ('g', "7034d6"), ('j', "35186e"), ('v', "ffb0ff"), ('V', "e03be0"))),
-            Weapon.None, EnemyClips),
+            Unarmed, EnemyClips),
     };
 
     public static readonly BodyFrame Dead = new(Agent, BodyClip.Die, 8);
 
     public static bool IsRigged(string who) => who != null && Bodies.ContainsKey(who);
-    public static bool IsArmed(string who) => Bodies[who].Gun != Weapon.None;
+    public static bool IsArmed(string who) => Bodies[who].Guns.Length > 0;
+
+    // The gun a soldier carries; the agent's comes from the session.
+    public static Weapon GunOf(string who) => Bodies[who].Guns.FirstOrDefault();
 
     private static readonly Dictionary<BodyFrame, ImageTexture> Cache = new();
     private static Dictionary<string, BodyFrame> _byKey;
@@ -181,9 +191,9 @@ public static class BodyPoses
             return cached;
         var body = Bodies[frame.Who];
         var pose = Sample(frame.Clip, frame.Index);
+        var gun = frame.Shot == Shot.None ? Weapon.None : frame.Gun;
         if (frame.Shot != Shot.None)
-            pose = pose.WithArms(ShotArms(frame.Shot, pose.Lean));
-        var gun = frame.Shot == Shot.None ? Weapon.None : body.Gun;
+            pose = pose.WithArms(ShotArms(frame.Shot, gun, pose.Lean));
         var image = CharacterRig.Render(pose, body.Look, frame.Left, gun, flash: frame.Shot == Shot.Fire);
         var texture = ImageTexture.CreateFromImage(image);
         Cache[frame] = texture;
@@ -202,10 +212,11 @@ public static class BodyPoses
                 for (int i = 0; i < FrameCounts[clip]; i++)
                 {
                     yield return new BodyFrame(name, clip, i);
-                    if (clip == BodyClip.Die || body.Gun == Weapon.None)
+                    if (clip == BodyClip.Die)
                         continue;
-                    foreach (var shot in new[] { Shot.Fire, Shot.Recoil, Shot.Aim })
-                        yield return new BodyFrame(name, clip, i, shot);
+                    foreach (var gun in body.Guns)
+                        foreach (var shot in new[] { Shot.Fire, Shot.Recoil, Shot.Aim })
+                            yield return new BodyFrame(name, clip, i, shot, Gun: gun);
                 }
         }
     }
@@ -372,16 +383,25 @@ public static class BodyPoses
         new(new(3f, 9.8f), -90f, new(250f, 262f), new(215f, 240f), new(88f, 88f, 172f), new(84f, 84f, 168f)),
     };
 
-    // Arms while the gun is out: both hands on the pistol at shoulder
-    // height, kicked up a few degrees on the recoil beat. Measured against
-    // the torso's lean so the aim stays level whatever the legs do.
-    private static Pose ShotArms(Shot shot, float lean)
+    // Arms while the weapon is out, kicked up on the recoil beat. The pistol
+    // is held out at shoulder height, the rifle and crossbow tucked into the
+    // shoulder, the minigun and chainsaw carried low at the hip with less
+    // kick for their weight, and dynamite reached down to set on the floor.
+    private static Pose ShotArms(Shot shot, Weapon gun, float lean)
     {
-        float kick = shot == Shot.Recoil ? 12f : 0f;
-        float aim = 90f + kick;
+        var (elbowDrop, aim, kick) = gun switch
+        {
+            Weapon.AssaultRifle or Weapon.Crossbow => (30f, 90f, 8f),
+            Weapon.Minigun => (52f, 92f, 4f),
+            Weapon.Chainsaw => (48f, 84f, 5f),
+            Weapon.Dynamite => (20f, 40f, 0f),
+            _ => (12f, 90f, 12f),
+        };
+        if (shot == Shot.Recoil)
+            aim += kick;
         return new Pose(Vector2.Zero, lean,
-            NearArm: new(aim - 12f, aim),
-            FarArm: new(aim - 22f, aim - 4f),
+            NearArm: new(aim - elbowDrop, aim),
+            FarArm: new(aim - elbowDrop - 10f, aim - 4f),
             NearLeg: default, FarLeg: default);
     }
 }

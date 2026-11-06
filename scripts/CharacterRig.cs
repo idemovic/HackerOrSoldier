@@ -46,9 +46,6 @@ public sealed record Look(
     Ramp Skin, Ramp Jacket, Ramp Legs, Ramp Shoes, Ramp? Shirt, Ramp? Tie,
     string[] HeadMap, System.Collections.Generic.Dictionary<char, Color> HeadColors);
 
-// Gun held in the near hand while shooting.
-public enum Weapon { None, Pistol, Rifle }
-
 // Rasterises a Pose with a Look into pixel art at native resolution: limbs
 // as shaded capsules, the torso as a capsule with the shirt and tie cut into
 // its front, the hand-drawn head, then edge lighting from the top-left and a
@@ -57,22 +54,111 @@ public enum Weapon { None, Pistol, Rifle }
 // tiles whichever way the character faces.
 public static class CharacterRig
 {
-    public const int Width = 40;
+    // Wide enough for a rifle and its muzzle flash either side of the body.
+    public const int Width = 52;
     public const int Height = 32;
 
     // Standing hip position and segment lengths, sized so a standing figure
     // spans rows 2-31 of the frame: one tile tall, feet on the bottom row.
-    private static readonly Vector2 Hip = new(19.5f, 19.5f);
+    private static readonly Vector2 Hip = new(Width / 2f - 0.5f, 19.5f);
     private const float Spine = 8.5f;
     private const float Thigh = 5.8f, Shin = 5.2f, Foot = 3f;
     private const float AnkleFloor = 30.5f;   // ankle height that puts the sole on the bottom row
     private const float UpperArm = 5f, Forearm = 4.6f;
 
-    private enum Part { None, FarArm, FarHand, FarLeg, FarShoe, NearLeg, NearShoe, Torso, Shirt, Tie, Head, NearArm, NearHand, Gun, Flash }
+    private enum Part
+    {
+        None, FarArm, FarHand, FarLeg, FarShoe, NearLeg, NearShoe, Torso, Shirt, Tie, Head, NearArm, NearHand,
+        Steel, Gunmetal, Wood, Paint, Flash,
+    }
 
     private static readonly Color Outline = new("0a0a10");
-    private static readonly Ramp GunSteel = new("8a93a8", "4a5266", "23262f");
+    private static readonly Ramp Steel = new("c4cbd8", "7d8699", "3e4454");
+    private static readonly Ramp Gunmetal = new("5a6072", "2c303b", "15171d");
+    private static readonly Ramp Wood = new("d08a4a", "8f5426", "4f2c12");
     private static readonly Ramp FlashFire = new("ffffff", "fff27a", "f28022");
+
+    // One piece of a weapon: a capsule in gun space, where X runs along the
+    // forearm towards the muzzle and Y drops below it, both in pixels from
+    // the wrist. Pieces paint in order, so later ones sit on top.
+    private readonly record struct Piece(float A0, float C0, float A1, float C1, float Radius, Part Part);
+
+    private enum Blast { None, Muzzle, BigMuzzle, Sparks }
+
+    // Paint is the weapon's own colour (chainsaw orange, dynamite red...).
+    private sealed record GunModel(Piece[] Pieces, Vector2 Muzzle, Blast Blast, Ramp Paint = default);
+
+    private static readonly System.Collections.Generic.Dictionary<Weapon, GunModel> Guns = new()
+    {
+        // Compact automatic: steel slide over a black frame, angled grip,
+        // trigger guard.
+        [Weapon.Pistol] = new(new Piece[]
+        {
+            new(-0.3f, 1f, -1.2f, 3.6f, 0.95f, Part.Gunmetal),
+            new(1.2f, 1.6f, 2.2f, 1.6f, 0.5f, Part.Gunmetal),
+            new(0f, 0.4f, 5.2f, 0.4f, 0.6f, Part.Gunmetal),
+            new(-0.8f, -0.8f, 5.6f, -0.8f, 0.85f, Part.Steel),
+        }, new(6.4f, -0.6f), Blast.Muzzle),
+        // Wood furniture, steel receiver, black barrel with a front sight,
+        // curved magazine and a stock that reaches back to the shoulder.
+        [Weapon.AssaultRifle] = new(new Piece[]
+        {
+            new(-7.5f, 1.4f, -3f, 0.2f, 1.25f, Part.Wood),
+            new(-1f, 1f, -1.8f, 3.4f, 0.8f, Part.Gunmetal),
+            new(1.8f, 1.2f, 2.6f, 2.6f, 0.95f, Part.Gunmetal),
+            new(2.6f, 2.6f, 2.2f, 4.2f, 0.95f, Part.Gunmetal),
+            new(-3f, -0.2f, 3.4f, -0.2f, 1.15f, Part.Steel),
+            new(3.4f, -0.1f, 8f, -0.1f, 0.95f, Part.Wood),
+            new(8f, -0.5f, 13f, -0.5f, 0.5f, Part.Gunmetal),
+            new(11.5f, -1.6f, 11.5f, -1.6f, 0.55f, Part.Gunmetal),
+            new(-1.5f, -1.8f, 0.8f, -1.8f, 0.5f, Part.Gunmetal),
+        }, new(13.4f, -0.5f), Blast.Muzzle),
+        // Rotary cannon slung at the hip: motor housing, ammo box, a carry
+        // handle and three barrels bound by two clamps.
+        [Weapon.Minigun] = new(new Piece[]
+        {
+            new(-4.5f, 2.6f, -1.5f, 3.4f, 1.6f, Part.Paint),
+            new(-4.5f, -0.2f, 1.5f, -0.2f, 1.9f, Part.Gunmetal),
+            new(-3.5f, -3f, 0.5f, -3f, 0.5f, Part.Steel),
+            new(1.5f, -1.4f, 11f, -1.4f, 0.55f, Part.Steel),
+            new(1.5f, 0f, 11f, 0f, 0.5f, Part.Gunmetal),
+            new(1.5f, 1.2f, 11f, 1.2f, 0.55f, Part.Steel),
+            new(5.5f, -2.1f, 5.5f, 1.9f, 0.65f, Part.Gunmetal),
+            new(10.5f, -2.1f, 10.5f, 1.9f, 0.65f, Part.Gunmetal),
+        }, new(11.6f, 0f), Blast.BigMuzzle, new Ramp("8fa05a", "56653a", "2c3420")),
+        // Wooden tiller with a steel prod, a drawn string and a bolt on the
+        // rail. It fires silently: no flash.
+        [Weapon.Crossbow] = new(new Piece[]
+        {
+            new(-1f, 0.8f, -1.6f, 3.2f, 0.75f, Part.Wood),
+            new(-5f, 0.9f, 7f, 0.1f, 0.95f, Part.Wood),
+            new(4f, -4.4f, 1.6f, -0.6f, 0.45f, Part.Paint),
+            new(4f, 4.4f, 1.6f, 0.6f, 0.45f, Part.Paint),
+            new(6.6f, -0.2f, 4f, -4.4f, 0.65f, Part.Steel),
+            new(6.6f, 0.2f, 4f, 4.4f, 0.65f, Part.Steel),
+            new(1.6f, -1.1f, 8.6f, -1.1f, 0.45f, Part.Gunmetal),
+            new(8.6f, -1.1f, 9.8f, -1.1f, 0.6f, Part.Steel),
+        }, new(9.8f, -1.1f), Blast.None, new Ramp("f2ead0", "c9bc94", "7d7356")),
+        // Orange engine block with a loop handle on top and a long steel
+        // bar ringed by chain teeth.
+        [Weapon.Chainsaw] = new(new Piece[]
+        {
+            new(2f, 0.3f, 12.5f, 0.3f, 1.2f, Part.Steel),
+            new(3f, -1.2f, 12f, -1.2f, 0.4f, Part.Gunmetal),
+            new(3f, 1.8f, 12f, 1.8f, 0.4f, Part.Gunmetal),
+            new(-4f, 0f, 1.5f, 0f, 1.9f, Part.Paint),
+            new(-3.5f, -2.6f, 0.5f, -3f, 0.5f, Part.Gunmetal),
+            new(0.5f, -3f, 1.5f, -1.8f, 0.5f, Part.Gunmetal),
+            new(-4.5f, 1f, -5.5f, 2.8f, 0.6f, Part.Gunmetal),
+        }, new(12.8f, 0.3f), Blast.Sparks, new Ramp("ffb060", "f28022", "a8501a")),
+        // A taped stick held out with its fuse burning at the tip.
+        [Weapon.Dynamite] = new(new Piece[]
+        {
+            new(0.4f, 0f, 4.4f, 0f, 1.25f, Part.Paint),
+            new(2.4f, -1.4f, 2.4f, 1.4f, 0.45f, Part.Gunmetal),
+            new(4.4f, 0f, 6f, -1.2f, 0.4f, Part.Wood),
+        }, new(6.2f, -1.3f), Blast.Sparks, new Ramp("ff6a55", "e03b2f", "8f1f1a")),
+    };
 
     public static Image Render(Pose pose, Look look, bool facingLeft, Weapon weapon = Weapon.None, bool flash = false)
     {
@@ -90,6 +176,7 @@ public static class CharacterRig
         DrawTorso(parts, hip, shoulder, up, Dir(90f - pose.Lean), look.Shirt != null);
         DrawHead(parts, headPixels, shoulder + up * 0.5f, pose.Lean, look);
         DrawArm(parts, armRoot, pose.NearArm, Part.NearArm, Part.NearHand, weapon, flash);
+        var paint = weapon == Weapon.None ? default : Guns[weapon].Paint;
 
         var img = Image.CreateEmpty(Width, Height, false, Image.Format.Rgba8);
         for (int y = 0; y < Height; y++)
@@ -104,7 +191,7 @@ public static class CharacterRig
                 }
                 img.SetPixel(x, y, part == Part.Head
                     ? headPixels[y * Width + x]
-                    : Lit(RampFor(part, look), parts, x, y, part, facingLeft));
+                    : Lit(RampFor(part, look, paint), parts, x, y, part, facingLeft));
             }
         if (facingLeft)
             img.FlipX();
@@ -120,7 +207,7 @@ public static class CharacterRig
         return pose with { Root = new Vector2(pose.Root.X, AnkleFloor - Hip.Y - lowest) };
     }
 
-    private static Ramp RampFor(Part part, Look look) => part switch
+    private static Ramp RampFor(Part part, Look look, Ramp paint) => part switch
     {
         Part.FarArm => look.Jacket.Far,
         Part.FarHand => look.Skin.Far,
@@ -132,7 +219,10 @@ public static class CharacterRig
         Part.Shirt => look.Shirt.Value,
         Part.Tie => look.Tie ?? look.Shirt.Value,
         Part.NearHand => look.Skin,
-        Part.Gun => GunSteel,
+        Part.Steel => Steel,
+        Part.Gunmetal => Gunmetal,
+        Part.Wood => Wood,
+        Part.Paint => paint,
         Part.Flash => FlashFire,
         _ => look.Jacket,
     };
@@ -200,21 +290,28 @@ public static class CharacterRig
         Capsule(parts, wrist, wrist + Dir(arm.Lower) * 0.8f, 1.0f, hand);
         if (weapon == Weapon.None)
             return;
-        // The gun extends the forearm along the aim line with a grip (and on
-        // the rifle a magazine) dropping below it; the rifle's stock reaches
-        // back past the hand towards the shoulder.
-        bool rifle = weapon == Weapon.Rifle;
+        var gun = Guns[weapon];
         Vector2 aim = Dir(arm.Lower), below = Dir(arm.Lower - 90f);
-        Vector2 muzzle = wrist + aim * (rifle ? 8f : 4.5f);
-        Capsule(parts, wrist + aim * (rifle ? -4f : 0.5f), muzzle, 0.9f, Part.Gun);
-        Capsule(parts, wrist, wrist + below * 1.8f, 0.7f, Part.Gun);
-        if (rifle)
-            Capsule(parts, wrist + aim * 2.5f, wrist + aim * 2.5f + below * 2.2f, 0.7f, Part.Gun);
-        if (flash)
+        Vector2 At(float a, float c) => wrist + aim * a + below * c;
+        foreach (var piece in gun.Pieces)
+            Capsule(parts, At(piece.A0, piece.C0), At(piece.A1, piece.C1), piece.Radius, piece.Part);
+        // The fist closes over the grip, in front of the gun.
+        Capsule(parts, wrist, wrist + aim * 0.6f, 0.95f, hand);
+        if (!flash)
+            return;
+        Vector2 muzzle = At(gun.Muzzle.X, gun.Muzzle.Y);
+        switch (gun.Blast)
         {
-            Capsule(parts, muzzle + aim * 1.5f, muzzle + aim * 4.5f, 1.4f, Part.Flash);
-            Capsule(parts, muzzle + aim * 2.5f + Dir(arm.Lower + 90f) * 2f,
-                muzzle + aim * 2.5f + Dir(arm.Lower - 90f) * 2f, 0.6f, Part.Flash);
+            case Blast.Muzzle or Blast.BigMuzzle:
+                float size = gun.Blast == Blast.BigMuzzle ? 1.5f : 1f;
+                Capsule(parts, muzzle + aim * 1.2f, muzzle + aim * (1.2f + 3.5f * size), 1.1f * size, Part.Flash);
+                Capsule(parts, muzzle + aim * 2.5f * size - below * 2.2f * size,
+                    muzzle + aim * 2.5f * size + below * 2.2f * size, 0.55f, Part.Flash);
+                break;
+            case Blast.Sparks:
+                foreach (var (a, c) in new[] { (1.2f, -1.6f), (2.4f, 0.4f), (1f, 1.8f), (3.2f, -0.8f) })
+                    Capsule(parts, muzzle + aim * a + below * c, muzzle + aim * a + below * c, 0.5f, Part.Flash);
+                break;
         }
     }
 
