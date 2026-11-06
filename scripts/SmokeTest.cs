@@ -1309,8 +1309,8 @@ public partial class SmokeTest : Node
         Check(OpenDoor(editor), "shooting while standing on a switch opens its security door");
         editor.StopPlay();
 
-        // Standing on a switch, the activate key flips it, and a prompt says so
-        // until it is flipped.
+        // Only a shot flips a switch: standing on one, the activate key does
+        // nothing and no prompt offers it.
         editor = await FreshEditor();
         PaintDoorColumn(editor, 8, "8");
         editor.SetBrushObject(ObjectDefs.Switch, number: "8");
@@ -1324,13 +1324,13 @@ public partial class SmokeTest : Node
             await Frames(1);
         Input.ActionRelease("move_right");
         await Frames(2);
-        Check(ActivatePrompt(editor) == "Press C to activate the switch", $"prompt on the switch: {ActivatePrompt(editor)}");
+        Check(Mathf.Abs(editor.PlayerAgent.Position.X - switchX) < 12, "the agent stands on the switch");
+        Check(ActivatePrompt(editor) == null, $"no activate prompt on a switch: {ActivatePrompt(editor)}");
         Input.ActionPress("activate");
         await Frames(2);
         Input.ActionRelease("activate");
         await Frames(10);
-        Check(OpenDoor(editor), "the activate key on a switch opens its security door");
-        Check(ActivatePrompt(editor) == null, "the prompt goes away once the switch is flipped");
+        Check(!OpenDoor(editor), "the activate key on a switch leaves its security door shut");
         editor.StopPlay();
     }
 

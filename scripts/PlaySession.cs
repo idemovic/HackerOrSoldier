@@ -651,7 +651,7 @@ public partial class PlaySession : Node2D
         }
     }
 
-    private enum Activation { None, LeaveCloset, Hide, FlipSwitch, UseItem }
+    private enum Activation { None, LeaveCloset, Hide, UseItem }
 
     // What the activate action does right now, by priority. The key press and
     // the on-screen prompt both read this, so the prompt never promises
@@ -665,9 +665,6 @@ public partial class PlaySession : Node2D
         foreach (var closet in _closets)
             if (WithinReach(closet))
                 return (Activation.Hide, closet);
-        foreach (var wallSwitch in _switches)
-            if (!wallSwitch.Activated && WithinReach(wallSwitch))
-                return (Activation.FlipSwitch, wallSwitch);
         if (HeldManualItem() != null)
             return (Activation.UseItem, null);
         return (Activation.None, null);
@@ -693,16 +690,13 @@ public partial class PlaySession : Node2D
                 Sfx.Play(Sound.Hide);
                 Agent.Position = target.Position;
                 break;
-            case Activation.FlipSwitch:
-                FlipSwitch((WallSwitch)target);
-                break;
             case Activation.UseItem:
                 ActivateHeldItem();
                 break;
         }
     }
 
-    // A shot or the activate key; either way the switch's circuit goes off.
+    // Only a shot flips a switch; the activate key does not.
     public void FlipSwitch(WallSwitch wallSwitch)
     {
         wallSwitch.Activate();
@@ -717,7 +711,6 @@ public partial class PlaySession : Node2D
         {
             Activation.LeaveCloset => "leave the closet",
             Activation.Hide => "hide",
-            Activation.FlipSwitch => "activate the switch",
             _ => null,
         };
         _activatePrompt.Visible = verb != null;
