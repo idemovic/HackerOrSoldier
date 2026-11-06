@@ -6,7 +6,7 @@ namespace HackerOrSoldier;
 // Picks which agent frame shows from the movement state. BodyPoses holds
 // the motion and CharacterRig draws it; this class only keeps the clocks.
 // Locomotion and shooting are separate layers: the gun pose replaces the
-// arms while the legs keep running, jumping or treading water under it.
+// arms while the legs keep running, jumping or swimming under it.
 public sealed class AgentAnimator
 {
     // Every distinct pose the animator can reach; the smoke test builds them
@@ -14,7 +14,9 @@ public sealed class AgentAnimator
     public static readonly string[] AllFrames = BodyPoses.All(BodyPoses.Agent).Select(f => f.Key).Distinct().ToArray();
 
     private const float IdleFrameTime = 0.35f;   // one breath per 1.4s
-    private const float SwimFrameTime = 0.1f;
+    private const float TreadFrameTime = 0.1f;
+    private const float SwimFrameTime = 0.07f;
+    private const float DiveFrameTime = 0.09f;
     private const float FallFrameTime = 0.09f;   // arm windmill
     private const float LandFrameTime = 0.05f;
     private const float DieFrameTime = 0.055f;
@@ -30,6 +32,12 @@ public sealed class AgentAnimator
     private const float WindmillSpeed = 160f;
     private const float MinAirTimeForLanding = 0.2f;
 
+    // Sinking turns into a dive only after this long without a stroke up,
+    // so tapping jump to hold a depth keeps treading water instead of
+    // flipping head-down between strokes. A fall into water is already
+    // sinking, so it dives straight in.
+    private const float DiveDelay = 0.4f;
+
     private static float LandTime => BodyPoses.FrameCounts[BodyClip.Land] * LandFrameTime;
 
     private readonly Sprite2D _sprite;
@@ -39,6 +47,7 @@ public sealed class AgentAnimator
     private Weapon _gun;
     private float _airTime;
     private float _landTime;
+    private float _sinkTime;
     private bool _dying;
     private BodyFrame? _frame;
 
@@ -70,6 +79,7 @@ public sealed class AgentAnimator
         _shootTime = 0f;
         _airTime = 0f;
         _landTime = 0f;
+        _sinkTime = 0f;
         _dying = false;
     }
 
@@ -89,6 +99,7 @@ public sealed class AgentAnimator
 
         _shootTime = Mathf.Max(_shootTime - dt, 0f);
         TrackLanding(dt, onFloor, submerged);
+        _sinkTime = !onFloor && velocity.Y > 0f ? _sinkTime + dt : 0f;
 
         var clip = SelectClip(velocity, onFloor, submerged, pushing);
         if (clip != _clip)
@@ -106,7 +117,9 @@ public sealed class AgentAnimator
             BodyClip.Run => Cycle(RunFrameStride, count),
             BodyClip.Push => Cycle(PushFrameTime, count),
             BodyClip.Idle => Cycle(IdleFrameTime, count),
+            BodyClip.Tread => Cycle(TreadFrameTime, count),
             BodyClip.Swim => Cycle(SwimFrameTime, count),
+            BodyClip.Dive => Cycle(DiveFrameTime, count),
             // Jump frames track vertical speed, so the tuck is timed by the
             // jump itself: take-off at full speed, the last frame at the apex.
             BodyClip.Jump => Mathf.Clamp((int)((1f + velocity.Y / TakeOffSpeed) * count), 0, count - 1),
@@ -139,7 +152,11 @@ public sealed class AgentAnimator
     private BodyClip SelectClip(Vector2 velocity, bool onFloor, bool submerged, bool pushing)
     {
         if (submerged)
-            return BodyClip.Swim;
+        {
+            if (Mathf.Abs(velocity.X) > 1f)
+                return BodyClip.Swim;
+            return _sinkTime >= DiveDelay ? BodyClip.Dive : BodyClip.Tread;
+        }
         if (!onFloor)
             return velocity.Y < 0f ? BodyClip.Jump : BodyClip.Fall;
         if (pushing)

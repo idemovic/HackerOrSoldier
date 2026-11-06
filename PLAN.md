@@ -295,7 +295,9 @@ Known simplifications (tuning constants, not README rules):
   swim, then jump/fall by vertical velocity, then run/idle. The run cycle
   advances on distance travelled rather than a clock, so the feet never
   slide at any speed; the pass frames sit a pixel higher than the contact
-  frames for the bob. Swimming reuses the run frames on a slower clock
+  frames for the bob. In water the agent crawls (prone front crawl) while
+  moving sideways, dives (the same stroke pointed head-down) after sinking
+  for 0.4 s without a stroke up, and otherwise treads water upright
 - PlaySession.TryShoot returns whether the weapon actually went off, so an
   empty magazine never flashes a muzzle
 - Smoke test drives the real inputs through idle, run, jump, fall and the

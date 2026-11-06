@@ -88,6 +88,7 @@ public partial class SmokeTest : Node
         await RocketLauncherCheck();
         await DecorationCheck();
         await AgentAnimationCheck();
+        await AgentSwimCheck();
         await AgentDeathCheck();
         await EnemyAnimationCheck();
         await MenuSceneCheck();
@@ -2352,6 +2353,60 @@ public partial class SmokeTest : Node
         await Frames(1);
         Input.ActionRelease("shoot");
         Check(IsIdleFrame(agent.AnimationFrame), "shooting with no ammo stays idle");
+        editor.StopPlay();
+    }
+
+    // In water the agent treads in place, crawls when it moves sideways and
+    // dives head-down once it has been sinking for a moment, all from the
+    // normal inputs in a pool around the start position.
+    private async Task AgentSwimCheck()
+    {
+        var editor = await FreshEditor();
+        editor.SetBrushTile(TileDefs.Water);
+        for (int x = 1; x <= 14; x++)
+            for (int y = 3; y <= 10; y++)
+                editor.PaintCell(new Vector2I(x, y));
+        Check(editor.StartPlay(), "swim level starts");
+        var agent = editor.PlayerAgent;
+        bool Shows(string clip) => agent.AnimationFrame?.StartsWith($"agent_{clip}") == true;
+
+        await Frames(10);
+        Check(Shows("tread"), "standing still in water treads water");
+
+        Input.ActionPress("move_right");
+        await Frames(20);
+        Check(Shows("swim"), "moving sideways in water swims");
+        string first = agent.AnimationFrame;
+        await Frames(10);
+        Check(agent.AnimationFrame != first, "the swim stroke advances between frames");
+        Input.ActionRelease("move_right");
+
+        // Tapping jump strokes upward; the gaps between taps are too short
+        // to read as a dive.
+        bool divedBetweenStrokes = false;
+        for (int stroke = 0; stroke < 6; stroke++)
+        {
+            Input.ActionPress("jump");
+            await Frames(1);
+            Input.ActionRelease("jump");
+            for (int i = 0; i < 12; i++)
+            {
+                await Frames(1);
+                divedBetweenStrokes |= Shows("dive");
+            }
+        }
+        Check(Shows("tread") && !divedBetweenStrokes, "stroking upward treads water");
+
+        bool dived = false;
+        for (int i = 0; i < 90 && !dived; i++)
+        {
+            await Frames(1);
+            dived = Shows("dive");
+        }
+        Check(dived, "sinking without a stroke dives head-down");
+
+        await Frames(90);
+        Check(agent.IsOnFloor() && Shows("tread"), "back on the bottom the agent treads water");
         editor.StopPlay();
     }
 

@@ -4,7 +4,7 @@ using Godot;
 
 namespace HackerOrSoldier;
 
-public enum BodyClip { Idle, Walk, Run, Push, Jump, Fall, Land, Swim, Die }
+public enum BodyClip { Idle, Walk, Run, Push, Jump, Fall, Land, Tread, Swim, Dive, Die }
 
 // The upper-body overlay while the gun is out. It replaces only the arms,
 // so the legs keep walking, running, falling or swimming under it.
@@ -40,7 +40,9 @@ public static class BodyPoses
         [BodyClip.Jump] = 4,
         [BodyClip.Fall] = 4,
         [BodyClip.Land] = 3,
-        [BodyClip.Swim] = 8,
+        [BodyClip.Tread] = 8,
+        [BodyClip.Swim] = 12,
+        [BodyClip.Dive] = 12,
         [BodyClip.Die] = 9,
     };
 
@@ -122,7 +124,7 @@ public static class BodyPoses
             },
             HeadColors: Tones(('H', "6e5238"), ('h', "402d1d"), ('j', "1f150d"), ('c', "3e5a78"))),
             AgentGuns,
-            new[] { BodyClip.Idle, BodyClip.Run, BodyClip.Push, BodyClip.Jump, BodyClip.Fall, BodyClip.Land, BodyClip.Swim, BodyClip.Die }),
+            new[] { BodyClip.Idle, BodyClip.Run, BodyClip.Push, BodyClip.Jump, BodyClip.Fall, BodyClip.Land, BodyClip.Tread, BodyClip.Swim, BodyClip.Dive, BodyClip.Die }),
         // Bare-knuckle brawler: orange tee, black trousers, no gun.
         [EnemyDefs.Fighter] = new(new Look(
             Skin: Skin,
@@ -239,7 +241,9 @@ public static class BodyPoses
             BodyClip.Jump => Jump[index],
             BodyClip.Fall => Fall[index],
             BodyClip.Land => CharacterRig.Grounded(Pose.Lerp(Crouch, Idle(0f), index / 3f)),
-            BodyClip.Swim => Swim(t),
+            BodyClip.Tread => Tread(t),
+            BodyClip.Swim => Stroke(t, SwimLean, SwimRoot),
+            BodyClip.Dive => Stroke(t, DiveLean, DiveRoot),
             _ => Die[index],
         };
     }
@@ -358,7 +362,7 @@ public static class BodyPoses
         new(Vector2.Zero, 18f, new(40f, 80f), new(20f, 60f), new(58f, -38f), new(42f, -48f), Chest: 1f);
 
     // Treading water: a flutter kick under a slow breaststroke.
-    private static Pose Swim(float t)
+    private static Pose Tread(float t)
     {
         float stroke = 95f + 50f * Mathf.Cos(Mathf.Tau * t);
         return new Pose(Vector2.Zero, 14f,
@@ -366,6 +370,32 @@ public static class BodyPoses
             FarArm: new(stroke - 15f, stroke + 20f + 20f * Wave(t, 0.1f)),
             NearLeg: new(18f + 18f * Wave(t), -8f + 22f * Wave(t, -0.15f), 50f),
             FarLeg: new(18f - 18f * Wave(t), -8f - 22f * Wave(t, -0.15f), 50f));
+    }
+
+    // The swim lies nearly flat with the head a touch up; the dive points
+    // the same stroke head-down. Each root centres its body in the frame.
+    private const float SwimLean = 80f, DiveLean = 110f;
+    private static readonly Vector2 SwimRoot = new(-3f, -4f), DiveRoot = new(-3f, -5f);
+
+    // Front crawl along the spine: each arm windmills in turn (reach past
+    // the head, pull under the body, push past the hip, recover over the
+    // back) with the forearm leading the pull and trailing the recovery,
+    // while the legs flutter twice per stroke with pointed toes.
+    private static Pose Stroke(float t, float lean, Vector2 root)
+    {
+        float ahead = 180f - lean;
+        Limb Arm(float phase)
+        {
+            float upper = ahead - 360f * phase;
+            return new Limb(upper, upper - 30f * Wave(phase));
+        }
+        Limb Leg(float phase)
+        {
+            float thigh = -lean + 12f * Wave(2f * phase);
+            float shin = thigh - 10f - 10f * Wave(2f * phase, -0.15f);
+            return new Limb(thigh, shin, shin - 5f);
+        }
+        return new Pose(root, lean, Arm(t), Arm(t + 0.5f), Leg(t), Leg(t + 0.5f));
     }
 
     // Struck, staggering back, knees going, toppling backwards, a bounce on
