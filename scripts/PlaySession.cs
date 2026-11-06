@@ -123,7 +123,9 @@ public partial class PlaySession : Node2D
     private float _gogglesTime;
     private float _disguiseTime;
     private Vector2 _respawnPoint;
+    private Vector2 _startPoint;
     private Checkpoint _checkpoint;   // the lit one, null until the first is touched
+    private readonly List<Checkpoint> _checkpoints = new();   // level object order
     private Camera2D _camera;
     private readonly List<Vector2I> _spikeCells = new();
     private Vector2I _spikeCoords = new(-1, -1);
@@ -171,6 +173,7 @@ public partial class PlaySession : Node2D
             {
                 case ObjectDefs.AgentStart:
                     _respawnPoint = pos;
+                    _startPoint = pos;
                     Agent = _agentScene.Instantiate<Agent>();
                     Agent.Position = pos;
                     Agent.Session = this;
@@ -194,6 +197,7 @@ public partial class PlaySession : Node2D
                 case ObjectDefs.Checkpoint:
                     var checkpoint = new Checkpoint { Position = pos };
                     checkpoint.Reached += OnCheckpoint;
+                    _checkpoints.Add(checkpoint);
                     AddChild(checkpoint);
                     break;
                 case ObjectDefs.Door:
@@ -877,6 +881,31 @@ public partial class PlaySession : Node2D
         checkpoint.Lit = true;
         Sfx.Play(Sound.Checkpoint);
         _respawnPoint = checkpoint.Position;
+    }
+
+    // Editor playtest shortcut: moves the agent to the next (step 1) or
+    // previous (step -1) stop on the route - the agent start, then each
+    // checkpoint in level object order, wrapping around - and makes that stop
+    // the respawn point, as if the agent had walked there. Returns the stop's
+    // name for the status line, or null when the agent cannot move now.
+    public string JumpCheckpoint(int step)
+    {
+        if (_ended || _agentDown || Agent == null)
+            return null;
+        int stops = _checkpoints.Count + 1;   // stop 0 is the agent start
+        int current = _checkpoint == null ? 0 : _checkpoints.IndexOf(_checkpoint) + 1;
+        int next = ((current + step) % stops + stops) % stops;
+        if (next == 0)
+        {
+            if (_checkpoint != null)
+                _checkpoint.Lit = false;
+            _checkpoint = null;
+            _respawnPoint = _startPoint;
+        }
+        else
+            OnCheckpoint(_checkpoints[next - 1]);
+        Agent.ResetForRespawn(_respawnPoint);
+        return next == 0 ? "the agent start" : $"checkpoint {next} of {_checkpoints.Count}";
     }
 
     private void FinishDeath()

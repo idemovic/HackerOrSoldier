@@ -36,6 +36,7 @@ public partial class SmokeTest : Node
         await VestCheck();
         await KillPlaneCheck();
         await CheckpointCheck();
+        await CheckpointJumpCheck();
         await ItemCourseCheck();
         await WaterCheck();
         await SpikeCheck();
@@ -842,6 +843,39 @@ public partial class SmokeTest : Node
         Check(editor.IsPlaying && editor.Session.Lives == 2, "the fall past the checkpoints costs one life");
         Check(editor.PlayerAgent != null && Mathf.Abs(editor.PlayerAgent.Position.X - (5 * 32 + 16)) < 4,
             "agent respawned at the last checkpoint");
+        editor.StopPlay();
+    }
+
+    // N / Shift+N in playtest step the agent through the agent start and the
+    // checkpoints in placement order, lighting each stop as its respawn point.
+    private async Task CheckpointJumpCheck()
+    {
+        var editor = await FreshEditor();
+        editor.SetBrushObject(ObjectDefs.Checkpoint);
+        editor.PaintCell(new Vector2I(20, 10));
+        editor.PaintCell(new Vector2I(10, 10));
+        Check(editor.StartPlay(), "checkpoint jump level starts");
+        var start = editor.PlayerAgent.Position;
+        static Vector2 Center(int x, int y) => new(x * 32 + 16, y * 32 + 16);
+        Checkpoint FlagAt(Vector2 at) =>
+            editor.Session.GetChildren().OfType<Checkpoint>().First(f => f.Position == at);
+
+        editor._UnhandledInput(KeyEvent(Key.N));
+        Check(editor.PlayerAgent.Position == Center(20, 10) && FlagAt(Center(20, 10)).Lit,
+            "N jumps to the first placed checkpoint and lights it");
+        editor._UnhandledInput(KeyEvent(Key.N));
+        Check(editor.PlayerAgent.Position == Center(10, 10) && FlagAt(Center(10, 10)).Lit && !FlagAt(Center(20, 10)).Lit,
+            "N again jumps to the second placed checkpoint");
+        editor._UnhandledInput(KeyEvent(Key.N));
+        Check(editor.PlayerAgent.Position == start && !FlagAt(Center(10, 10)).Lit, "N wraps back to the agent start");
+        editor._UnhandledInput(KeyEvent(Key.N, shift: true));
+        Check(editor.PlayerAgent.Position == Center(10, 10), "Shift+N steps back to the last checkpoint");
+
+        editor.PlayerAgent.Position = new Vector2(12 * 32, 40 * 32);
+        editor.Session.AgentFell();
+        await Frames(90);
+        Check(editor.PlayerAgent.Position.DistanceTo(Center(10, 10)) < 4, "a jumped-to checkpoint is the respawn point");
+        Check(editor.IsPlaying, "jumping does not stop play");
         editor.StopPlay();
     }
 

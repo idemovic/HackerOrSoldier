@@ -152,6 +152,8 @@ public partial class Editor : Node2D
         new("Play / stop", "View", TogglePlay, new Chord(Key.P), new Chord(Key.P, Ctrl: true)),
         new("Invincible playtest", "View", ToggleInvincible, new Chord(Key.I), new Chord(Key.I, Ctrl: true)),
         new("Solid hidden platforms", "View", ToggleRevealHidden, new Chord(Key.H)),
+        new("Next checkpoint (play)", "View", () => JumpCheckpoint(1), new Chord(Key.N)),
+        new("Prev checkpoint (play)", "View", () => JumpCheckpoint(-1), new Chord(Key.N, Shift: true)),
         new("Zoom in", "View", () => ZoomBy(-1, null), new Chord(Key.Equal)),
         new("Zoom out", "View", () => ZoomBy(1, null), new Chord(Key.Minus)),
         new("Grid", "View", ToggleGrid, new Chord(Key.G)),
@@ -159,7 +161,10 @@ public partial class Editor : Node2D
     };
 
     // The playtest switches that also work while playing.
-    private static readonly string[] PlaytestCommands = { "Invincible playtest", "Solid hidden platforms" };
+    private static readonly string[] PlaytestCommands =
+    {
+        "Invincible playtest", "Solid hidden platforms", "Next checkpoint (play)", "Prev checkpoint (play)",
+    };
 
     private EditorCommand Command(string name) => Array.Find(_commands, c => c.Name == name);
 
@@ -1015,6 +1020,18 @@ public partial class Editor : Node2D
         _playRevealButton.SetPressedNoSignal(_revealHidden);
         _playRevealButton.Text = _revealHidden ? "HIDDEN SOLID" : "HIDDEN OFF";
         SetStatus(_revealHidden ? "Hidden platforms are visible and solid in playtest." : "Hidden platforms need goggles again.");
+    }
+
+    private void JumpCheckpoint(int step)
+    {
+        if (!IsPlaying)
+        {
+            SetStatus("Checkpoint jumps work while playing: press P first.");
+            return;
+        }
+        string stop = _session.JumpCheckpoint(step);
+        if (stop != null)
+            SetStatus($"Jumped to {stop}.");
     }
 
     private void ToggleGrid()
