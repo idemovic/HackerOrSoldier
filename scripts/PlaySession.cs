@@ -720,7 +720,7 @@ public partial class PlaySession : Node2D
             for (int x = minX; x <= maxX; x++)
             {
                 var cellCenter = new Vector2(x * tile + tile / 2f, y * tile + tile / 2f);
-                if (TileAt(x, y) == TileDefs.DestructibleWall && center.DistanceTo(cellCenter) <= ExplosionRadius)
+                if (TileDefs.IsDestructible(TileAt(x, y)) && center.DistanceTo(cellCenter) <= ExplosionRadius)
                     DestroyTile(new Vector2I(x, y));
             }
         foreach (var enemy in _enemies.ToArray())

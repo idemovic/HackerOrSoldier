@@ -102,7 +102,7 @@ public static class EditorPalette
         };
         var walls = wallIds.Select(Tile).ToArray();
 
-        var terrain = TileDefs.All.Where(d => !wallIds.Contains(d.Id)).Select(d => Tile(d.Id))
+        var terrain = TileDefs.All.Where(d => !wallIds.Contains(d.Id) && TileDefs.PaletteTile(d.Id) == d.Id).Select(d => Tile(d.Id))
             .Append(Obj(ObjectDefs.Door))
             .Append(Obj(ObjectDefs.Teleport))
             .Append(Obj(ObjectDefs.Elevator))
@@ -160,7 +160,7 @@ public static class EditorPalette
         for (int c = 0; c < Categories.Length; c++)
         {
             int slot = Array.FindIndex(Categories[c].Entries,
-                e => objectType != null ? e.ObjectType == objectType : e.TileId == tileId);
+                e => objectType != null ? e.ObjectType == objectType : e.TileId == TileDefs.PaletteTile(tileId));
             if (slot >= 0)
                 return (c, slot);
         }

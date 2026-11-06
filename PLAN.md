@@ -121,6 +121,10 @@ Known simplifications (tuning constants, not README rules):
 - Security cameras carry a facing property (`right` default, or `left`), picked with
   two chips in the status bar or [ ]; left is the same sprite mirrored (FlipH) in
   the editor and in play. Sight is still all-around; levels saved without a facing stay right
+- Destructible walls come in six brick colors (clay, stone, red, steel, moss, sand),
+  each its own tile id (2, 26-30) so levels store them as plain tiles. One palette
+  slot paints them all; tile-icon chips in the status bar or [ ] pick the color,
+  and the picker brings a wall's color back. Bullets and explosions break every color
 - Closets: activate (C) next to a closet hides the agent (immobile,
   invisible to enemies, cameras, bullets and contact damage); C again leaves.
   Priority for C: leave closet, hide in closet, then use held items

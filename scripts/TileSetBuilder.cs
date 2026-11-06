@@ -318,6 +318,26 @@ public static class TileSetBuilder
                 DrawBricks(img, ClayRamp, new Color("2a1a0c"), seed: 2, wear: 0.1f);
                 DrawCrack(img, ClayRamp);
                 break;
+            case TileDefs.DestructibleStone:
+                DrawBricks(img, StoneRamp, new Color("10101a"), seed: 2, wear: 0.1f);
+                DrawCrack(img, StoneRamp);
+                break;
+            case TileDefs.DestructibleRed:
+                DrawBricks(img, RedRamp, new Color("2a1010"), seed: 2, wear: 0.1f);
+                DrawCrack(img, RedRamp);
+                break;
+            case TileDefs.DestructibleSteel:
+                DrawBricks(img, SteelRamp, new Color("161a26"), seed: 2, wear: 0.1f);
+                DrawCrack(img, SteelRamp);
+                break;
+            case TileDefs.DestructibleMoss:
+                DrawBricks(img, GreenRamp, new Color("0b180b"), seed: 2, wear: 0.1f);
+                DrawCrack(img, GreenRamp);
+                break;
+            case TileDefs.DestructibleSand:
+                DrawBricks(img, SandRamp, new Color("2e2210"), seed: 2, wear: 0.1f);
+                DrawCrack(img, SandRamp);
+                break;
             case TileDefs.AlarmFloor:
                 DrawAlarmFloor(img);
                 break;

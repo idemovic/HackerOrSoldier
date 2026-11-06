@@ -60,6 +60,7 @@ public partial class SmokeTest : Node
         await SwitchCheck();
         await CameraAlarmCheck();
         await CameraFacingCheck();
+        await WallColorCheck();
         await DisguiseCheck();
         await EnemyDisguiseCheck();
         await ClosetCheck();
@@ -123,7 +124,9 @@ public partial class SmokeTest : Node
             (18, TileDefs.Sandbags, "Sandbags"), (19, TileDefs.Container, "Container"), (20, TileDefs.PipeWall, "PipeWall"),
             (21, TileDefs.BackgroundBrick, "BackgroundBrick"), (22, TileDefs.BackgroundCircuit, "BackgroundCircuit"),
             (23, TileDefs.BackgroundHangar, "BackgroundHangar"), (24, TileDefs.BackgroundSky, "BackgroundSky"),
-            (25, TileDefs.BackgroundSkyDay, "BackgroundSkyDay"),
+            (25, TileDefs.BackgroundSkyDay, "BackgroundSkyDay"), (26, TileDefs.DestructibleStone, "DestructibleStone"),
+            (27, TileDefs.DestructibleRed, "DestructibleRed"), (28, TileDefs.DestructibleSteel, "DestructibleSteel"),
+            (29, TileDefs.DestructibleMoss, "DestructibleMoss"), (30, TileDefs.DestructibleSand, "DestructibleSand"),
         };
         var moved = tiles.Where(t => t.Pinned != t.Actual).Select(t => $"{t.Name} {t.Pinned}->{t.Actual}").ToList();
         Check(moved.Count == 0, $"tile numbers match the pinned ones{(moved.Count > 0 ? ": " + string.Join(", ", moved) : "")}");
@@ -1425,6 +1428,42 @@ public partial class SmokeTest : Node
         var cameras = editor.Session.GetChildren().OfType<SecurityCamera>().OrderBy(c => c.Position.X).ToArray();
         Check(cameras.Length == 3 && !cameras[0].Sprite.FlipH && cameras[1].Sprite.FlipH && cameras[2].Sprite.FlipH,
             "in play the left-facing camera sprites are flipped, alarm blink included");
+        editor.StopPlay();
+    }
+
+    // One destructible wall slot paints every brick color; the color comes
+    // back through the picker, keeps the help line, and every color breaks.
+    private async Task WallColorCheck()
+    {
+        var editor = await FreshEditor();
+        var stone = new Vector2I(5, 9);
+        var red = new Vector2I(7, 9);
+        editor.SetBrushTile(TileDefs.DestructibleWall);
+        Check(editor.BrushTile == TileDefs.DestructibleWall, "the destructible wall brush starts as plain clay");
+        editor._UnhandledInput(KeyEvent(Key.Bracketright));
+        Check(editor.Brush.TileId == TileDefs.DestructibleWall && editor.BrushTile == TileDefs.DestructibleStone,
+            "] picks the next wall color on the same palette slot");
+        editor.PaintCell(stone);
+        Check(editor.Level.GetTile(stone.X, stone.Y) == TileDefs.DestructibleStone, "the brush paints the chosen wall color");
+
+        editor.SetBrushTile(TileDefs.RedBrick);
+        editor.Pick(stone);
+        Check(editor.Brush.TileId == TileDefs.DestructibleWall && editor.BrushTile == TileDefs.DestructibleStone,
+            "the picker selects the wall slot with the picked color");
+
+        editor.SetBrushTile(TileDefs.DestructibleRed);
+        editor.PaintCell(red);
+        var level = new LevelData();
+        level.SetTile(0, 0, TileDefs.DestructibleMoss);
+        Check(HelpOverlay.EntriesFor(level).Any(e => e.Name == TileDefs.Get(TileDefs.DestructibleWall).Name),
+            "a colored destructible wall gets the destructible wall help line");
+
+        Check(editor.StartPlay(), "wall color level starts");
+        await Frames(2);
+        editor.Session.Explode(new Vector2(6 * 32 + 16, 9 * 32 + 16));
+        await Frames(2);
+        Check(editor.Session.TileAt(stone.X, stone.Y) == TileDefs.Empty && editor.Session.TileAt(red.X, red.Y) == TileDefs.Empty,
+            "explosions break colored destructible walls");
         editor.StopPlay();
     }
 

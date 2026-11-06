@@ -60,7 +60,7 @@ public partial class Bullet : Node2D
         int id = Session.TileAt(cell.X, cell.Y);
         if (TileDefs.Get(id) is { Solid: true })
         {
-            if (id == TileDefs.DestructibleWall)
+            if (TileDefs.IsDestructible(id))
                 Session.DestroyTile(cell);
             else
                 Sfx.PlayAt(Sound.BulletHit, Position);

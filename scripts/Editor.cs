@@ -51,6 +51,8 @@ public partial class Editor : Node2D
     private readonly Dictionary<string[], string> _brushColors = new();
     private string _brushNumber = ObjectDefs.Numbers[0];
     private string _brushFacing = ObjectDefs.Facings[0];
+    // The color the destructible wall slot paints, one of TileDefs.DestructibleWalls.
+    private int _brushWall = TileDefs.DestructibleWall;
     private Drag _drag;
     private Vector2I _dragStart;
     private bool _rectErase;
@@ -80,6 +82,7 @@ public partial class Editor : Node2D
     private HBoxContainer _colorChips;
     private HBoxContainer _numberChips;
     private HBoxContainer _facingChips;
+    private HBoxContainer _wallChips;
     private Label _propertyHint;
     private Label _cellLabel;
     private Label _zoomLabel;
@@ -107,6 +110,7 @@ public partial class Editor : Node2D
     public PaletteEntry Brush => _brush;   // for tests
     public string BrushColor => BrushColorFor(_brush.ObjectType);   // for tests
     public string BrushFacing => _brushFacing;   // for tests
+    public int BrushTile => PaintedTile();   // for tests
     public bool GhostFlipped => _ghost.FlipH;   // for tests
     public bool MarkerFlipped(Vector2I cell) =>   // for tests
         _markers.GetChildren().OfType<Sprite2D>().First(m => !m.IsQueuedForDeletion() && m.Position == CellCenter(cell)).FlipH;
@@ -580,7 +584,16 @@ public partial class Editor : Node2D
         _clipboard = null;
     }
 
-    public void SetBrushTile(int tileId) => SelectBrush(EntryFor(tileId, null));
+    public void SetBrushTile(int tileId)
+    {
+        if (TileDefs.IsDestructible(tileId))
+            _brushWall = tileId;
+        SelectBrush(EntryFor(tileId, null));
+    }
+
+    // The tile id the brush lays down: the destructible wall slot paints
+    // its chosen color.
+    private int PaintedTile() => _brush.TileId == TileDefs.DestructibleWall ? _brushWall : _brush.TileId;
 
     public void SetBrushObject(string type, string color = null, string number = null, string facing = null)
     {
@@ -644,6 +657,8 @@ public partial class Editor : Node2D
             _brushNumber = ObjectDefs.Numbers[Wrap(Array.IndexOf(ObjectDefs.Numbers, _brushNumber) + step, ObjectDefs.Numbers.Length)];
         else if (_brush.ObjectType != null && ObjectDefs.HasFacingProperty(_brush.ObjectType))
             _brushFacing = ObjectDefs.Facings[Wrap(Array.IndexOf(ObjectDefs.Facings, _brushFacing) + step, ObjectDefs.Facings.Length)];
+        else if (_brush.TileId == TileDefs.DestructibleWall)
+            _brushWall = TileDefs.DestructibleWalls[Wrap(Array.IndexOf(TileDefs.DestructibleWalls, _brushWall) + step, TileDefs.DestructibleWalls.Length)];
         else
             SetStatus($"{_brush.Name} has no color, number or direction.");
         RefreshBrushUi();
@@ -686,11 +701,12 @@ public partial class Editor : Node2D
             return;
         if (_brush.IsTile)
         {
-            if (_level.GetTile(cell.X, cell.Y) == _brush.TileId)
+            int tile = PaintedTile();
+            if (_level.GetTile(cell.X, cell.Y) == tile)
                 return;
             RecordStroke();
-            _level.SetTile(cell.X, cell.Y, _brush.TileId);
-            _grids.SetCell(cell, _brush.TileId);
+            _level.SetTile(cell.X, cell.Y, tile);
+            _grids.SetCell(cell, tile);
         }
         else
             PlaceObject(cell, _brush.ObjectType);

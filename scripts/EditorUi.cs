@@ -271,6 +271,27 @@ public partial class Editor
             _facingChips.AddChild(chip);
         }
         row.AddChild(_facingChips);
+
+        _wallChips = new HBoxContainer();
+        foreach (int id in TileDefs.DestructibleWalls)
+        {
+            int captured = id;
+            var chip = new Button
+            {
+                Icon = TileSetBuilder.TileIcon(id),
+                ThemeTypeVariation = EditorTheme.Chip,
+                ToggleMode = true,
+                FocusMode = Control.FocusModeEnum.None,
+                TooltipText = $"{TileDefs.Get(id).Name}  ([ / ])",
+            };
+            chip.Pressed += () =>
+            {
+                _brushWall = captured;
+                RefreshBrushUi();
+            };
+            _wallChips.AddChild(chip);
+        }
+        row.AddChild(_wallChips);
         _propertyHint = new Label { Text = "[ ]", ThemeTypeVariation = EditorTheme.DimLabel, VerticalAlignment = VerticalAlignment.Center };
         row.AddChild(_propertyHint);
 
@@ -486,7 +507,7 @@ public partial class Editor
             Tool.Eraser => EditorTheme.Icon("eraser"),
             Tool.Picker => EditorTheme.Icon("picker"),
             Tool.Rect => EditorTheme.Icon("rect"),
-            _ => _brush.Icon,
+            _ => _brush.IsTile ? TileSetBuilder.TileIcon(PaintedTile()) : _brush.Icon,
         };
         _brushLabel.Text = _tool switch
         {
@@ -501,9 +522,13 @@ public partial class Editor
         if (hasColor)
             ShowColorChips(ObjectDefs.ColorChoices(_brush.ObjectType));
         bool hasFacing = painting && _brush.ObjectType != null && ObjectDefs.HasFacingProperty(_brush.ObjectType);
+        bool hasWallColor = painting && _brush.TileId == TileDefs.DestructibleWall;
         _numberChips.Visible = hasNumber;
         _facingChips.Visible = hasFacing;
-        _propertyHint.Visible = hasColor || hasNumber || hasFacing;
+        _wallChips.Visible = hasWallColor;
+        _propertyHint.Visible = hasColor || hasNumber || hasFacing || hasWallColor;
+        for (int i = 0; i < TileDefs.DestructibleWalls.Length; i++)
+            ((Button)_wallChips.GetChild(i)).SetPressedNoSignal(TileDefs.DestructibleWalls[i] == _brushWall);
         for (int i = 0; i < ObjectDefs.Facings.Length; i++)
             ((Button)_facingChips.GetChild(i)).SetPressedNoSignal(ObjectDefs.Facings[i] == _brushFacing);
         foreach (var node in _colorChips.GetChildren())
@@ -512,7 +537,7 @@ public partial class Editor
             ((Button)_numberChips.GetChild(i)).SetPressedNoSignal(ObjectDefs.Numbers[i] == _brushNumber);
 
         _ghost.Texture = _brush.IsTile
-            ? TileSetBuilder.TileTexture(_brush.TileId)
+            ? TileSetBuilder.TileTexture(PaintedTile())
             : Sprites.ForObject(_brush.ObjectType, hasColor ? BrushColor : null);
         _ghost.FlipH = hasFacing && _brushFacing == ObjectDefs.Facings[1];
         _ghost.Offset = _brush.IsTile ? Vector2.Zero : MarkerOffset(_brush.ObjectType, _ghost.Texture);

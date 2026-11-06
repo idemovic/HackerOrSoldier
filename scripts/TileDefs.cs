@@ -34,11 +34,32 @@ public static class TileDefs
     public const int BackgroundHangar = 23;
     public const int BackgroundSky = 24;
     public const int BackgroundSkyDay = 25;
+    public const int DestructibleStone = 26;
+    public const int DestructibleRed = 27;
+    public const int DestructibleSteel = 28;
+    public const int DestructibleMoss = 29;
+    public const int DestructibleSand = 30;
+
+    // The destructible wall in each brick color, plain clay first. One
+    // palette slot paints them all; the status bar picks the color.
+    public static readonly int[] DestructibleWalls =
+        { DestructibleWall, DestructibleStone, DestructibleRed, DestructibleSteel, DestructibleMoss, DestructibleSand };
+
+    public static bool IsDestructible(int id) => System.Array.IndexOf(DestructibleWalls, id) >= 0;
+
+    // The palette tile that paints this id: a colored destructible wall
+    // folds into the plain one.
+    public static int PaletteTile(int id) => IsDestructible(id) ? DestructibleWall : id;
 
     public static readonly TileDef[] All =
     {
         new(Wall, "Wall", new Color(0.35f, 0.37f, 0.45f), Solid: true),
         new(DestructibleWall, "Destructible wall", new Color(0.55f, 0.45f, 0.30f), Solid: true),
+        new(DestructibleStone, "Destructible wall (stone)", new Color(0.42f, 0.42f, 0.48f), Solid: true),
+        new(DestructibleRed, "Destructible wall (red)", new Color(0.56f, 0.16f, 0.13f), Solid: true),
+        new(DestructibleSteel, "Destructible wall (steel)", new Color(0.44f, 0.50f, 0.60f), Solid: true),
+        new(DestructibleMoss, "Destructible wall (moss)", new Color(0.18f, 0.36f, 0.16f), Solid: true),
+        new(DestructibleSand, "Destructible wall (sand)", new Color(0.71f, 0.57f, 0.35f), Solid: true),
         new(AlarmFloor, "Alarm floor", new Color(0.85f, 0.65f, 0.10f), Solid: true),
         new(ElectricFloor, "Electric floor", new Color(0.90f, 0.85f, 0.20f), Solid: true),
         new(Water, "Water", new Color(0.10f, 0.35f, 0.80f), Solid: false),
