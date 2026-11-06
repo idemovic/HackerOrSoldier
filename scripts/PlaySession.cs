@@ -349,6 +349,18 @@ public partial class PlaySession : Node2D
         return stat;
     }
 
+    // Holding look_down slides the view a few tiles below the agent and holds
+    // it there; letting go slides it back. The camera limits still stop it
+    // at the level's bottom edge.
+    private const float LookDownDistance = 3 * TileSetBuilder.TileSize;
+    private const float LookDownSpeed = 320f;   // px per second
+
+    private void UpdateLookDown(float dt)
+    {
+        float target = Input.IsActionPressed("look_down") && !Agent.IsDead ? LookDownDistance : 0f;
+        _camera.Position = new Vector2(0, Mathf.MoveToward(_camera.Position.Y, target, LookDownSpeed * dt));
+    }
+
     public override void _PhysicsProcess(double delta)
     {
         if (_ended)
@@ -368,6 +380,7 @@ public partial class PlaySession : Node2D
             }
         }
 
+        UpdateLookDown(dt);
         Time += dt;
         UpdateSpikes();
         UpdateSpears();

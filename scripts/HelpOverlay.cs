@@ -83,6 +83,7 @@ public partial class HelpOverlay : CanvasLayer
         ("Jump", "jump", "Swims up in water."),
         ("Shoot", "shoot", "Fires the weapon you hold. Guns sound the alarm."),
         ("Activate", "activate", "Hides in a closet, or uses a briefcase or goggles."),
+        ("Look down", "look_down", "Hold to see a few tiles below you."),
         ("Pause", "pause", null),
         ("Help", Action, "Hold to show this screen."),
     };

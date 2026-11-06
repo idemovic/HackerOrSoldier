@@ -67,6 +67,7 @@ public partial class SmokeTest : Node
         await EnemyDisguiseCheck();
         await ClosetCheck();
         await PlaytestHelpCheck();
+        await LookDownCheck();
         await BarrelCheck(ObjectDefs.Barrel);
         await BarrelCheck(ObjectDefs.SteelBarrel);
         await CollectibleCheck();
@@ -1732,6 +1733,33 @@ public partial class SmokeTest : Node
         Input.ActionRelease("move_right");
         Check(!editor.GetChildren().OfType<HelpOverlay>().Any(), "releasing help closes the help screen");
         Check(editor.PlayerAgent.Position.X > frozenX, "play resumes after the help screen closes");
+        editor.StopPlay();
+    }
+
+    // Holding look_down slides the view about three tiles below the agent and
+    // keeps it there; releasing it brings the view back.
+    private async Task LookDownCheck()
+    {
+        var editor = await FreshEditor();
+        var level = LevelData.NewDefault(40, 40);
+        for (int x = 0; x < level.Width; x++)
+            level.SetTile(x, 20, TileDefs.All[0].Id);
+        level.Objects.First(o => o.Type == ObjectDefs.AgentStart).Y = 19;
+        editor.SetLevel(level);
+        Check(editor.StartPlay(), "look-down level starts");
+        await Frames(20);
+        var camera = editor.GetViewport().GetCamera2D();
+        float CenterY() { camera.ForceUpdateScroll(); return camera.GetScreenCenterPosition().Y; }
+        float restY = CenterY();
+        Input.ActionPress("look_down");
+        await Frames(40);
+        float lookY = CenterY();
+        await Frames(30);
+        Check(Mathf.Abs(lookY - restY - 3 * 32) < 1 && Mathf.Abs(CenterY() - lookY) < 1,
+            $"holding look down moves the view 3 tiles down and holds it ({restY} -> {lookY})");
+        Input.ActionRelease("look_down");
+        await Frames(40);
+        Check(Mathf.Abs(CenterY() - restY) < 1, "releasing look down brings the view back");
         editor.StopPlay();
     }
 

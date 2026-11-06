@@ -7,7 +7,7 @@ namespace HackerOrSoldier;
 public partial class MainMenu : Control
 {
     private static readonly string[] RebindableActions =
-        { "move_left", "move_right", "jump", "shoot", "activate" };
+        { "move_left", "move_right", "jump", "shoot", "activate", "look_down" };
 
     private ConfirmationDialog _newGameConfirm;
     private PanelContainer _settingsPanel;
