@@ -134,6 +134,8 @@ public partial class PlaySession : Node2D
     private HBoxContainer _scoreStat;
     private Label _scoreCount;
     private Label _hud;
+    private Label _activatePrompt;
+    private readonly string _activateKey = HelpOverlay.KeysFor("activate");   // keys are rebound only in the main menu
     private bool _ended;
     private bool _agentDown;      // a life is being lost right now
     private bool _failAfterDeath; // it was the last one
@@ -313,6 +315,20 @@ public partial class PlaySession : Node2D
         hudRow.AddChild(_scoreStat);
         _hud = new Label { VerticalAlignment = VerticalAlignment.Center };
         hudRow.AddChild(_hud);
+
+        // Centered, a little below the agent the camera keeps in the middle.
+        _activatePrompt = new Label
+        {
+            HorizontalAlignment = HorizontalAlignment.Center,
+            VerticalAlignment = VerticalAlignment.Center,
+            Theme = new Theme { DefaultFontSize = 10 },
+            Visible = false,
+        };
+        _activatePrompt.SetAnchorsAndOffsetsPreset(Control.LayoutPreset.FullRect);
+        _activatePrompt.OffsetTop = 72;
+        _activatePrompt.AddThemeColorOverride("font_outline_color", Colors.Black);
+        _activatePrompt.AddThemeConstantOverride("outline_size", 4);
+        canvas.AddChild(_activatePrompt);
         UpdateHud();
     }
 
@@ -418,6 +434,7 @@ public partial class PlaySession : Node2D
         }
 
         UpdateHud();
+        UpdateActivatePrompt();
     }
 
     // Spike cells show the frame for the clock; the editor redraws the
@@ -633,28 +650,78 @@ public partial class PlaySession : Node2D
         }
     }
 
-    // The activate action, by priority: leave a closet, hide in a nearby
-    // closet, otherwise use a held manual item.
+    private enum Activation { None, LeaveCloset, Hide, FlipSwitch, UseItem }
+
+    // What the activate action does right now, by priority. The key press and
+    // the on-screen prompt both read this, so the prompt never promises
+    // something the key would not do.
+    private (Activation Kind, Node2D Target) CurrentActivation()
+    {
+        if (Agent == null || _agentDown)
+            return (Activation.None, null);
+        if (Agent.IsHiding)
+            return (Activation.LeaveCloset, null);
+        foreach (var closet in _closets)
+            if (WithinReach(closet))
+                return (Activation.Hide, closet);
+        foreach (var wallSwitch in _switches)
+            if (!wallSwitch.Activated && WithinReach(wallSwitch))
+                return (Activation.FlipSwitch, wallSwitch);
+        if (HeldManualItem() != null)
+            return (Activation.UseItem, null);
+        return (Activation.None, null);
+    }
+
+    private bool WithinReach(Node2D node)
+    {
+        var offset = (node.Position - Agent.Position).Abs();
+        return offset.X < 24 && offset.Y < 24;
+    }
+
     public void ActivateAction()
     {
-        if (Agent.IsHiding)
+        var (kind, target) = CurrentActivation();
+        switch (kind)
         {
-            Agent.SetHiding(false);
-            Sfx.Play(Sound.Unhide);
-            return;
-        }
-        foreach (var closet in _closets)
-        {
-            var offset = (closet.Position - Agent.Position).Abs();
-            if (offset.X < 24 && offset.Y < 24)
-            {
+            case Activation.LeaveCloset:
+                Agent.SetHiding(false);
+                Sfx.Play(Sound.Unhide);
+                break;
+            case Activation.Hide:
                 Agent.SetHiding(true);
                 Sfx.Play(Sound.Hide);
-                Agent.Position = closet.Position;
-                return;
-            }
+                Agent.Position = target.Position;
+                break;
+            case Activation.FlipSwitch:
+                FlipSwitch((WallSwitch)target);
+                break;
+            case Activation.UseItem:
+                ActivateHeldItem();
+                break;
         }
-        ActivateHeldItem();
+    }
+
+    // A shot or the activate key; either way the switch's circuit goes off.
+    public void FlipSwitch(WallSwitch wallSwitch)
+    {
+        wallSwitch.Activate();
+        TurnOffCircuit(wallSwitch.Number);
+    }
+
+    // Held items already show their key in the HUD, so the centered prompt
+    // only covers things the agent is standing next to.
+    private void UpdateActivatePrompt()
+    {
+        string verb = CurrentActivation().Kind switch
+        {
+            Activation.LeaveCloset => "leave the closet",
+            Activation.Hide => "hide",
+            Activation.FlipSwitch => "activate the switch",
+            _ => null,
+        };
+        _activatePrompt.Visible = verb != null;
+        if (verb != null)
+            _activatePrompt.Text = $"Press {_activateKey} to {verb}";
     }
 
     public bool LineClear(Vector2 from, Vector2 to)
@@ -736,12 +803,15 @@ public partial class PlaySession : Node2D
         AddChild(new Explosion { Position = center, Radius = ExplosionRadius, Camera = _camera });
     }
 
-    public void ActivateHeldItem()
+    // Goggles affect platforming, so they win when both items are held.
+    private string HeldManualItem() =>
+        _heldItems.Contains(ObjectDefs.InfraGoggles) ? ObjectDefs.InfraGoggles
+        : _heldItems.Contains(ObjectDefs.Briefcase) ? ObjectDefs.Briefcase
+        : null;
+
+    private void ActivateHeldItem()
     {
-        // Goggles affect platforming, so they win when both items are held.
-        string item = _heldItems.Contains(ObjectDefs.InfraGoggles) ? ObjectDefs.InfraGoggles
-            : _heldItems.Contains(ObjectDefs.Briefcase) ? ObjectDefs.Briefcase
-            : null;
+        string item = HeldManualItem();
         if (item == null)
             return;
         _heldItems.Remove(item);
@@ -958,13 +1028,13 @@ public partial class PlaySession : Node2D
         if (_usbKeys.Count > 0)
             parts.Add("USB: " + string.Join(" ", _usbKeys));
         if (Agent != null && Agent.IsHiding)
-            parts.Add("Hidden (C to leave)");
+            parts.Add("Hidden");
         if (CoinsCollected > 0)
             parts.Add($"Coins +{CoinsCollected}");
         if (HasVest)
             parts.Add("Vest");
         foreach (var item in _heldItems)
-            parts.Add(item == ObjectDefs.InfraGoggles ? "Goggles (press C)" : "Briefcase (press C)");
+            parts.Add((item == ObjectDefs.InfraGoggles ? "Goggles" : "Briefcase") + $" (press {_activateKey})");
         if (GogglesActive)
             parts.Add($"Infra {Mathf.CeilToInt(_gogglesTime)}s");
         if (_disguiseTime > 0)

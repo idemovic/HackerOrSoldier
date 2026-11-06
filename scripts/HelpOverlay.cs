@@ -82,7 +82,7 @@ public partial class HelpOverlay : CanvasLayer
         ("Right", "move_right", null),
         ("Jump", "jump", "Swims up in water."),
         ("Shoot", "shoot", "Fires the weapon you hold. Guns sound the alarm."),
-        ("Activate", "activate", "Hides in a closet, or uses a briefcase or goggles."),
+        ("Activate", "activate", "Hides in a closet, flips a switch, or uses a briefcase or goggles."),
         ("Pause", "pause", null),
         ("Help", Action, "Hold to show this screen."),
     };
@@ -207,11 +207,12 @@ public partial class HelpOverlay : CanvasLayer
 
     // The keyboard keys bound to an action, by the label they carry on the
     // player's layout.
-    private static string KeysFor(string action) =>
+    public static string KeysFor(string action) =>
         string.Join(" / ", InputMap.ActionGetEvents(action).OfType<InputEventKey>().Select(e =>
-            Chord.KeyName(e.PhysicalKeycode != Key.None
-                ? DisplayServer.KeyboardGetKeycodeFromPhysical(e.PhysicalKeycode)
-                : e.Keycode)));
+            Chord.KeyName(e.PhysicalKeycode == Key.None ? e.Keycode
+                // The headless display server has no keyboard layout to ask.
+                : DisplayServer.GetName() == "headless" ? e.PhysicalKeycode
+                : DisplayServer.KeyboardGetKeycodeFromPhysical(e.PhysicalKeycode))));
 
     private static Label Heading(string text) => new() { Text = text, ThemeTypeVariation = EditorTheme.Heading };
 

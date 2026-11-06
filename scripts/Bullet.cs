@@ -43,8 +43,7 @@ public partial class Bullet : Node2D
             if (Mathf.Abs(dx) < 18 && Mathf.Abs(wallSwitch.Position.Y - Position.Y) < 18)
             {
                 QueueFree();
-                wallSwitch.Activate();
-                Session.TurnOffCircuit(wallSwitch.Number);   // README: switch turns off laser beam / floor on hit
+                Session.FlipSwitch(wallSwitch);
                 return;
             }
         }

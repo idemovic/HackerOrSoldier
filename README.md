@@ -110,12 +110,14 @@ twice as quickly.
 #### Closet
 The agent can hide in the closet on activate action, e.g. in case of an alarm.
 
+Whenever the activate action does something where the agent stands (hide in or leave a closet, flip a switch), a prompt such as "Press C to hide" shows in the middle of the screen.
+
 ### Machines / Devices
 - Computer - can be hacked via USB key with same number, switches off the laser beams, security doors and floor circuits with that number (8 circuits)
 - Security camera - triggers the alarm
 - Laser beam - a beam between two ends, takes a life the moment the agent touches it (then a 1 second cooldown before it can hit again)
 - Rocket launcher - launches rockets
-- Switch - switches off the laser beams, security doors and floor circuits with its number on hit (a shot counts even when the agent stands on the switch)
+- Switch - switches off the laser beams, security doors and floor circuits with its number on hit (a shot counts even when the agent stands on the switch), or on activate action while the agent stands on it
 - Security door - a solid door wired to a circuit number; opens for good when the circuit goes off, colored keys do not open it
 - Floor circuit - editor-only marker with a number, placed on an electric floor tile; it assigns that tile's connected electric floor region to the circuit
 

@@ -1300,7 +1300,36 @@ public partial class SmokeTest : Node
         await Frames(10);
         Check(OpenDoor(editor), "shooting while standing on a switch opens its security door");
         editor.StopPlay();
+
+        // Standing on a switch, the activate key flips it, and a prompt says so
+        // until it is flipped.
+        editor = await FreshEditor();
+        PaintDoorColumn(editor, 8, "8");
+        editor.SetBrushObject(ObjectDefs.Switch, number: "8");
+        editor.PaintCell(new Vector2I(3, 10));
+        Check(editor.StartPlay(), "activate switch level starts");
+        await Frames(2);
+        Check(ActivatePrompt(editor) == null, "no activate prompt away from the switch");
+        switchX = editor.Session.Switches[0].Position.X;
+        Input.ActionPress("move_right");
+        for (int i = 0; i < 60 && editor.PlayerAgent.Position.X < switchX; i++)
+            await Frames(1);
+        Input.ActionRelease("move_right");
+        await Frames(2);
+        Check(ActivatePrompt(editor) == "Press C to activate the switch", $"prompt on the switch: {ActivatePrompt(editor)}");
+        Input.ActionPress("activate");
+        await Frames(2);
+        Input.ActionRelease("activate");
+        await Frames(10);
+        Check(OpenDoor(editor), "the activate key on a switch opens its security door");
+        Check(ActivatePrompt(editor) == null, "the prompt goes away once the switch is flipped");
+        editor.StopPlay();
     }
+
+    private static string ActivatePrompt(Editor editor) =>
+        editor.Session.GetChildren().OfType<CanvasLayer>()
+            .SelectMany(c => c.GetChildren().OfType<Label>())
+            .FirstOrDefault(l => l.Visible && l.Text.StartsWith("Press "))?.Text;
 
     // Four tiles tall so the agent cannot jump over it.
     private static void PaintDoorColumn(Editor editor, int x, string number)
@@ -1542,10 +1571,13 @@ public partial class SmokeTest : Node
         Input.ActionPress("move_right");
         await Frames(30);
         Input.ActionRelease("move_right");
+        Check(ActivatePrompt(editor) == "Press C to hide", $"prompt next to the closet: {ActivatePrompt(editor)}");
         Input.ActionPress("activate");
         await Frames(2);
         Input.ActionRelease("activate");
         Check(editor.PlayerAgent.IsHiding, "agent hides in the closet");
+        await Frames(1);
+        Check(ActivatePrompt(editor) == "Press C to leave the closet", $"prompt while hidden: {ActivatePrompt(editor)}");
         await Frames(150);
         Check(editor.Session.Lives == 3, "hidden agent is not hurt by patrolling enemies");
         Input.ActionPress("activate");
