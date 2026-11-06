@@ -1340,15 +1340,19 @@ public partial class SmokeTest : Node
             .FirstOrDefault(l => l.Visible && l.Text.StartsWith("Press "))?.Text;
 
     // An opened door sinks into the floor over a few frames instead of vanishing,
-    // and the agent is not blocked while it does.
+    // the agent is not blocked while it does, and once down only its solid top
+    // lip shows, with no see-through ghost of the door left behind.
     private async Task CheckDoorSlide(IReadOnlyCollection<SlidingDoor> doors, string kind)
     {
         Check(doors.Count > 0 && doors.All(d => d.IsOpen), $"the {kind} opened");
         await Frames(5);
-        Check(doors.All(d => d.Drop > 0 && d.Drop < TileSetBuilder.TileSize), $"the {kind} is sliding into the floor");
+        Check(doors.All(d => d.Drop > 0 && d.Drop < SlidingDoor.MaxDrop), $"the {kind} is sliding into the floor");
         Check(doors.All(d => d.GetChildren().OfType<CollisionShape2D>().All(c => c.Disabled)), $"the {kind} no longer blocks mid-slide");
         await Frames(40);
-        Check(doors.All(d => d.Drop == TileSetBuilder.TileSize), $"the {kind} is fully down");
+        Check(doors.All(d => d.Drop == SlidingDoor.MaxDrop), $"the {kind} is fully down");
+        Check(doors.All(d => d.GetChildren().OfType<Sprite2D>().ToList() is [var lip]
+                && lip.Visible && lip.Modulate.A == 1f && lip.RegionRect.Size.Y == SlidingDoor.OpenLip),
+            $"the open {kind} shows only its solid top lip");
     }
 
     // Four tiles tall so the agent cannot jump over it.

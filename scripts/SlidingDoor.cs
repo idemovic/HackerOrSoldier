@@ -4,9 +4,11 @@ namespace HackerOrSoldier;
 
 // A one-tile door that opens by sinking into the floor. The panel's bottom
 // edge stays on the tile's bottom, so the visible part shrinks from the top
-// down and nothing draws below the tile.
+// down and nothing draws below the tile. An open door leaves its top lip
+// showing so the doorway still reads.
 public abstract partial class SlidingDoor : StaticBody2D
 {
+    public const float OpenLip = 4f;
     private const float SlideSeconds = 0.4f;
 
     private CollisionShape2D _shape;
@@ -14,8 +16,10 @@ public abstract partial class SlidingDoor : StaticBody2D
 
     public bool IsOpen { get; private set; }
 
-    // Pixels the panel has sunk: 0 closed, TileSize fully down.
+    // Pixels the panel has sunk: 0 closed, MaxDrop fully down.
     public float Drop { get; private set; }
+
+    public static float MaxDrop => TileSetBuilder.TileSize - OpenLip;
 
     protected abstract Texture2D PanelTexture { get; }
 
@@ -37,19 +41,12 @@ public abstract partial class SlidingDoor : StaticBody2D
         Sfx.PlayAt(Sound.DoorOpen, Position);
         OnOpened();
         CreateTween()
-            .TweenMethod(Callable.From<float>(SetDrop), 0f, (float)TileSetBuilder.TileSize, SlideSeconds)
+            .TweenMethod(Callable.From<float>(SetDrop), 0f, MaxDrop, SlideSeconds)
             .SetTrans(Tween.TransitionType.Quad)
             .SetEase(Tween.EaseType.In);   // starts slow and accelerates like a sci-fi door
     }
 
     protected virtual void OnOpened() { }
-
-    // Puts a node under the sliding panel.
-    protected void AddBehindPanel(Node node)
-    {
-        AddChild(node);
-        MoveChild(node, _panel.GetIndex());
-    }
 
     private void SetDrop(float drop)
     {
@@ -57,6 +54,5 @@ public abstract partial class SlidingDoor : StaticBody2D
         Drop = drop;
         _panel.RegionRect = new Rect2(0, 0, tile, tile - drop);
         _panel.Position = new Vector2(0, drop / 2);
-        _panel.Visible = drop < tile;
     }
 }

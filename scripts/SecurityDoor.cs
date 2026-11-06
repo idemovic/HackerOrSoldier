@@ -25,10 +25,5 @@ public partial class SecurityDoor : SlidingDoor
         AddChild(_label);
     }
 
-    protected override void OnOpened()
-    {
-        _label.Visible = false;
-        // A faint frame stays so the route reads once the panel is gone.
-        AddBehindPanel(new Sprite2D { Texture = PanelTexture, Modulate = new Color(1, 1, 1, 0.25f) });
-    }
+    protected override void OnOpened() => _label.Visible = false;
 }
