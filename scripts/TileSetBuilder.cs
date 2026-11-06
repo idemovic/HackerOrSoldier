@@ -25,47 +25,41 @@ public static class TileSetBuilder
     public const int TileSize = 32;
     public const int SourceId = 0;
 
-    // Night-sky star layouts. One level tile id and one palette entry; the
-    // variant is picked per cell from its coordinates, so nothing extra is
-    // serialized and a reload always reproduces the same sky. Variant 0 sits
-    // in the defs row of the atlas, the rest in a second row.
-    public const int SkyVariants = 10;
-
     // Water and lava animate via native TileSet animations; their frames
-    // fill dedicated atlas rows below the defs row and the sky variants.
+    // fill dedicated atlas rows below the defs row.
     // The shadow masks take the last row, one column per mask.
     private const int WaterFrames = 4;
     private const int LavaFrames = 6;
-    private static readonly Vector2I WaterCoords = new(0, 2);
+    private static readonly Vector2I WaterCoords = new(0, 1);
     // Water under water: same row, after the surface frames.
-    private static readonly Vector2I DeepWaterCoords = new(WaterFrames, 2);
-    private static readonly Vector2I LavaCoords = new(0, 3);
+    private static readonly Vector2I DeepWaterCoords = new(WaterFrames, 1);
+    private static readonly Vector2I LavaCoords = new(0, 2);
     // Lava under lava: same row, after the surface frames.
-    private static readonly Vector2I DeepLavaCoords = new(LavaFrames, 3);
+    private static readonly Vector2I DeepLavaCoords = new(LavaFrames, 2);
     // Spike frames: frame 0 is both spikes down, then the left spike rising
     // through SpikeLevels heights, then the right one. Not a native
     // animation: the play session picks the frame from its own clock.
     public const int SpikeLevels = 3;
     private const int SpikeFrames = 1 + 2 * SpikeLevels;
-    private static readonly Vector2I SpikesCoords = new(0, 4);
+    private static readonly Vector2I SpikesCoords = new(0, 3);
     // Spear frames: same row, after the spike frames. One frame per state:
     // bare holes, tips showing in the holes, spears out. Not a native
     // animation: the play session picks the frame from its own clock.
     public const int SpearFrames = 3;
     private static readonly int[] SpearRise = { 0, 3, 24 };   // pixels above the plate, per frame
-    private const int ShadowRow = 5;
+    private const int ShadowRow = 4;
     private const int ShadowMasks = 8;
     // Electric floor joins: join = (left neighbour is electric ? 1 : 0) |
     // (right ? 2 : 0), each an animated run of frames in its own row.
-    private const int ElectricJoinRow = 6;
+    private const int ElectricJoinRow = 5;
     private const int ElectricJoins = 4;
     private const int ElectricFrames = 4;
     private static Vector2I ElectricJoinCoords(int join) => new(join * ElectricFrames, ElectricJoinRow);
     // Pipe walls: column = the PipeLinks mask of the cell.
-    private const int PipeRow = 7;
+    private const int PipeRow = 6;
     private const int PipeVariants = 16;
     // The circuit board: a Span x Span block of tiles, picked per cell.
-    private const int CircuitRow = 8;
+    private const int CircuitRow = 7;
     private const int RockRow = CircuitRow + CircuitBoard.Span;
     private const int AtlasRows = RockRow + RockFace.Span;
 
@@ -109,21 +103,11 @@ public static class TileSetBuilder
         return Vector2I.Zero;
     }
 
-    public static int SkyVariantFor(Vector2I cell) =>
-        (int)((uint)(cell.X * 73856093 ^ cell.Y * 19349663) % SkyVariants);
-
-    public static Vector2I NightSkyCoordsFor(Vector2I cell)
-    {
-        int variant = SkyVariantFor(cell);
-        return variant == 0 ? AtlasCoordsFor(TileDefs.BackgroundSky) : new Vector2I(variant - 1, 1);
-    }
-
-    // Atlas coords for a painted cell: the night sky picks its per-cell
-    // variant, water, lava and electric floor point at their animated
-    // tiles.
+    // Atlas coords for a painted cell: the circuit board and rock face pick
+    // their per-cell block, water, lava and electric floor point at their
+    // animated tiles.
     public static Vector2I GridCoordsFor(int tileId, Vector2I cell) => tileId switch
     {
-        TileDefs.BackgroundSky => NightSkyCoordsFor(cell),
         TileDefs.BackgroundCircuit => CircuitCoordsFor(cell),
         TileDefs.BackgroundRock => RockCoordsFor(cell),
         TileDefs.ElectricFloor => ElectricJoinCoords(0),
@@ -169,8 +153,6 @@ public static class TileSetBuilder
             image.BlitRect(tile, tileRect, new Vector2I(column * TileSize, row * TileSize));
         for (int i = 0; i < defs.Length; i++)
             Put(BuildTileImage(defs[i].Id), i, 0);
-        for (int v = 1; v < SkyVariants; v++)
-            Put(BuildNightSkyImage(v), v - 1, 1);
         for (int f = 0; f < WaterFrames; f++)
         {
             Put(BuildWaterImage(f, surface: true), WaterCoords.X + f, WaterCoords.Y);
@@ -259,8 +241,6 @@ public static class TileSetBuilder
             if (defs[i].Solid)
                 Solid(data);
         }
-        for (int v = 1; v < SkyVariants; v++)
-            Create(new Vector2I(v - 1, 1), TileDefs.BackgroundSky);
         Animated(WaterCoords, TileDefs.Water, WaterFrames, 0.25f);
         Animated(DeepWaterCoords, TileDefs.Water, WaterFrames, 0.25f);
         Animated(LavaCoords, TileDefs.Lava, LavaFrames, 0.3f);
@@ -388,13 +368,6 @@ public static class TileSetBuilder
                 return CircuitBoard.Tile(0, 0);
             case TileDefs.BackgroundHangar:
                 DrawHangar(img);
-                break;
-            case TileDefs.BackgroundSky:
-                return BuildNightSkyImage(0);
-            case TileDefs.BackgroundSkyDay:
-                for (int y = 0; y < TileSize; y++)
-                    for (int x = 0; x < TileSize; x++)
-                        img.SetPixel(x, y, Noise(x, y, 25) < 0.004f ? new Color("5c8aec") : new Color("3b6fe0"));
                 break;
             case TileDefs.BackgroundMesh:
                 DrawMesh(img);
@@ -1100,39 +1073,6 @@ public static class TileSetBuilder
                 int halfWidth = Mathf.Min((dy + 2) / 3, 7);
                 for (int dx = -halfWidth; dx <= halfWidth; dx++)
                     Dot(img, center + dx, y, BladeTone(dx, halfWidth));
-            }
-        }
-        return img;
-    }
-
-    // One night-sky tile: the base blue-black, a faint nebula from smooth
-    // noise, and stars of three brightnesses scattered by the variant's seed.
-    private static Image BuildNightSkyImage(int variant)
-    {
-        var img = Image.CreateEmpty(TileSize, TileSize, false, Image.Format.Rgba8);
-        var sky = Ramp("0b0e1a", "10142a", "161b36");
-        for (int y = 0; y < TileSize; y++)
-            for (int x = 0; x < TileSize; x++)
-                img.SetPixel(x, y, Tone(sky, Smooth(x, y, 16, 180 + variant) * 2.4f - 0.8f, x, y));
-        uint seed = (uint)variant * 747796405u + 2891336453u;
-        uint Next() { seed = seed * 1664525u + 1013904223u; return seed >> 8; }
-        int stars = 3 + (int)(Next() % 3);
-        for (int i = 0; i < stars; i++)
-        {
-            int sx = (int)(Next() % TileSize), sy = (int)(Next() % TileSize);
-            switch (Next() % 4)
-            {
-                case 0:
-                    img.SetPixel(sx, sy, new Color("e8e8f4"));
-                    foreach (var (dx, dy) in new[] { (1, 0), (-1, 0), (0, 1), (0, -1) })
-                        Dot(img, sx + dx, sy + dy, new Color("4a4e66"));
-                    break;
-                case 1:
-                    img.SetPixel(sx, sy, new Color("5a5a6a"));
-                    break;
-                default:
-                    img.SetPixel(sx, sy, new Color("9a9aa5"));
-                    break;
             }
         }
         return img;

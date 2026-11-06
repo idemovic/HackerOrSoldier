@@ -126,8 +126,7 @@ public partial class SmokeTest : Node
             (16, TileDefs.BackgroundPanel, "BackgroundPanel"), (17, TileDefs.Concrete, "Concrete"),
             (18, TileDefs.Sandbags, "Sandbags"), (19, TileDefs.Container, "Container"), (20, TileDefs.PipeWall, "PipeWall"),
             (21, TileDefs.BackgroundBrick, "BackgroundBrick"), (22, TileDefs.BackgroundCircuit, "BackgroundCircuit"),
-            (23, TileDefs.BackgroundHangar, "BackgroundHangar"), (24, TileDefs.BackgroundSky, "BackgroundSky"),
-            (25, TileDefs.BackgroundSkyDay, "BackgroundSkyDay"), (26, TileDefs.DestructibleStone, "DestructibleStone"),
+            (23, TileDefs.BackgroundHangar, "BackgroundHangar"), (26, TileDefs.DestructibleStone, "DestructibleStone"),
             (27, TileDefs.DestructibleRed, "DestructibleRed"), (28, TileDefs.DestructibleSteel, "DestructibleSteel"),
             (29, TileDefs.DestructibleMoss, "DestructibleMoss"), (30, TileDefs.DestructibleSand, "DestructibleSand"),
         };

@@ -32,8 +32,6 @@ public static class TileDefs
     public const int BackgroundBrick = 21;
     public const int BackgroundCircuit = 22;
     public const int BackgroundHangar = 23;
-    public const int BackgroundSky = 24;
-    public const int BackgroundSkyDay = 25;
     public const int DestructibleStone = 26;
     public const int DestructibleRed = 27;
     public const int DestructibleSteel = 28;
@@ -82,8 +80,6 @@ public static class TileDefs
         new(BackgroundBrick, "Background brick", new Color(0.14f, 0.15f, 0.18f), Solid: false),
         new(BackgroundCircuit, "Background circuit", new Color(0.08f, 0.14f, 0.10f), Solid: false),
         new(BackgroundHangar, "Background hangar", new Color(0.12f, 0.13f, 0.16f), Solid: false),
-        new(BackgroundSky, "Night sky", new Color(0.05f, 0.06f, 0.10f), Solid: false),
-        new(BackgroundSkyDay, "Day sky", new Color(0.23f, 0.44f, 0.88f), Solid: false),
     };
 
     public static TileDef Get(int id)
@@ -97,7 +93,7 @@ public static class TileDefs
     public static bool CastsShadow(int id) => Get(id) is { Solid: true };
 
     public static bool ReceivesShadow(int id) =>
-        id is not (Empty or Water or Lava or BackgroundSky or BackgroundSkyDay) && Get(id) is { Solid: false };
+        id is not (Empty or Water or Lava) && Get(id) is { Solid: false };
 }
 
 public static class ObjectDefs

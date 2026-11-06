@@ -98,7 +98,6 @@ public static class EditorPalette
             TileDefs.Container, TileDefs.PipeWall,
             TileDefs.BackgroundMesh, TileDefs.BackgroundRock, TileDefs.BackgroundPanel,
             TileDefs.BackgroundBrick, TileDefs.BackgroundCircuit, TileDefs.BackgroundHangar,
-            TileDefs.BackgroundSky, TileDefs.BackgroundSkyDay,
         };
         var walls = wallIds.Select(Tile).ToArray();
 

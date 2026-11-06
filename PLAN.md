@@ -243,8 +243,8 @@ Known simplifications (tuning constants, not README rules):
 - The sky is a level property ("night" or "day", default night), toggled
   with a toolbar button in the editor and saved in the level JSON; old
   levels without the field load as night
-- New "Day sky" paintable tile (blue with dithered cloud dashes and haze)
-  next to the night one
+- The night and day sky tiles were removed: the sky is only the level
+  setting, and saved levels had those cells cleared to empty
 - The sky is animated by a pixel-art canvas shader (SkyBackdrop): stars
   step in one palette shade at a time, twinkle, step out and respawn
   elsewhere; night wisps and two depths of day clouds drift right, swell

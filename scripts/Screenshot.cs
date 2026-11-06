@@ -92,9 +92,6 @@ public partial class Screenshot : Node
         editor.SetBrushTile(TileDefs.BackgroundCircuit);
         editor.PaintCell(new Vector2I(15, 33));
         editor.PaintCell(new Vector2I(16, 33));
-        editor.SetBrushTile(TileDefs.BackgroundSky);
-        editor.PaintCell(new Vector2I(18, 33));
-        editor.PaintCell(new Vector2I(19, 33));
 
         editor.SetBrushTile(TileDefs.Wall);
         for (int y = 32; y <= 35; y++)
