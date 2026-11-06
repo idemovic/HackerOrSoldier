@@ -136,6 +136,7 @@ The agent may encounter the following enemies:
 - Robot - Lives: infinite, Weapon: plasma shot, LoS: row, Speed: 1
 - Landmine - Lives: infinite, Weapon: mine, LoS: none (impact), Speed: 0
 - Electric eel - Lives: 1, Weapon electric shock, LoS: row, Speed 1
+- Robot piranha - Lives: 1, Weapon: bite, LoS: none, Speed: 0
 Legend:
 LoS - line of sight, where can the enemy spot the agent
 Soldier, Super soldier, Drone, Robodog and Robot sometimes drop a free ammo pack
@@ -145,6 +146,9 @@ Ultimate soldier once hit, changes to Super soldier, who when hit, changes to so
 
 ### Robot
 Robot can be killed only when stopped and turned off for a second. Robot stops and turns off automatically every 10 seconds.
+
+### Robot piranha
+Robot piranha jumps 3 tiles straight up from its spawn point every 1.5 seconds, in lava, water or anywhere else. While it lurks under the surface it is hidden and harmless and can't be shot. It bites on contact.
 
 ### On low difficulty
 On low difficulty super soldier doesn't change to

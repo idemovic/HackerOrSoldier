@@ -50,7 +50,7 @@ PICKUP_TOKENS = {
 }
 GROUND_ENEMIES = {"fighter", "soldier", "super_soldier", "ultimate_soldier", "robodog", "robot"}
 ROW_SHOOTERS = {"soldier", "super_soldier", "robot"}
-ENEMY_TYPES = GROUND_ENEMIES | {"drone", "turret", "electric_eel", "landmine"}
+ENEMY_TYPES = GROUND_ENEMIES | {"drone", "turret", "electric_eel", "landmine", "robot_piranha"}
 
 ROW_SIGHT = 10 * TILE
 ALL_SIGHT = 8 * TILE
@@ -420,6 +420,12 @@ class World:
                         sight.add((cx, cy))
         elif typ == "electric_eel":
             contact = self.flood((x, y), lambda c: c in self.water) if (x, y) in self.water else {(x, y)}
+        elif typ == "robot_piranha":
+            contact = {(x, y)}
+            for k in range(1, 4):
+                if self.static_solid((x, y - k)):
+                    break
+                contact.add((x, y - k))
         return EnemyZone(obj, (x, y), contact, sight)
 
     def blocked_cells(self, mode, disguise):

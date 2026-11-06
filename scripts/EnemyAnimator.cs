@@ -45,6 +45,7 @@ public sealed class EnemyAnimator
             EnemyDefs.ElectricEel, "electric_eel_swim1",
             "electric_eel_swim2", "electric_eel_swim3",
         }, ClockDriven: true),
+        [EnemyDefs.RobotPiranha] = new(new[] { EnemyDefs.RobotPiranha, "robot_piranha_bite" }, ClockDriven: true),
     };
 
     private static readonly string[] Rigged =

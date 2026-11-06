@@ -51,6 +51,7 @@ public partial class SmokeTest : Node
         await RobotCheck();
         await DropCheck();
         await EelCheck();
+        await PiranhaCheck();
         await AlarmFloorCheck();
         await MineCheck();
         await ExplosionCheck();
@@ -144,7 +145,7 @@ public partial class SmokeTest : Node
             "barrel", "barrel_steel", "teleport", "elevator", "moving_platform", "electric_door", "flame_trap", "rocket_launcher", "light",
             "weapon_chainsaw", "weapon_assault_rifle", "weapon_minigun", "weapon_crossbow", "weapon_dynamite",
             "fighter", "soldier", "super_soldier", "ultimate_soldier", "drone", "robodog", "turret", "robot", "landmine",
-            "electric_eel",
+            "electric_eel", "robot_piranha",
             "letter_a", "letter_g", "letter_e", "letter_n", "letter_t", "admin_password", "diamond", "notebook", "mobile",
             "smartwatch", "audio_recorder", "sim_card", "cash_stack", "business_card", "tombstone",
             "deco_clock", "deco_poster", "deco_plant", "deco_toilet", "deco_machine", "deco_copier",
@@ -1255,6 +1256,37 @@ public partial class SmokeTest : Node
         Input.ActionRelease("move_right");
         await Frames(10);
         Check(editor.IsPlaying && editor.Session.Lives == 2, "electric eel shock costs a life");
+        editor.StopPlay();
+    }
+
+    // The piranha lurks harmless under the water around the agent, then leaps
+    // out of it and bites, and settles back at its spawn point.
+    private async Task PiranhaCheck()
+    {
+        var editor = await FreshEditor();
+        editor.SetBrushTile(TileDefs.Water);
+        editor.PaintCell(new Vector2I(4, 10));
+        editor.SetBrushObject(EnemyDefs.RobotPiranha);
+        editor.PaintCell(new Vector2I(4, 10));
+        Check(editor.StartPlay(), "piranha level starts");
+        var piranha = editor.Session.Enemies[0];
+        var home = piranha.Position;
+        editor.Session.Agent.Position = home;
+        await Frames(30);
+        piranha.TakeHit();
+        Check(editor.Session.Enemies.Count == 1 && piranha.Submerged, "submerged piranha ignores hits");
+        await Frames(30);
+        Check(editor.Session.Lives == 3, "submerged piranha is harmless");
+        float highest = home.Y;
+        for (int i = 0; i < 60; i++)
+        {
+            await Frames(1);
+            highest = Mathf.Min(highest, piranha.Position.Y);
+        }
+        Check(editor.Session.Lives == 2, "leaping piranha costs a life");
+        Check(Mathf.Abs(home.Y - highest - 96f) < 8f, "piranha leaps 3 tiles");
+        await Frames(90);
+        Check(piranha.Position == home, "piranha returns to its spawn point");
         editor.StopPlay();
     }
 

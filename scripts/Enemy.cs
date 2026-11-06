@@ -13,6 +13,11 @@ public partial class Enemy : CharacterBody2D
     private const float AllSightRange = 256f;    // 8 tiles
     private const float ContactCooldownTime = 1f;
 
+    private const float LurkTime = 1.5f;
+    private const int LeapTiles = 3;
+
+    private enum LeapPhase { Lurk, Leap }
+
     public EnemyDef Def { get; set; }
     public PlaySession Session { get; set; }
 
@@ -23,6 +28,11 @@ public partial class Enemy : CharacterBody2D
     private Sprite2D _sprite;
     private EnemyAnimator _animator;   // every enemy but the turret
     private TurretGun _gun;            // the turret only
+    private LeapPhase _leapPhase;      // leapers only
+    private Vector2 _home;
+    private float _launchSpeed;
+    private float _leapVelocity;
+    private float _leapTimer;
 
     public bool IsTurnedOff => Def.Type == EnemyDefs.Robot && Session.RobotsOff;
     public string AnimationFrame => _gun?.Frame ?? _animator?.Frame;
@@ -48,6 +58,8 @@ public partial class Enemy : CharacterBody2D
         _sprite = new Sprite2D { Texture = Sprites.ForObject(Def.Type) };
         AddChild(_sprite);
         _animator = new EnemyAnimator(_sprite, Def.Type);
+        if (Def.Leaps)
+            PrepareLeap();
     }
 
     public override void _PhysicsProcess(double delta)
@@ -63,6 +75,11 @@ public partial class Enemy : CharacterBody2D
             _sprite.Modulate = new Color(0.4f, 0.4f, 0.5f);
             Velocity = Vector2.Zero;
             _animator.Update(dt, Vector2.Zero, turnedOff: true, _facing);
+            return;
+        }
+        if (Def.Leaps)
+        {
+            LeapStep(dt);
             return;
         }
         _sprite.Modulate = Colors.White;
@@ -118,6 +135,11 @@ public partial class Enemy : CharacterBody2D
 
     public void TakeHit()
     {
+        if (Submerged)
+        {
+            Sfx.PlayAt(Sound.BulletHit, Position);   // the shot sinks into the liquid
+            return;
+        }
         if (Def.Type == EnemyDefs.Robot)
         {
             if (!Session.RobotsOff)
@@ -248,6 +270,67 @@ public partial class Enemy : CharacterBody2D
             return;
         _contactCooldown = ContactCooldownTime;
         Session.AgentHit();
+    }
+
+    // A leaper never uses MoveAndSlide: lava and water are not solid, so it
+    // would fall through them. It follows its own arc and returns to _home.
+    private void PrepareLeap()
+    {
+        _home = Position;
+        int cx = (int)Mathf.Floor(_home.X / 32f);
+        int cy = (int)Mathf.Floor(_home.Y / 32f);
+        float height = LeapTiles * 32f;
+        for (int k = 1; k <= LeapTiles; k++)
+        {
+            if (!SolidAt(cx, cy - k))
+                continue;
+            height = Mathf.Max(0f, _home.Y + Def.Body.Position.Y - (cy - k + 1) * 32f);
+            break;
+        }
+        _launchSpeed = Mathf.Sqrt(2f * EnemyGravity * height);
+        _leapTimer = LurkTime;
+    }
+
+    public bool Submerged => Def.Leaps && _leapPhase == LeapPhase.Lurk && InLiquid;
+
+    private bool InLiquid =>
+        Session.TileAt((int)Mathf.Floor(_home.X / 32f), (int)Mathf.Floor(_home.Y / 32f)) is TileDefs.Water or TileDefs.Lava;
+
+    private void LeapStep(float dt)
+    {
+        if (_leapPhase == LeapPhase.Lurk)
+        {
+            _leapTimer -= dt * (Session.AlarmActive ? 2f : 1f);   // README: alarm doubles enemy speed
+            Position = _home;
+            _sprite.Rotation = 0f;
+            if (_leapTimer <= 0f && _launchSpeed > 0f)
+            {
+                _leapPhase = LeapPhase.Leap;
+                _leapVelocity = -_launchSpeed;
+                if (InLiquid)
+                    Sfx.PlayAt(Sound.Swim, Position);
+            }
+        }
+        else
+        {
+            _leapVelocity += EnemyGravity * dt;
+            Position += new Vector2(0f, _leapVelocity * dt);
+            if (_leapVelocity > 0f && Position.Y >= _home.Y)
+            {
+                Position = _home;
+                _leapPhase = LeapPhase.Lurk;
+                _leapTimer = LurkTime;
+            }
+            else
+            {
+                _sprite.Rotation = _facing * (_leapVelocity / _launchSpeed) * Mathf.Pi / 2f;
+            }
+        }
+
+        _sprite.Modulate = Submerged ? new Color(1f, 1f, 1f, 0.35f) : Colors.White;
+        _animator.Update(dt, Vector2.Zero, turnedOff: false, _facing);
+        if (!Submerged)
+            CheckContact();
     }
 
     private float FrontX => Position.X + (_facing > 0 ? Def.Body.End.X : Def.Body.Position.X);

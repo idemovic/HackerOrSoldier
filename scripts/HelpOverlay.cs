@@ -72,6 +72,7 @@ public partial class HelpOverlay : CanvasLayer
         [EnemyDefs.Robot] = "Hit it in its 1s shutdown every 10s.",
         [EnemyDefs.Landmine] = "Blows up on touch. Indestructible.",
         [EnemyDefs.ElectricEel] = "Shocks on touch in water.",
+        [EnemyDefs.RobotPiranha] = "Leaps 3 tiles out of lava or water. Bites.",
     };
 
     private const string CollectiblesHelp = "Score and coins. Spell AGENT for a bonus.";

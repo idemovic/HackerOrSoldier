@@ -10,7 +10,7 @@ public enum EnemyAttack { Contact, Pistol, MiniGun, Plasma, Dynamite, Mine }
 // chain instead degrades one stage per hit (Ultimate -> Super -> Soldier).
 public record EnemyDef(string Type, string Name, Color Color, int Lives, int Speed,
     EnemyLoS LoS, EnemyAttack Attack,
-    bool Flies = false, bool Swims = false, bool DropsAmmo = false,
+    bool Flies = false, bool Swims = false, bool Leaps = false, bool DropsAmmo = false,
     bool InfiniteLives = false, string DegradesTo = null)
 {
     // The collision box around the enemy's position, fitted to its drawn
@@ -30,6 +30,7 @@ public static class EnemyDefs
     public const string Robot = "robot";
     public const string Landmine = "landmine";
     public const string ElectricEel = "electric_eel";
+    public const string RobotPiranha = "robot_piranha";
 
     // Same box as the agent: the rigged soldiers share its body art.
     public static readonly Rect2 HumanBody = new(-8, -15, 16, 30);
@@ -54,6 +55,8 @@ public static class EnemyDefs
             InfiniteLives: true) { Body = new Rect2(-13, 7, 26, 8) },
         new(ElectricEel, "Electric eel", new Color(0.30f, 0.80f, 0.80f), Lives: 1, Speed: 1, EnemyLoS.Row, EnemyAttack.Contact,
             Swims: true) { Body = new Rect2(-15, -3, 30, 12) },
+        new(RobotPiranha, "Robot piranha", new Color(0.65f, 0.30f, 0.30f), Lives: 1, Speed: 0, EnemyLoS.None, EnemyAttack.Contact,
+            Leaps: true) { Body = new Rect2(-11, -11, 22, 22) },
     };
 
     public static EnemyDef Get(string type)
