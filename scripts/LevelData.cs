@@ -22,7 +22,8 @@ public class LevelData
     // and convert those files in LevelStore.Load. Files saved before the
     // field existed have none and read as version 1.
     // 2: the pipe and sign decorations were removed.
-    public const int CurrentFormatVersion = 2;
+    // 3: background walls moved from Tiles into their own Background layer.
+    public const int CurrentFormatVersion = 3;
 
     public int FormatVersion { get; set; } = 1;
     public string Name { get; set; } = "";
@@ -33,6 +34,8 @@ public class LevelData
     public int Width { get; set; } = DefaultWidth;
     public int Height { get; set; } = DefaultHeight;
     public int[] Tiles { get; set; } = new int[DefaultWidth * DefaultHeight];
+    // Background walls, drawn behind Tiles; 0 where there is none.
+    public int[] Background { get; set; } = new int[DefaultWidth * DefaultHeight];
     public List<LevelObject> Objects { get; set; } = new();
 
     public bool InBounds(int x, int y) => x >= 0 && x < Width && y >= 0 && y < Height;
@@ -45,15 +48,37 @@ public class LevelData
             Tiles[y * Width + x] = tileId;
     }
 
+    public int GetBackground(int x, int y) => InBounds(x, y) ? Background[y * Width + x] : TileDefs.Empty;
+
+    public void SetBackground(int x, int y, int tileId)
+    {
+        if (InBounds(x, y))
+            Background[y * Width + x] = tileId;
+    }
+
+    // The tile on the layer that id belongs to.
+    public int GetLayerTile(int x, int y, int id) =>
+        TileDefs.IsBackground(id) ? GetBackground(x, y) : GetTile(x, y);
+
+    // Writes id to its own layer and leaves the other layer alone.
+    public void Paint(int x, int y, int id)
+    {
+        if (TileDefs.IsBackground(id))
+            SetBackground(x, y, id);
+        else
+            SetTile(x, y, id);
+    }
+
     // The cells a paint bucket fills from start: every cell reachable through
-    // edge neighbours that holds the same tile. Cells holding an object are
-    // left out, so a fill never buries one.
+    // edge neighbours that holds the same tile and the same background.
+    // Cells holding an object are left out, so a fill never buries one.
     public List<Vector2I> FillRegion(Vector2I start)
     {
         var region = new List<Vector2I>();
         if (!InBounds(start.X, start.Y))
             return region;
         int target = GetTile(start.X, start.Y);
+        int targetBack = GetBackground(start.X, start.Y);
         var occupied = Objects.Select(o => new Vector2I(o.X, o.Y)).ToHashSet();
         var seen = new HashSet<Vector2I> { start };
         var open = new Stack<Vector2I>();
@@ -61,7 +86,7 @@ public class LevelData
         while (open.Count > 0)
         {
             var cell = open.Pop();
-            if (GetTile(cell.X, cell.Y) != target || occupied.Contains(cell))
+            if (GetTile(cell.X, cell.Y) != target || GetBackground(cell.X, cell.Y) != targetBack || occupied.Contains(cell))
                 continue;
             region.Add(cell);
             foreach (var next in new[] { cell + Vector2I.Left, cell + Vector2I.Right, cell + Vector2I.Up, cell + Vector2I.Down })
@@ -80,6 +105,7 @@ public class LevelData
         Width = Width,
         Height = Height,
         Tiles = (int[])Tiles.Clone(),
+        Background = (int[])Background.Clone(),
         Objects = Objects.Select(o => new LevelObject
         {
             Type = o.Type,
@@ -104,7 +130,8 @@ public class LevelData
     {
         var level = new LevelData
         {
-            FormatVersion = CurrentFormatVersion, Width = width, Height = height, Tiles = new int[width * height],
+            FormatVersion = CurrentFormatVersion, Width = width, Height = height,
+            Tiles = new int[width * height], Background = new int[width * height],
         };
         int wall = TileDefs.All[0].Id;
         for (int x = 0; x < level.Width; x++)
@@ -179,10 +206,20 @@ public static class LevelStore
         // A file from a newer build may mean something this one would misread.
         if (level.FormatVersion > LevelData.CurrentFormatVersion)
             return null;
+        // Before version 3 there is no background layer; a missing one would
+        // otherwise keep the default size.
+        if (level.FormatVersion < 3)
+            level.Background = new int[level.Tiles.Length];
+        if (level.Background?.Length != level.Tiles.Length)
+            return null;
         level.Objects ??= new List<LevelObject>();
         // Unknown types would otherwise load as pickups.
         if (level.FormatVersion < 2)
             level.Objects.RemoveAll(o => o.Type is "deco_pipe" or "deco_sign");
+        if (level.FormatVersion < 3)
+            for (int i = 0; i < level.Tiles.Length; i++)
+                if (TileDefs.IsBackground(level.Tiles[i]))
+                    (level.Background[i], level.Tiles[i]) = (level.Tiles[i], TileDefs.Empty);
         return level;
     }
 

@@ -395,9 +395,9 @@ public partial class PlaySession : Node2D
         if (_alarmTime > 0)
         {
             _alarmTime -= dt;
-            _grids.Main.Modulate = new Color(1f, 0.72f, 0.72f);   // README: rooms change appearance during an alarm
+            _grids.Tint(new Color(1f, 0.72f, 0.72f));   // README: rooms change appearance during an alarm
             if (_alarmTime <= 0)
-                _grids.Main.Modulate = Colors.White;
+                _grids.Tint(Colors.White);
         }
 
         // Doors open on contact when the agent carries the matching key.

@@ -82,6 +82,13 @@ public static class TileDefs
         new(BackgroundHangar, "Background hangar", new Color(0.12f, 0.13f, 0.16f), Solid: false),
     };
 
+    // Background walls sit on a layer of their own behind every other tile,
+    // so a wall, pipe or liquid can be painted over them and keep them.
+    public static readonly int[] BackgroundWalls =
+        { BackgroundMesh, BackgroundRock, BackgroundPanel, BackgroundBrick, BackgroundCircuit, BackgroundHangar };
+
+    public static bool IsBackground(int id) => System.Array.IndexOf(BackgroundWalls, id) >= 0;
+
     public static TileDef Get(int id)
     {
         foreach (var def in All)

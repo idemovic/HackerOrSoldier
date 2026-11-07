@@ -120,7 +120,7 @@ public partial class HelpOverlay : CanvasLayer
     // palette order. Collectibles fold into one line.
     public static IEnumerable<(Texture2D Icon, string Name, string Text)> EntriesFor(LevelData level)
     {
-        var tiles = level.Tiles.Select(TileDefs.PaletteTile).ToHashSet();
+        var tiles = level.Tiles.Concat(level.Background).Select(TileDefs.PaletteTile).ToHashSet();
         var types = level.Objects.Select(o => o.Type).ToHashSet();
         foreach (var category in EditorPalette.Categories)
         {
