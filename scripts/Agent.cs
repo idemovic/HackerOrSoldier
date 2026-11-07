@@ -88,6 +88,7 @@ public partial class Agent : CharacterBody2D
     public override void _PhysicsProcess(double delta)
     {
         float dt = (float)delta;
+        _animator.Disguised = Session?.DisguiseActive == true;
 
         // A downed agent takes no input and does not move: the body stays
         // where it fell until the respawn, hazards included.

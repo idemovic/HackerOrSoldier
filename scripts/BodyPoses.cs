@@ -30,6 +30,8 @@ public readonly record struct BodyFrame(string Who, BodyClip Clip, int Index, Sh
 public static class BodyPoses
 {
     public const string Agent = "agent";
+    // The agent under the briefcase disguise: a soldier's kit, own moves.
+    public const string Disguise = "disguise";
 
     public static readonly Dictionary<BodyClip, int> FrameCounts = new()
     {
@@ -53,6 +55,11 @@ public static class BodyPoses
     private static readonly Weapon[] Unarmed = { };
     private static readonly Weapon[] AgentGuns = WeaponDefs.All.Select(def => def.Kind).ToArray();
 
+    private static readonly BodyClip[] AgentClips =
+    {
+        BodyClip.Idle, BodyClip.Run, BodyClip.Push, BodyClip.Jump, BodyClip.Fall,
+        BodyClip.Land, BodyClip.Tread, BodyClip.Swim, BodyClip.Dive, BodyClip.Die,
+    };
     private static readonly BodyClip[] EnemyClips = { BodyClip.Idle, BodyClip.Walk, BodyClip.Run };
 
     private static readonly Ramp Skin = new("f7cfa8", "e0a078", "a86a48");
@@ -124,7 +131,29 @@ public static class BodyPoses
             },
             HeadColors: Tones(('H', "6e5238"), ('h', "402d1d"), ('j', "1f150d"), ('c', "3e5a78"))),
             AgentGuns,
-            new[] { BodyClip.Idle, BodyClip.Run, BodyClip.Push, BodyClip.Jump, BodyClip.Fall, BodyClip.Land, BodyClip.Tread, BodyClip.Swim, BodyClip.Dive, BodyClip.Die }),
+            AgentClips),
+        // The soldier's green fatigues and helmet, but still the agent's
+        // shades, so the player can pick themselves out of a squad.
+        [Disguise] = new(new Look(
+            Skin: Skin,
+            Jacket: new("6fbf5a", "3d8a34", "1f4a1c"),
+            Legs: new("4f9a44", "2e6a28", "173a15"),
+            Shoes: new("3a3a30", "1c1c16", "0c0c0a"),
+            Shirt: null, Tie: null,
+            HeadMap: new[]
+            {
+                "..gGGg..",
+                ".gGGGGg.",
+                "gGGGGGGg",
+                "gggggggg",
+                "jgzKKKKc",
+                "jgzsSSSS",
+                ".jzssmz.",
+                "..zss...",
+                "...z^...",
+            },
+            HeadColors: Tones(('G', "6fbf5a"), ('g', "3d7d34"), ('j', "1f4a1c"), ('c', "3e5a78"))),
+            AgentGuns, AgentClips),
         // Bare-knuckle brawler: orange tee, black trousers, no gun.
         [EnemyDefs.Fighter] = new(new Look(
             Skin: Skin,
