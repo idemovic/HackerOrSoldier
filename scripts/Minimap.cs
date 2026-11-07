@@ -57,6 +57,8 @@ public partial class Minimap : Control
             {
                 int id = _level.GetTile(x, y);
                 if (id == TileDefs.Empty)
+                    id = _level.GetBackground(x, y);
+                if (id == TileDefs.Empty)
                     continue;
                 foreach (var def in TileDefs.All)
                     if (def.Id == id)

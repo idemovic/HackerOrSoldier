@@ -279,7 +279,7 @@ public partial class GameFlow : Node2D
             _session = null;
         }
         _grids.Clear();
-        _grids.Main.Modulate = Colors.White;
+        _grids.Tint(Colors.White);
         _grids.Hidden.Modulate = new Color(1, 1, 1, 0);
         _sky.Apply(GetViewportRect().Size, day: false);
     }

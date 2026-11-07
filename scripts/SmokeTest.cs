@@ -30,6 +30,7 @@ public partial class SmokeTest : Node
         await DefaultLevelCheck();
         await WallTilesCheck();
         await ShadowCheck();
+        await BackgroundLayerCheck();
         await PipeCheck();
         await RimCheck();
         await SkyCheck();
@@ -223,6 +224,17 @@ public partial class SmokeTest : Node
             "a level from a newer format version is refused");
         Check(LoadRaw("_format-v1-deco.json", unversioned.Replace("[] }", "[{ \"type\": \"deco_pipe\", \"x\": 0, \"y\": 0 }] }"))?.Objects.Count == 0,
             "a version 1 level drops the removed pipe and sign decorations");
+        var v2 = LoadRaw("_format-v2-back.json",
+            $"{{ \"formatVersion\": 2, \"width\": 2, \"height\": 1, \"tiles\": [{TileDefs.BackgroundBrick}, {TileDefs.Wall}], \"objects\": [] }}");
+        Check(v2 != null && v2.GetTile(0, 0) == TileDefs.Empty && v2.GetBackground(0, 0) == TileDefs.BackgroundBrick
+            && v2.GetTile(1, 0) == TileDefs.Wall && v2.GetBackground(1, 0) == TileDefs.Empty,
+            "a version 2 level moves its background walls onto the background layer");
+        var layered = LevelData.NewDefault();
+        layered.SetBackground(3, 3, TileDefs.BackgroundCircuit);
+        layered.SetTile(3, 3, TileDefs.PipeWall);
+        var reread = LevelStore.Parse(LevelStore.Serialize(layered));
+        Check(reread != null && reread.GetBackground(3, 3) == TileDefs.BackgroundCircuit && reread.GetTile(3, 3) == TileDefs.PipeWall,
+            "a level round trip keeps the background under a pipe");
         FormatPinChecks();
 
         var tileSet = TileSetBuilder.Build();
@@ -699,7 +711,7 @@ public partial class SmokeTest : Node
         editor.PaintCell(wall);
         Check(HasShadow(editor, beneath), "painting a solid tile shades the scenery beneath it");
         Check(!HasShadow(editor, wall), "the solid tile itself gets no shade");
-        Check(editor.Level.GetTile(beneath.X, beneath.Y) == TileDefs.BackgroundBrick,
+        Check(editor.Level.GetBackground(beneath.X, beneath.Y) == TileDefs.BackgroundBrick,
             "the shade is not written into the level");
         editor.EraseCell(wall);
         Check(!HasShadow(editor, beneath), "erasing the solid tile removes the shade");
@@ -723,6 +735,101 @@ public partial class SmokeTest : Node
         Check(!HasShadow(editor, beneath), "a wall destroyed in play stops shading");
         editor.StopPlay();
         Check(HasShadow(editor, beneath), "stopping play restores the wall's shade");
+    }
+
+    // Background walls sit on their own layer: walls, pipes and liquids paint
+    // over them and keep them, and the eraser takes one layer at a time.
+    private async Task BackgroundLayerCheck()
+    {
+        var editor = await FreshEditor();
+        var level = editor.Level;
+        var cell = new Vector2I(6, 5);
+        editor.SetBrushTile(TileDefs.BackgroundBrick);
+        editor.PaintCell(cell);
+        editor.SetBrushTile(TileDefs.PipeWall);
+        editor.PaintCell(cell);
+        Check(level.GetTile(cell.X, cell.Y) == TileDefs.PipeWall && level.GetBackground(cell.X, cell.Y) == TileDefs.BackgroundBrick,
+            "a pipe wall painted over a background keeps the background");
+        Check(editor.Grids.BackgroundIdAt(cell) == TileDefs.BackgroundBrick && editor.Grids.TileIdAt(cell) == TileDefs.PipeWall,
+            "the background draws on its own layer behind the pipe");
+        editor.SetBrushTile(TileDefs.BackgroundRock);
+        editor.PaintCell(cell);
+        Check(level.GetTile(cell.X, cell.Y) == TileDefs.PipeWall && level.GetBackground(cell.X, cell.Y) == TileDefs.BackgroundRock,
+            "painting a background swaps the background and leaves the pipe");
+        editor.Pick(cell);
+        Check(editor.Brush.TileId == TileDefs.PipeWall, "picking takes the front tile first");
+
+        editor.EraseCell(cell);
+        Check(level.GetTile(cell.X, cell.Y) == TileDefs.Empty && level.GetBackground(cell.X, cell.Y) == TileDefs.BackgroundRock
+            && editor.Grids.BackgroundIdAt(cell) == TileDefs.BackgroundRock, "erasing takes the pipe and leaves the background");
+        editor.Pick(cell);
+        Check(editor.Brush.TileId == TileDefs.BackgroundRock, "picking a bare background takes the background");
+        editor._UnhandledInput(new InputEventMouseButton { ButtonIndex = MouseButton.Left, Pressed = false });   // ends the stroke
+        editor.EraseCell(cell);
+        Check(level.GetBackground(cell.X, cell.Y) == TileDefs.Empty && editor.Grids.BackgroundIdAt(cell) == TileDefs.Empty,
+            "erasing again takes the background");
+        editor.Undo();
+        Check(editor.Level.GetBackground(cell.X, cell.Y) == TileDefs.BackgroundRock, "undo brings the background back");
+        level = editor.Level;
+
+        // The fill bucket still stops at walls: an empty room fills with
+        // background, the wall cells around it keep theirs empty.
+        for (int x = 10; x <= 14; x++)
+        {
+            level.SetTile(x, 2, TileDefs.Wall);
+            level.SetTile(x, 6, TileDefs.Wall);
+        }
+        for (int y = 2; y <= 6; y++)
+        {
+            level.SetTile(10, y, TileDefs.Wall);
+            level.SetTile(14, y, TileDefs.Wall);
+        }
+        editor.SetLevel(level);
+        editor.SetTool(Editor.Tool.Fill);
+        editor.SetBrushTile(TileDefs.BackgroundPanel);
+        editor.FillAt(new Vector2I(12, 4));
+        Check(level.GetBackground(11, 3) == TileDefs.BackgroundPanel && level.GetBackground(13, 5) == TileDefs.BackgroundPanel,
+            "a background fill covers the room");
+        Check(level.GetBackground(10, 4) == TileDefs.Empty && level.GetBackground(16, 4) == TileDefs.Empty,
+            "a background fill stops at the walls");
+        editor.SetBrushTile(TileDefs.Water);
+        editor.FillAt(new Vector2I(12, 4));
+        Check(level.GetTile(12, 4) == TileDefs.Water && level.GetBackground(12, 4) == TileDefs.BackgroundPanel,
+            "filling water over a background keeps the background");
+        editor.SetTool(Editor.Tool.Brush);
+
+        var copy = LevelClip.Copy(level, new Rect2I(11, 3, 3, 3));
+        copy.PasteInto(level, new Vector2I(20, 3));
+        Check(level.GetTile(21, 4) == TileDefs.Water && level.GetBackground(21, 4) == TileDefs.BackgroundPanel,
+            "copy and paste carry both layers");
+
+        // A destructible wall shot away in play reveals the background.
+        var wall = new Vector2I(30, 5);
+        level.SetBackground(wall.X, wall.Y, TileDefs.BackgroundHangar);
+        level.SetTile(wall.X, wall.Y, TileDefs.DestructibleWall);
+        editor.SetLevel(level);
+        Check(editor.StartPlay(), "background layer level starts");
+        editor.Session.DestroyTile(wall);
+        Check(editor.Grids.TileIdAt(wall) == TileDefs.Empty && editor.Grids.BackgroundIdAt(wall) == TileDefs.BackgroundHangar,
+            "a destroyed wall shows the background behind it");
+        editor.StopPlay();
+
+        // One erase drag takes one layer off each cell, however often the
+        // mouse moves inside it.
+        editor = await FreshEditor(legacySize: false);
+        level = editor.Level;
+        var hover = editor.HoverCell;
+        Check(level.InBounds(hover.X, hover.Y), "the headless mouse sits over the level");
+        editor.SetBrushTile(TileDefs.BackgroundMesh);
+        editor.PaintCell(hover);
+        editor.SetBrushTile(TileDefs.Wall);
+        editor.PaintCell(hover);
+        editor._UnhandledInput(new InputEventMouseButton { ButtonIndex = MouseButton.Right, Pressed = true });
+        for (int i = 0; i < 3; i++)
+            editor._UnhandledInput(new InputEventMouseMotion { ButtonMask = MouseButtonMask.Right });
+        editor._UnhandledInput(new InputEventMouseButton { ButtonIndex = MouseButton.Right, Pressed = false });
+        Check(level.GetTile(hover.X, hover.Y) == TileDefs.Empty && level.GetBackground(hover.X, hover.Y) == TileDefs.BackgroundMesh,
+            "an erase drag over a wall keeps the background behind it");
     }
 
     private static bool HasShadow(Editor editor, Vector2I cell) =>

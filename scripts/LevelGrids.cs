@@ -4,6 +4,7 @@ namespace HackerOrSoldier;
 
 public sealed class LevelGrids
 {
+    public TileMapLayer Back { get; }
     public TileMapLayer Main { get; }
     public TileMapLayer Hidden { get; }
     public TileMapLayer Shadow { get; }
@@ -11,16 +12,26 @@ public sealed class LevelGrids
     public LevelGrids(Node parent)
     {
         var tileSet = TileSetBuilder.Build();
+        Back = new TileMapLayer { TileSet = tileSet };
         Main = new TileMapLayer { TileSet = tileSet };
         Hidden = new TileMapLayer { TileSet = tileSet };
         Shadow = new TileMapLayer { TileSet = tileSet };
+        parent.AddChild(Back);
         parent.AddChild(Main);
         parent.AddChild(Hidden);
         parent.AddChild(Shadow);
     }
 
+    // A background wall goes to the back layer, any other tile replaces the
+    // front one; the other layer is left as it is.
     public void SetCell(Vector2I cell, int tileId)
     {
+        if (TileDefs.IsBackground(tileId))
+        {
+            Back.SetCell(cell, TileSetBuilder.SourceId, TileSetBuilder.GridCoordsFor(tileId, cell));
+            RefreshShadow(cell);
+            return;
+        }
         Place(cell, tileId);
         RefreshShadowsAround(cell);
         RefreshElectricJoinsAround(cell);
@@ -29,6 +40,7 @@ public sealed class LevelGrids
         RefreshRimsAround(cell);
     }
 
+    // Clears the front tile; the background behind it stays.
     public void EraseCell(Vector2I cell)
     {
         Main.EraseCell(cell);
@@ -40,8 +52,22 @@ public sealed class LevelGrids
         RefreshRimsAround(cell);
     }
 
+    public void EraseBackground(Vector2I cell)
+    {
+        Back.EraseCell(cell);
+        RefreshShadow(cell);
+    }
+
+    // Colors the front and back walls alike; the alarm uses it.
+    public void Tint(Color color)
+    {
+        Back.Modulate = color;
+        Main.Modulate = color;
+    }
+
     public void Clear()
     {
+        Back.Clear();
         Main.Clear();
         Hidden.Clear();
         Shadow.Clear();
@@ -56,6 +82,9 @@ public sealed class LevelGrids
                 int id = level.GetTile(x, y);
                 if (id != TileDefs.Empty)
                     Place(new Vector2I(x, y), id);
+                int back = level.GetBackground(x, y);
+                if (back != TileDefs.Empty)
+                    Back.SetCell(new Vector2I(x, y), TileSetBuilder.SourceId, TileSetBuilder.GridCoordsFor(back, new Vector2I(x, y)));
             }
         for (int y = 0; y < level.Height; y++)
             for (int x = 0; x < level.Width; x++)
@@ -68,8 +97,12 @@ public sealed class LevelGrids
             }
     }
 
-    public int TileIdAt(Vector2I cell) =>
-        Main.GetCellTileData(cell) is { } data ? data.GetCustomData(TileSetBuilder.TileIdData).AsInt32() : TileDefs.Empty;
+    public int TileIdAt(Vector2I cell) => IdOn(Main, cell);
+
+    public int BackgroundIdAt(Vector2I cell) => IdOn(Back, cell);
+
+    private static int IdOn(TileMapLayer layer, Vector2I cell) =>
+        layer.GetCellTileData(cell) is { } data ? data.GetCustomData(TileSetBuilder.TileIdData).AsInt32() : TileDefs.Empty;
 
     private void Place(Vector2I cell, int tileId)
     {
@@ -93,10 +126,13 @@ public sealed class LevelGrids
             RefreshShadow(cell - offset);
     }
 
+    // Scenery takes shade: a non-solid front tile such as spikes, or a bare
+    // background wall.
     private void RefreshShadow(Vector2I cell)
     {
         var mask = ShadowMask.None;
-        if (TileDefs.ReceivesShadow(TileIdAt(cell)))
+        int id = TileIdAt(cell);
+        if (id == TileDefs.Empty ? BackgroundIdAt(cell) != TileDefs.Empty : TileDefs.ReceivesShadow(id))
             foreach (var (offset, band) in Casters)
                 if (TileDefs.CastsShadow(TileIdAt(cell + offset)))
                     mask |= band;

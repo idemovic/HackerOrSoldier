@@ -57,6 +57,9 @@ public partial class Editor : Node2D
     private Drag _drag;
     private Vector2I _dragStart;
     private bool _rectErase;
+    // Cells an erase drag has already cleared: one stroke takes one layer off
+    // each cell, so dragging over a pipe keeps the background behind it.
+    private readonly HashSet<Vector2I> _erasedInDrag = new();
     private Rect2I? _selection;
     private LevelClip _clipboard;
     private bool _showGrid = true;
@@ -112,6 +115,7 @@ public partial class Editor : Node2D
     public string BrushColor => BrushColorFor(_brush.ObjectType);   // for tests
     public string BrushFacing => _brushFacing;   // for tests
     public int BrushTile => PaintedTile();   // for tests
+    public Vector2I HoverCell => MouseCell();   // for tests
     public bool GhostFlipped => _ghost.FlipH;   // for tests
     public bool MarkerFlipped(Vector2I cell) =>   // for tests
         _markers.GetChildren().OfType<Sprite2D>().First(m => !m.IsQueuedForDeletion() && m.Position == CellCenter(cell)).FlipH;
@@ -416,8 +420,7 @@ public partial class Editor : Node2D
                 _drag = Drag.Select;
                 break;
             case MouseButton.Left when _tool == Tool.Eraser:
-                _drag = Drag.Erase;
-                EraseCell(cell);
+                StartEraseDrag(cell);
                 break;
             case MouseButton.Left:
                 _drag = Drag.Paint;
@@ -431,8 +434,7 @@ public partial class Editor : Node2D
                 ResetSelection();
                 break;
             case MouseButton.Right:
-                _drag = Drag.Erase;
-                EraseCell(cell);
+                StartEraseDrag(cell);
                 break;
         }
     }
@@ -458,10 +460,18 @@ public partial class Editor : Node2D
             case Drag.Paint:
                 PaintCell(MouseCell());
                 break;
-            case Drag.Erase:
+            case Drag.Erase when _erasedInDrag.Add(MouseCell()):
                 EraseCell(MouseCell());
                 break;
         }
+    }
+
+    private void StartEraseDrag(Vector2I cell)
+    {
+        _drag = Drag.Erase;
+        _erasedInDrag.Clear();
+        _erasedInDrag.Add(cell);
+        EraseCell(cell);
     }
 
     private static Rect2I CellRect(Vector2I a, Vector2I b)
@@ -719,10 +729,13 @@ public partial class Editor : Node2D
             return;
         var obj = _level.Objects.Find(o => o.X == cell.X && o.Y == cell.Y);
         int tile = _level.GetTile(cell.X, cell.Y);
+        int back = _level.GetBackground(cell.X, cell.Y);
         if (obj != null)
             SetBrushObject(obj.Type, obj.Properties.GetValueOrDefault("color"), obj.Properties.GetValueOrDefault("number"), obj.Properties.GetValueOrDefault("facing"));
         else if (tile != TileDefs.Empty)
             SetBrushTile(tile);
+        else if (back != TileDefs.Empty)
+            SetBrushTile(back);
         else
         {
             SetStatus("Nothing to pick here.");
@@ -749,10 +762,10 @@ public partial class Editor : Node2D
         if (_brush.IsTile)
         {
             int tile = PaintedTile();
-            if (_level.GetTile(cell.X, cell.Y) == tile)
+            if (_level.GetLayerTile(cell.X, cell.Y, tile) == tile)
                 return;
             RecordStroke();
-            _level.SetTile(cell.X, cell.Y, tile);
+            _level.Paint(cell.X, cell.Y, tile);
             _grids.SetCell(cell, tile);
         }
         else
@@ -771,7 +784,7 @@ public partial class Editor : Node2D
             return;
         }
         int tile = PaintedTile();
-        if (_level.GetTile(cell.X, cell.Y) == tile)
+        if (_level.GetLayerTile(cell.X, cell.Y, tile) == tile)
             return;
         var region = _level.FillRegion(cell);
         if (region.Count == 0)
@@ -779,18 +792,27 @@ public partial class Editor : Node2D
         RecordUndo();
         foreach (var c in region)
         {
-            _level.SetTile(c.X, c.Y, tile);
+            _level.Paint(c.X, c.Y, tile);
             _grids.SetCell(c, tile);
         }
         SetStatus($"Filled {region.Count} cells with {_brush.Name}.");
     }
 
+    // Erases the top of the cell: its tile and objects, or once those are
+    // gone the background wall behind them.
     public void EraseCell(Vector2I cell)
     {
         if (!_level.InBounds(cell.X, cell.Y))
             return;
         if (_level.GetTile(cell.X, cell.Y) == TileDefs.Empty && !_level.Objects.Any(o => o.X == cell.X && o.Y == cell.Y))
+        {
+            if (_level.GetBackground(cell.X, cell.Y) == TileDefs.Empty)
+                return;
+            RecordStroke();
+            _level.SetBackground(cell.X, cell.Y, TileDefs.Empty);
+            _grids.EraseBackground(cell);
             return;
+        }
         RecordStroke();
         _level.SetTile(cell.X, cell.Y, TileDefs.Empty);
         _grids.EraseCell(cell);
@@ -835,7 +857,7 @@ public partial class Editor : Node2D
         _session = null;
         _grids.Hidden.Modulate = HiddenEditTint;
         _grids.Hidden.CollisionEnabled = true;
-        _grids.Main.Modulate = Colors.White;   // clears the alarm tint
+        _grids.Tint(Colors.White);   // clears the alarm tint
         RedrawLevel();   // restores walls destroyed during play
         _markers.Visible = true;
         _editUi.Visible = true;

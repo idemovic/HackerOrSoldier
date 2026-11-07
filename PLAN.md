@@ -234,6 +234,13 @@ Known simplifications (tuning constants, not README rules):
   sky with stars for the outdoor top of tall levels
 - Smoke test: agent walks through a background wall and is stopped by a
   stone block wall (both negative-verified by flipping the Solid flags)
+- Background walls live on their own layer (LevelData.Background, format
+  version 3; older files move them out of Tiles on load). Any other tile
+  paints over a background and keeps it, so a pipe, liquid or spike shows
+  the wall behind it, and a destroyed wall reveals it. The eraser takes the
+  front tile and objects first, then the background; one erase drag takes
+  one layer off each cell. Fill matches both layers, so it still stops at
+  walls
 - Wall ends are finished, not cut off: every side of a solid tile without a
   solid neighbour (empty or a background wall) gets a rim in flat tones of
   the tile's face colour (dark outline, lit cap on top and left, shade on
