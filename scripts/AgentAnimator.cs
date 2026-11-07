@@ -11,7 +11,8 @@ public sealed class AgentAnimator
 {
     // Every distinct pose the animator can reach; the smoke test builds them
     // all so a broken pose fails the run.
-    public static readonly string[] AllFrames = BodyPoses.All(BodyPoses.Agent).Select(f => f.Key).Distinct().ToArray();
+    public static readonly string[] AllFrames = BodyPoses.All(BodyPoses.Agent).Concat(BodyPoses.All(BodyPoses.Disguise))
+        .Select(f => f.Key).Distinct().ToArray();
 
     private const float IdleFrameTime = 0.35f;   // one breath per 1.4s
     private const float TreadFrameTime = 0.1f;
@@ -50,6 +51,12 @@ public sealed class AgentAnimator
     private float _sinkTime;
     private bool _dying;
     private BodyFrame? _frame;
+
+    // True while the briefcase disguise is on: every clip draws the agent
+    // in a soldier's kit.
+    public bool Disguised { get; set; }
+
+    private string Who => Disguised ? BodyPoses.Disguise : BodyPoses.Agent;
 
     // Pose currently on screen; the smoke test asserts against it.
     public string Frame => _frame?.Key;
@@ -93,7 +100,7 @@ public sealed class AgentAnimator
         {
             _phase += dt;
             int last = BodyPoses.FrameCounts[BodyClip.Die] - 1;
-            Show(new BodyFrame(BodyPoses.Agent, BodyClip.Die, Mathf.Min((int)(_phase / DieFrameTime), last), Left: left));
+            Show(new BodyFrame(Who, BodyClip.Die, Mathf.Min((int)(_phase / DieFrameTime), last), Left: left));
             return;
         }
 
@@ -128,7 +135,7 @@ public sealed class AgentAnimator
             _ => 0,
         };
         var shot = CurrentShot();
-        Show(new BodyFrame(BodyPoses.Agent, clip, index, shot, left, shot == Shot.None ? Weapon.None : _gun));
+        Show(new BodyFrame(Who, clip, index, shot, left, shot == Shot.None ? Weapon.None : _gun));
     }
 
     private int Cycle(float step, int count)

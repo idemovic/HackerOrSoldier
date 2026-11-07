@@ -15,6 +15,7 @@ public partial class AgentFramesPreview : Node
     public override void _Ready()
     {
         BodySheet("user://agent_frames.png", BodyPoses.Agent);
+        BodySheet("user://disguise_frames.png", BodyPoses.Disguise);
         foreach (var who in new[] { EnemyDefs.Fighter, EnemyDefs.Soldier, EnemyDefs.SuperSoldier, EnemyDefs.UltimateSoldier })
             BodySheet($"user://{who}_frames.png", who);
         Sheet("user://enemy_frames.png", EnemyAnimator.AllFrames.Where(k => !BodyPoses.IsRigged(BodyPoses.Find(k)?.Who)).ToArray(), columns: 8);

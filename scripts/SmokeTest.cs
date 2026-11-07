@@ -1822,6 +1822,7 @@ public partial class SmokeTest : Node
         Input.ActionRelease("move_right");
         await Frames(10);
         Check(editor.Session.DisguiseActive, "activate turns on the briefcase disguise");
+        Check(editor.PlayerAgent.AnimationFrame?.StartsWith(BodyPoses.Disguise) == true, "the disguised agent is drawn as a soldier");
         Check(!editor.Session.AlarmActive, "disguised agent is not detected by the camera");
         editor.StopPlay();
     }
