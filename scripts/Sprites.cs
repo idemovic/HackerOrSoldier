@@ -256,6 +256,35 @@ public static class Sprites
         "................................",
     };
 
+    // A 32x32 door: frame, sign plate near the top and a knob. The exit door
+    // and the colored doors share it so a colored door reads as a door.
+    private static string[] DoorRows(char frame, char body)
+    {
+        var rows = new string[32];
+        for (int y = 0; y < 32; y++)
+        {
+            var row = new string('.', 32).ToCharArray();
+            for (int x = 6; x <= 24 && y >= 2 && y <= 29; x++)
+            {
+                bool edge = x < 8 || x > 22 || y < 5 || y == 12 || y > 27;
+                bool sign = y >= 5 && y <= 11;
+                bool knob = (y == 17 || y == 18) && (x == 19 || x == 20);
+                row[x] = edge ? frame : sign ? 'y' : knob ? 'w' : body;
+            }
+            rows[y] = new string(row);
+        }
+        return rows;
+    }
+
+    private static readonly string[] ExitSign =
+    {
+        "kkk.k.k.k.kkk",
+        "k...k.k.k..k.",
+        "kk...k..k..k.",
+        "k...k.k.k..k.",
+        "kkk.k.k.k..k.",
+    };
+
     // Lays one map over another, shifted by (dx, dy); '.' stays see-through.
     private static string[] Overlay(string[] under, string[] over, int dx, int dy)
     {
@@ -783,47 +812,11 @@ public static class Sprites
             "................",
             "................",
         }),
-        [ObjectDefs.ExitDoor] = new(new[]
-        {
-            "................",
-            "...EEEEEEEEE....",
-            "...EeeeeeeeE....",
-            "...EeyyyyyeE....",
-            "...EeeeeeeeE....",
-            "...EeeeeeeeE....",
-            "...EeeeeeeeE....",
-            "...EeeeeeeeE....",
-            "...EeeeeeweE....",
-            "...EeeeeeeeE....",
-            "...EeeeeeeeE....",
-            "...EeeeeeeeE....",
-            "...EeeeeeeeE....",
-            "...EeeeeeeeE....",
-            "...EEEEEEEEE....",
-            "................",
-        }),
+        [ObjectDefs.ExitDoor] = new(Overlay(DoorRows('E', 'e'), ExitSign, dx: 9, dy: 6), Scale: 1),
         // Red until the agent touches it, green while it is the respawn point.
         [ObjectDefs.Checkpoint] = Flag('r', 'R'),
         ["checkpoint_lit"] = Flag('e', 'E'),
-        [ObjectDefs.Door] = new(new[]
-        {
-            "................",
-            "...XXXXXXXXX....",
-            "...XxxxxxxxX....",
-            "...XxxxxxxxX....",
-            "...XxxxxxxxX....",
-            "...XxxxxxxxX....",
-            "...XxxxxxxxX....",
-            "...XxxxxxxxX....",
-            "...XxxxyxxxX....",
-            "...XxxxyxxxX....",
-            "...XxxxxxxxX....",
-            "...XxxxxxxxX....",
-            "...XxxxxxxxX....",
-            "...XxxxxxxxX....",
-            "...XXXXXXXXX....",
-            "................",
-        }),
+        [ObjectDefs.Door] = new(DoorRows('x', 'X'), Scale: 1),
         [ObjectDefs.DoorKey] = new(new[]
         {
             "................",
