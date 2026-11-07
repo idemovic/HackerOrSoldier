@@ -759,6 +759,17 @@ public partial class PlaySession : Node2D
         AddChild(new Dynamite { Session = this, Position = from });
     }
 
+    // Editor playtest cheat: every ammo pool full.
+    public const int FullAmmo = 99;
+
+    public void RefillAmmo()
+    {
+        Ammo = FullAmmo;
+        Arrows = FullAmmo;
+        DynamiteSticks = FullAmmo;
+        Sfx.Play(Sound.PickupAmmo);
+    }
+
     public void SpawnAmmoPack(Vector2 at)
     {
         var pickup = new Pickup

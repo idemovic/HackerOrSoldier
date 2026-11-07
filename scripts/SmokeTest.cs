@@ -952,6 +952,9 @@ public partial class SmokeTest : Node
         Check(editor.Session.Ammo == 9, "shooting spent one ammo");
         Check(agent != null && agent.Position.X > 14 * 32,
             "key opened the door and the shot cleared the wall");
+        editor.Session.RefillAmmo();
+        Check(editor.Session.Ammo == PlaySession.FullAmmo && editor.Session.Arrows == PlaySession.FullAmmo
+            && editor.Session.DynamiteSticks == PlaySession.FullAmmo, "reload fills every ammo pool");
         editor.StopPlay();
         Check(editor.Level.GetTile(13, 10) == TileDefs.DestructibleWall,
             "destroyed wall is restored in edit mode");

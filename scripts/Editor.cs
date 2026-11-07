@@ -1022,6 +1022,14 @@ public partial class Editor : Node2D
         SetStatus(_revealHidden ? "Hidden platforms are visible and solid in playtest." : "Hidden platforms need goggles again.");
     }
 
+    private void RefillAmmo()
+    {
+        if (_session == null)
+            return;
+        _session.RefillAmmo();
+        SetStatus($"Ammo refilled to {PlaySession.FullAmmo}.");
+    }
+
     private void JumpCheckpoint(int step)
     {
         if (!IsPlaying)

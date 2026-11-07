@@ -346,6 +346,16 @@ public partial class Editor
         _playRevealButton.Pressed += ToggleRevealHidden;
         row.AddChild(_playRevealButton);
 
+        var reload = new Button
+        {
+            Text = "RELOAD",
+            Icon = EditorTheme.Icon("undo"),
+            FocusMode = Control.FocusModeEnum.None,
+            TooltipText = $"Refill bullets, arrows and dynamite to {PlaySession.FullAmmo}",
+        };
+        reload.Pressed += RefillAmmo;
+        row.AddChild(reload);
+
         var stop = new Button
         {
             Text = "EDIT  Esc",
