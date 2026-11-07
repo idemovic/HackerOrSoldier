@@ -102,7 +102,7 @@ public partial class Editor
             button.TooltipText += tool switch
             {
                 Tool.Fill => "\nClick fills the connected area of the same tile\n(or of empty cells) with the brush tile",
-                Tool.Rect => "\nCtrl+C copies, Ctrl+V pastes at the cursor\nEsc, right click or another tool clears it\nShift+drag still fills a rectangle",
+                Tool.Rect => "\nCtrl+C copies, Ctrl+V pastes at the cursor, Delete erases it\nEsc, right click or another tool clears it\nShift+drag still fills a rectangle",
                 Tool.Eraser => "\nor right mouse button",
                 Tool.Picker => "\nor Alt+click",
                 _ => "",
@@ -413,7 +413,7 @@ public partial class Editor
 
         var mouse = new[]
         {
-            ("Left", "paint"), ("Right", "erase"), ("Shift+drag", "fill / erase a rectangle"), ("Select tool", "drag an area, Ctrl+C / Ctrl+V"),
+            ("Left", "paint"), ("Right", "erase"), ("Shift+drag", "fill / erase a rectangle"), ("Select tool", "drag an area, Ctrl+C / Ctrl+V / Delete"),
             ("Alt+click", "pick the brush under the cursor"), ("Middle drag", "pan"), ("Space+drag", "pan"),
             ("Wheel", "next / prev item"), ("Shift+wheel", "next / prev category"), ("Ctrl+wheel", "zoom"),
             ("Minimap", "click to jump"),

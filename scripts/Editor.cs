@@ -140,6 +140,7 @@ public partial class Editor : Node2D
         new("Redo", "Edit", Redo, new Chord(Key.Y, Ctrl: true), new Chord(Key.Z, Ctrl: true, Shift: true)),
         new("Copy", "Edit", CopySelection, new Chord(Key.C, Ctrl: true)),
         new("Paste", "Edit", () => PasteAt(MouseCell()), new Chord(Key.V, Ctrl: true)),
+        new("Delete selection", "Edit", DeleteSelection, new Chord(Key.Delete)),
         new("Brush", "Tools", () => SetTool(Tool.Brush), new Chord(Key.B)),
         new("Fill", "Tools", () => SetTool(Tool.Fill), new Chord(Key.F)),
         new("Select", "Tools", () => SetTool(Tool.Rect), new Chord(Key.R)),
@@ -498,6 +499,18 @@ public partial class Editor : Node2D
         }
         _clipboard = LevelClip.Copy(_level, area);
         SetStatus($"Copied {area.Size.X}x{area.Size.Y}. Ctrl+V pastes at the cursor.");
+    }
+
+    // Clears every tile and object in the selection as one undo step.
+    public void DeleteSelection()
+    {
+        if (_selection is not { } area)
+        {
+            SetStatus("Select an area first (R, then drag).", warn: true);
+            return;
+        }
+        ApplyRect(area.Position, area.End - Vector2I.One, erase: true);
+        SetStatus($"Deleted {area.Size.X}x{area.Size.Y}.");
     }
 
     // The clip's top-left lands on the cell; whatever falls outside the level is cut off.

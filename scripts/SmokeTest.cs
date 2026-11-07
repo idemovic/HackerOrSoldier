@@ -503,6 +503,17 @@ public partial class SmokeTest : Node
         editor.PasteAt(new Vector2I(2, 78));
         Check(editor.Level.Validate() == null, "pasting over the agent start leaves it in place");
 
+        editor.Level.SetTile(40, 40, TileDefs.Wall);
+        editor.Level.SetTile(41, 41, TileDefs.Lava);
+        editor.Level.Objects.Add(new LevelObject { Type = ObjectDefs.Door, X = 41, Y = 40, Properties = new() { ["color"] = "red" } });
+        editor.SelectArea(new Vector2I(40, 40), new Vector2I(41, 41));
+        editor._UnhandledInput(KeyEvent(Key.Delete));
+        Check(editor.Level.GetTile(40, 40) == TileDefs.Empty && editor.Level.GetTile(41, 41) == TileDefs.Empty
+            && !editor.Level.Objects.Any(o => o.X == 41 && o.Y == 40), "Delete erases the tiles and objects in the selection");
+        editor.Undo();
+        Check(editor.Level.GetTile(40, 40) == TileDefs.Wall && editor.Level.GetTile(41, 41) == TileDefs.Lava
+            && editor.Level.Objects.Any(o => o.X == 41 && o.Y == 40), "one undo restores the whole deleted area");
+
         Check(editor.Selection != null, "the paste left a selection");
         editor._UnhandledInput(KeyEvent(Key.Escape));
         Check(editor.Selection == null && editor.Clipboard == null, "Esc clears the selection and the copy");
