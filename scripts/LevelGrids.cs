@@ -8,6 +8,7 @@ public sealed class LevelGrids
     public TileMapLayer Main { get; }
     public TileMapLayer Hidden { get; }
     public TileMapLayer Shadow { get; }
+    public LavaSpit Spit { get; }
 
     public LevelGrids(Node parent)
     {
@@ -20,6 +21,8 @@ public sealed class LevelGrids
         parent.AddChild(Main);
         parent.AddChild(Hidden);
         parent.AddChild(Shadow);
+        Spit = new LavaSpit { Covered = cell => TileDefs.Get(TileIdAt(cell + Vector2I.Up)) is { Solid: true } };
+        parent.AddChild(Spit);
     }
 
     // A background wall goes to the back layer, any other tile replaces the
@@ -63,6 +66,7 @@ public sealed class LevelGrids
     {
         Back.Modulate = color;
         Main.Modulate = color;
+        Spit.Modulate = color;
     }
 
     public void Clear()
@@ -71,6 +75,7 @@ public sealed class LevelGrids
         Main.Clear();
         Hidden.Clear();
         Shadow.Clear();
+        Spit.Clear();
     }
 
     public void Fill(LevelData level)
@@ -195,16 +200,18 @@ public sealed class LevelGrids
     }
 
     // Only the top cell of a water or lava column draws the surface; a cell
-    // with the same liquid above it draws the body alone.
+    // with the same liquid above it draws the body alone. Top lava cells
+    // also spit droplets.
     private void RefreshWater(Vector2I cell)
     {
         int id = TileIdAt(cell);
+        bool sameAbove = TileIdAt(cell + Vector2I.Up) == id;
+        Spit.SetSurface(cell, id == TileDefs.Lava && !sameAbove);
         if (id != TileDefs.Water && id != TileDefs.Lava)
             return;
-        bool sameAbove = TileIdAt(cell + Vector2I.Up) == id;
         Main.SetCell(cell, TileSetBuilder.SourceId, id == TileDefs.Water
             ? TileSetBuilder.WaterCoordsFor(sameAbove)
-            : TileSetBuilder.LavaCoordsFor(sameAbove));
+            : TileSetBuilder.LavaCoordsFor(cell, sameAbove));
     }
 
     private static readonly (Vector2I Offset, WallJoins Join)[] RimSides =
