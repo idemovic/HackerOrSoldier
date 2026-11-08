@@ -53,7 +53,7 @@ public static class Sprites
         if (!Maps.TryGetValue(key, out var map))
             return BodyPoses.Find(key) is BodyFrame frame ? BodyPoses.Texture(frame) : null;
         var slot = colorName != null ? ObjectDefs.SlotColor(colorName) : Colors.Magenta;
-        var texture = ImageTexture.CreateFromImage(FromMap(key, map.Rows, map.Scale, map.ShadeBody, slot));
+        var texture = ImageTexture.CreateFromImage(FromMap(key, map, slot));
         Cache[cacheKey] = texture;
         return texture;
     }
@@ -112,10 +112,17 @@ public static class Sprites
         return texture;
     }
 
-    private static Image FromMap(string key, string[] rows, int scale, bool shadeBody, Color slot)
+    private static Image FromMap(string key, SpriteMap map, Color slot)
+    {
+        var img = PixelArt.Finish(Paint(key, map.Rows, slot, null), upscale: map.Scale == 2, map.ShadeBody);
+        return map.Overlay == null ? img : Paint(key, map.Overlay, slot, img);
+    }
+
+    // Paints a map's opaque pixels onto img, or onto a new blank image.
+    private static Image Paint(string key, string[] rows, Color slot, Image img)
     {
         int width = rows[0].Length;
-        var img = Image.CreateEmpty(width, rows.Length, false, Image.Format.Rgba8);
+        img ??= Image.CreateEmpty(width, rows.Length, false, Image.Format.Rgba8);
         for (int y = 0; y < rows.Length; y++)
         {
             if (rows[y].Length != width)
@@ -136,10 +143,12 @@ public static class Sprites
                 img.SetPixel(x, y, color);
             }
         }
-        return PixelArt.Finish(img, upscale: scale == 2, shadeBody);
+        return img;
     }
 
-    private record SpriteMap(string[] Rows, int Scale = 2, bool ShadeBody = true);
+    // Overlay is a native 32x32 map painted over the finished sprite, for
+    // detail too fine to survive the 16x16 doubling.
+    private record SpriteMap(string[] Rows, int Scale = 2, bool ShadeBody = true, string[] Overlay = null);
 
     private static SpriteMap Flag(char fill, char shade) => new(System.Array.ConvertAll(new[]
     {
@@ -307,6 +316,43 @@ public static class Sprites
         }
         return rows;
     }
+
+    // Yellow two-way arrow with a 1px black outline, the mark of a movable.
+    private static readonly string[] MoveArrow =
+    {
+        "................................",
+        "................................",
+        "................................",
+        "................................",
+        "................................",
+        "................................",
+        "................................",
+        "................................",
+        "................................",
+        "................................",
+        "................................",
+        "................................",
+        "..........kkkk....kkkk..........",
+        ".........kkyyk....kyykk.........",
+        "........kkyykk....kkyykk........",
+        ".......kkyykkkkkkkkkkyykk.......",
+        ".......kyyyyyyyyyyyyyyyyk.......",
+        ".......kyyyyyyyyyyyyyyyyk.......",
+        ".......kkyykkkkkkkkkkyykk.......",
+        "........kkyykk....kkyykk........",
+        ".........kkyyk....kyykk.........",
+        "..........kkkk....kkkk..........",
+        "................................",
+        "................................",
+        "................................",
+        "................................",
+        "................................",
+        "................................",
+        "................................",
+        "................................",
+        "................................",
+        "................................",
+    };
 
     private static readonly Dictionary<string, SpriteMap> Maps = new()
     {
@@ -1195,8 +1241,8 @@ public static class Sprites
             "..NNNNNNNNNNNN..",
             "..NN........NN..",
         }),
-        // The decoration crates with a yellow two-way arrow stencilled on,
-        // so the pushable ones stand out. They fill the cell like their
+        // The decoration crates with MoveArrow stencilled on, so the
+        // pushable ones stand out. They fill the cell like their
         // 30x30 collision box so they rest on the floor.
         [ObjectDefs.Barrel] = new(new[]
         {
@@ -1206,17 +1252,17 @@ public static class Sprites
             "NtNnnnnnnnnttNnN",
             "NtNnnnnnnnttnNnN",
             "NtNnnnnnnttnnNnN",
-            "NtNNNyNNttyNNNnN",
-            "NtNnynnttnnynNnN",
-            "NtNyyyyyyyyyyNnN",
-            "NtNNyttNNNNyNNnN",
-            "NtNntynnnnynnNnN",
+            "NtNNNNNNttNNNNnN",
+            "NtNnnnnttnnnnNnN",
+            "NtNnnnttnnnnnNnN",
+            "NtNNNttNNNNNNNnN",
+            "NtNnttnnnnnnnNnN",
             "NtNttnnnnnnnnNnN",
             "NtNtnnnnnnnnnNnN",
             "NtNNNNNNNNNNNNnN",
             "NtnnnnnnnnnnnnnN",
             "NNNNNNNNNNNNNNNN",
-        }),
+        }, Overlay: MoveArrow),
         [ObjectDefs.SteelBarrel] = new(new[]
         {
             "dddddddddddddddddddddddddddddddd",
@@ -1232,14 +1278,14 @@ public static class Sprites
             "dlvvudVVVVVVVVVVVVVvuudVVVVvuuVd",
             "dlvvudVVVVVVVVVVVVvuudVVVVVvuuVd",
             "dlvvudVVVVVVVVVVVvuudVVVVVVvuuVd",
-            "dlvvudVVVVVyyVVVvuuyyVVVVVVvuuVd",
-            "dlvvudVVVVyyVVVvuudVyyVVVVVvuuVd",
-            "dlvvudVVVyyVVVvuudVVVyyVVVVvuuVd",
-            "dlvvudVVyyyyyyyyyyyyyyyyVVVvuuVd",
-            "dlvvudVVyyyyyyyyyyyyyyyyVVVvuuVd",
-            "dlvvudVVVyyvuudVVVVVVyyVVVVvuuVd",
-            "dlvvudVVVVyyudVVVVVVyyVVVVVvuuVd",
-            "dlvvudVVVvuyyVVVVVVyyVVVVVVvuuVd",
+            "dlvvudVVVVVVVVVVvuudVVVVVVVvuuVd",
+            "dlvvudVVVVVVVVVvuudVVVVVVVVvuuVd",
+            "dlvvudVVVVVVVVvuudVVVVVVVVVvuuVd",
+            "dlvvudVVVVVVVvuudVVVVVVVVVVvuuVd",
+            "dlvvudVVVVVVvuudVVVVVVVVVVVvuuVd",
+            "dlvvudVVVVVvuudVVVVVVVVVVVVvuuVd",
+            "dlvvudVVVVvuudVVVVVVVVVVVVVvuuVd",
+            "dlvvudVVVvuudVVVVVVVVVVVVVVvuuVd",
             "dlvvudVVvuudVVVVVVVVVVVVVVVvuuVd",
             "dlvvudVvuudVVVVVVVVVVVVVVVVvuuVd",
             "dlvvudvuudVVVVVVVVVVVVVVVVVvuuVd",
@@ -1251,7 +1297,7 @@ public static class Sprites
             "dludduuuuuuuuuuuuuuuuuuuuuuuddVd",
             "dVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVd",
             "dddddddddddddddddddddddddddddddd",
-        }, Scale: 1, ShadeBody: false),
+        }, Scale: 1, ShadeBody: false, Overlay: MoveArrow),
         // Taller than a cell: the emitter hangs over the agent's head and the
         // pad sits on the floor; sprites taller than 32 px are bottom-aligned.
         [ObjectDefs.Teleport] = new(new[]
