@@ -101,12 +101,12 @@ public static class Sprites
 
     // A sprite cropped to its drawn pixels, so object art centred in a 16x16
     // cell can sit in a HUD row at the same pixel size as the hearts.
-    public static ImageTexture Trimmed(string key)
+    public static ImageTexture Trimmed(string key, string colorName = null)
     {
-        string cacheKey = $"trimmed:{key}";
+        string cacheKey = colorName == null ? $"trimmed:{key}" : $"trimmed:{key}:{colorName}";
         if (Cache.TryGetValue(cacheKey, out var cached))
             return cached;
-        var img = Get(key).GetImage();
+        var img = Get(key, colorName).GetImage();
         var texture = ImageTexture.CreateFromImage(img.GetRegion(img.GetUsedRect()));
         Cache[cacheKey] = texture;
         return texture;
@@ -2368,6 +2368,30 @@ public static class Sprites
             ".yyoyy..",
             ".yo.oy..",
             "yo...oy.",
+        }),
+        // HUD coin counter.
+        ["coin"] = new(new[]
+        {
+            "..oooo..",
+            ".oywyyo.",
+            "oywyyyyo",
+            "oyyyyyyo",
+            "oyyyyyyo",
+            "oyyyyyoo",
+            ".oyyyoo.",
+            "..oooo..",
+        }),
+        // HUD alarm timer: a red siren light.
+        ["alarm"] = new(new[]
+        {
+            "...rr...",
+            "..rwrR..",
+            ".rwrrrR.",
+            ".rrrrrR.",
+            ".rrrrrR.",
+            "lllllllg",
+            "gggggggd",
+            "........",
         }),
         // Projectiles face right; the shot flips them when it flies left.
         // Brass slug trailing a white streak: the pistol and rifle round.
