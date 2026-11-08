@@ -1,4 +1,5 @@
 using System.Collections.Generic;
+using System.Linq;
 using Godot;
 
 namespace HackerOrSoldier;
@@ -159,6 +160,11 @@ public static class Sprites
         "...dggld........",
         "..dddddddd......",
     }, row => row.Replace('F', fill).Replace('S', shade)));
+
+    // Pads a flame frame to the full 28 rows so every frame shares one anchor.
+    // No dithered body shade: it reads as soot on a flame.
+    private static SpriteMap Flame(params string[] rows) => new(
+        Enumerable.Repeat(".........", 28 - rows.Length).Concat(rows).ToArray(), ShadeBody: false);
 
     // CCTV box: sun hood, record LED, glass lens, wall bracket.
     private static SpriteMap CameraBox(char led) => new(System.Array.ConvertAll(new[]
@@ -1383,37 +1389,36 @@ public static class Sprites
             "...dddddddddd...",
             "................",
         }),
-        ["flame"] = new(new[]
-        {
-            "....y....",
-            "....y....",
-            "...yyy...",
-            "...yyy...",
-            "..yyyyy..",
-            "..yyyyy..",
-            "..yyyyy..",
-            "..yyyyy..",
-            ".yyooyy..",
-            ".yooooy..",
-            ".ooooooo.",
-            ".ooooooo.",
-            ".ooooooo.",
-            ".ooooooo.",
-            "ooooooooo",
-            "ooooooooo",
-            "ooooooooo",
-            "ooroooroo",
-            "ooroooroo",
-            "orrooorro",
-            "orrooorro",
-            "orrooorro",
-            "rrrooorrr",
-            "rrrooorrr",
-            "rrroorrrr",
-            "rrrrorrrr",
-            "rrrrrrrrr",
-            "rrrrrrrrr",
-        }),
+        // Burner flame, 28 rows tall with the nozzle at the bottom. Three
+        // flicker frames plus two ignition frames that FlameTrap also plays
+        // in reverse as the burst dies out.
+        ["flame"] = Flame("...r.....", "...r...r.", "..rr...r.", "..ro..rr.",
+            ".rro..ro.", ".roo.roo.", ".roorooo.", ".rooooor.",
+            "rooyyoorr", "rooyyyoor", "roooyyyor", "rooyyyyor",
+            "royyyyyor", "royywyyor", "royywwyor", "royywwyor",
+            "roywwwyor", "roywwwyor", "rooywwyor", ".royywyr.",
+            ".royywyr.", ".roywwor.", ".rooywor.", "..royyr..",
+            "..roywr..", "..royyr..", "..rowyr..", "...ryr..."),
+        ["flame2"] = Flame(".....r...", ".r...r...", ".r..rr...", ".rr.or...",
+            "..r.orr..", "..oroorr.", ".rooooor.", ".roooyor.",
+            "rrooyyoor", "rooyyyoor", "rooyyyyor", "royyyyyor",
+            "royywyyor", "royywwyor", "roywwwyor", "roywwwyor",
+            "roywwwyor", "rooywwyor", "rooywwyor", ".royywor.",
+            ".roywwor.", ".roywyor.", ".rooywor.", "..roywr..",
+            "..rowyr..", "..royyr..", "..rywor..", "...ryr..."),
+        ["flame3"] = Flame("..r......", "..r....r.", "..rr..rr.", "..or..or.",
+            ".roo.ror.", ".roorroo.", ".rooooor.", ".roooyoor",
+            "roooyyoor", "rooyyyyor", "rooyyyyor", "royywyyor",
+            "royywwyor", "royywwyor", "roywwwyor", "roywwwyor",
+            "rooywwyor", "rooywwyor", ".royywyr.", ".roywwyr.",
+            ".roywwor.", ".rooywor.", "..royyr..", "..rowyr..",
+            "..roywr..", "..royyr..", "..rywyr..", "...ryr..."),
+        ["flame_start1"] = Flame("....r....", "...ror...", "..royor..", "..roywr..",
+            "..rywyr..", "..rowyr..", "..ryyyr..", "...ryr..."),
+        ["flame_start2"] = Flame("...r.....", "...rr.r..", "..ror.r..", "..roorr..",
+            ".rooyoor.", ".royyyor.", ".roywyor.", ".roywwor.",
+            ".roywwor.", ".royywor.", "..roywr..", "..rowyr..",
+            "..roywr..", "..royyr..", "..rywyr..", "...ryr..."),
         // Launch tube on a swivel mount: flared exhaust at the back, hazard
         // band, sight on top and a rocket nose in the muzzle. Faces right;
         // RocketLauncher flips it towards its next shot.

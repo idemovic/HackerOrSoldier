@@ -24,6 +24,19 @@ public partial class FlameTrap : Node2D
         return t is >= 2f and < 6f ? Mathf.Min(4, (int)((t - 2f) / 0.5f) + 1) : 0;
     }
 
+    private static readonly string[] Flicker = { "flame", "flame2", "flame3" };
+
+    // Frame for a moment of the 2s burst: it grows out of the nozzle,
+    // flickers at 12 fps, then shrinks back down.
+    public static string FlameFrame(float t)
+    {
+        if (t < 0.08f || t >= 1.92f)
+            return "flame_start1";
+        if (t < 0.16f || t >= 1.84f)
+            return "flame_start2";
+        return Flicker[(int)(t * 12f) % Flicker.Length];
+    }
+
     public override void _Ready()
     {
         _body = new Sprite2D { Texture = Sprites.Get(ObjectDefs.FlameTrap) };
@@ -47,6 +60,11 @@ public partial class FlameTrap : Node2D
         }
         bool flaming = Flaming;
         _flame.Visible = flaming;
+        if (flaming)
+        {
+            _flame.Texture = Sprites.Get(FlameFrame(Session.Time % 10f - 4f));
+            _flame.FlipH = (int)(Session.Time * 4f) % 2 == 1;
+        }
         if (flaming && !_wasFlaming)
             Sfx.PlayAt(Sound.FlameBurst, Position);
         _wasFlaming = flaming;
