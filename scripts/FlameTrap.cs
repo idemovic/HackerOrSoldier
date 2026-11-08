@@ -5,18 +5,29 @@ namespace HackerOrSoldier;
 // README: cyclically (10s) fires a flame from a hole, which takes a life.
 // The flame covers the trap's cell and the cell above it during seconds 4-6
 // of each cycle, a different phase than spikes so they can be combined.
+// The four dots on the trap light up one by one (seconds 2, 2.5, 3, 3.5)
+// as a countdown to the burst and stay lit while it burns.
 public partial class FlameTrap : Node2D
 {
     public PlaySession Session { get; set; }
 
+    private Sprite2D _body;
     private Sprite2D _flame;
     private bool _wasFlaming;
+    private int _shownDots;
 
     public bool Flaming => Session.Time % 10f is >= 4f and < 6f;
 
+    public static int WarningDots(float time)
+    {
+        float t = time % 10f;
+        return t is >= 2f and < 6f ? Mathf.Min(4, (int)((t - 2f) / 0.5f) + 1) : 0;
+    }
+
     public override void _Ready()
     {
-        AddChild(new Sprite2D { Texture = Sprites.Get(ObjectDefs.FlameTrap) });
+        _body = new Sprite2D { Texture = Sprites.Get(ObjectDefs.FlameTrap) };
+        AddChild(_body);
         _flame = new Sprite2D
         {
             Texture = Sprites.Get("flame"),
@@ -28,6 +39,12 @@ public partial class FlameTrap : Node2D
 
     public override void _PhysicsProcess(double delta)
     {
+        int dots = WarningDots(Session.Time);
+        if (dots != _shownDots)
+        {
+            _body.Texture = Sprites.Get(dots == 0 ? ObjectDefs.FlameTrap : $"flame_trap_lit{dots}");
+            _shownDots = dots;
+        }
         bool flaming = Flaming;
         _flame.Visible = flaming;
         if (flaming && !_wasFlaming)
