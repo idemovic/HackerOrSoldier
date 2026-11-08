@@ -1099,8 +1099,8 @@ public partial class SmokeTest : Node
         editor.PaintCell(new Vector2I(22, 9));
         editor.PaintCell(new Vector2I(22, 10));
         Vector2I LavaAt(int y) => editor.Grids.Main.GetCellAtlasCoords(new Vector2I(22, y));
-        Check(LavaAt(9) == TileSetBuilder.LavaCoordsFor(lavaAbove: false)
-            && LavaAt(10) == TileSetBuilder.LavaCoordsFor(lavaAbove: true),
+        Check(LavaAt(9) == TileSetBuilder.LavaCoordsFor(new Vector2I(22, 9), lavaAbove: false)
+            && LavaAt(10) == TileSetBuilder.LavaCoordsFor(new Vector2I(22, 10), lavaAbove: true),
             "only the top lava cell draws the bubbling surface");
         editor.EraseCell(new Vector2I(22, 9));
         editor.EraseCell(new Vector2I(22, 10));

@@ -39,13 +39,16 @@ public static class TileSetBuilder
     // fill dedicated atlas rows below the defs row.
     // The shadow masks take the last row, one column per mask.
     private const int WaterFrames = 4;
-    private const int LavaFrames = 6;
+    private const int LavaFrames = 8;
+    // Surface lava comes in a few variants, picked by column, so bubbles in
+    // a wide pool do not line up tile after tile.
+    private const int LavaVariants = 3;
     private static readonly Vector2I WaterCoords = new(0, 1);
     // Water under water: same row, after the surface frames.
     private static readonly Vector2I DeepWaterCoords = new(WaterFrames, 1);
-    private static readonly Vector2I LavaCoords = new(0, 2);
-    // Lava under lava: same row, after the surface frames.
-    private static readonly Vector2I DeepLavaCoords = new(LavaFrames, 2);
+    private const int LavaRow = 2;
+    // Lava under lava: same row, after the surface variants.
+    private static readonly Vector2I DeepLavaCoords = new(LavaVariants * LavaFrames, LavaRow);
     // Spike frames: frame 0 is both spikes down, then the left spike rising
     // through SpikeLevels heights, then the right one. Not a native
     // animation: the play session picks the frame from its own clock.
@@ -136,7 +139,7 @@ public static class TileSetBuilder
         TileDefs.BackgroundRock => RockCoordsFor(cell),
         TileDefs.ElectricFloor => ElectricJoinCoords(0),
         TileDefs.Water => WaterCoords,
-        TileDefs.Lava => LavaCoords,
+        TileDefs.Lava => LavaCoordsFor(cell, lavaAbove: false),
         _ => AtlasCoordsFor(tileId),
     };
 
@@ -145,7 +148,8 @@ public static class TileSetBuilder
     public static Vector2I WaterCoordsFor(bool waterAbove) => waterAbove ? DeepWaterCoords : WaterCoords;
 
     // Lava follows the same rule: bubbles only on the top cell.
-    public static Vector2I LavaCoordsFor(bool lavaAbove) => lavaAbove ? DeepLavaCoords : LavaCoords;
+    public static Vector2I LavaCoordsFor(Vector2I cell, bool lavaAbove) =>
+        lavaAbove ? DeepLavaCoords : new(Mathf.PosMod(cell.X, LavaVariants) * LavaFrames, LavaRow);
 
     // spike 0 is the left one, 1 the right one; level 0 is fully down.
     public static Vector2I SpikeCoordsFor(int spike, int level) =>
@@ -197,8 +201,9 @@ public static class TileSetBuilder
         }
         for (int f = 0; f < LavaFrames; f++)
         {
-            Put(BuildLavaImage(f, surface: true), LavaCoords.X + f, LavaCoords.Y);
-            Put(BuildLavaImage(f, surface: false), DeepLavaCoords.X + f, DeepLavaCoords.Y);
+            for (int v = 0; v < LavaVariants; v++)
+                Put(BuildLavaImage(f, v), v * LavaFrames + f, LavaRow);
+            Put(BuildLavaImage(f, variant: -1), DeepLavaCoords.X + f, LavaRow);
         }
         Put(BuildSpikesImage(0, 0), 0, SpikesCoords.Y);
         for (int level = 1; level <= SpikeLevels; level++)
@@ -286,8 +291,9 @@ public static class TileSetBuilder
         }
         Animated(WaterCoords, TileDefs.Water, WaterFrames, 0.25f);
         Animated(DeepWaterCoords, TileDefs.Water, WaterFrames, 0.25f);
-        Animated(LavaCoords, TileDefs.Lava, LavaFrames, 0.3f);
-        Animated(DeepLavaCoords, TileDefs.Lava, LavaFrames, 0.3f);
+        for (int v = 0; v < LavaVariants; v++)
+            Animated(new Vector2I(v * LavaFrames, LavaRow), TileDefs.Lava, LavaFrames, 0.22f);
+        Animated(DeepLavaCoords, TileDefs.Lava, LavaFrames, 0.22f);
         for (int f = 0; f < SpikeFrames; f++)
             Create(new Vector2I(f, SpikesCoords.Y), TileDefs.Spikes);
         for (int f = 0; f < SpearFrames; f++)
@@ -373,7 +379,7 @@ public static class TileSetBuilder
             case TileDefs.Water:
                 return BuildWaterImage(0, surface: true);
             case TileDefs.Lava:
-                return BuildLavaImage(3, surface: true);
+                return BuildLavaImage(4, variant: 0);
             case TileDefs.Spikes:
                 return BuildSpikesImage(SpikeLevels, SpikeLevels);
             case TileDefs.Spear:
@@ -990,104 +996,135 @@ public static class TileSetBuilder
     }
 
     // Lava frame: a churn of crust and glow from drifting smooth noise,
-    // with sparks that twinkle frame to frame. The churn loops every three
-    // frames; a surface frame adds a glowing skin where small bubbles rise,
-    // swell and pop over the full six-frame cycle, each on its own phase.
-    private static readonly (int X, int Phase)[] LavaBubbles = { (5, 0), (16, 2), (26, 4) };
+    // with sparks that twinkle frame to frame. A surface frame (variant >= 0)
+    // ends in a rolling wave with open air above it: a glowing skin, dark
+    // crust plates drifting along it, and bubbles that rise, dome up and
+    // pop, each on its own phase. Everything loops over LavaFrames and is
+    // periodic in the tile, so neighbours join.
+    private static readonly (int X, int Phase, int Size)[][] LavaBubbles =
+    {
+        new[] { (8, 0, 4), (23, 5, 2) },
+        new[] { (18, 3, 4), (5, 6, 2) },
+        new[] { (25, 6, 4), (12, 2, 2) },
+    };
 
-    private static Image BuildLavaImage(int frame, bool surface)
+    // The surface line at column x: two waves rolling opposite ways.
+    private static int LavaSurface(int x, int frame) => 6 + Mathf.RoundToInt(
+        1.3f * Mathf.Sin(Mathf.Tau * (x / (float)TileSize - frame / (float)LavaFrames))
+        + 0.7f * Mathf.Sin(Mathf.Tau * (2f * x / TileSize + frame / (float)LavaFrames)));
+
+    private static Image BuildLavaImage(int frame, int variant)
     {
         var img = Image.CreateEmpty(TileSize, TileSize, false, Image.Format.Rgba8);
-        int churn = frame % 3;
-        for (int y = 0; y < TileSize; y++)
-            for (int x = 0; x < TileSize; x++)
+        bool surface = variant >= 0;
+        int churn = frame % 4;
+        for (int x = 0; x < TileSize; x++)
+        {
+            int top = surface ? LavaSurface(x, frame) : 0;
+            // Slag drifts one tile width per cycle.
+            int drift = x - frame * TileSize / LavaFrames;
+            for (int y = top; y < TileSize; y++)
             {
+                float n = 0.6f * Smooth(x, y, 8, 160) + 0.4f * Smooth(x + churn * 3, y + churn, 4, 161);
+                float body = n * 7f - 0.8f;
+                int d = y - top;
+                float slag = d is >= 1 and <= 4 ? Smooth(drift, d * 4, 8, 170) - (d - 2.5f) * (d - 2.5f) * 0.03f : 0f;
                 Color c;
-                if (surface && y == 0)
-                    c = (x + frame) % 6 < 3 ? LavaRamp[5] : LavaRamp[4];
-                else if (surface && y == 1)
-                    c = (x + frame / 2) % 2 == 0 ? LavaRamp[4] : LavaRamp[3];
-                else if (surface && y == 2)
-                    c = (x + frame) % 3 == 0 ? LavaRamp[1] : LavaRamp[2];
+                if (surface && slag > 0.64f)
+                    c = slag > 0.71f ? LavaRamp[1] : LavaRamp[2];
+                else if (surface && d == 0 && Smooth(drift, 4, 8, 170) > 0.64f)
+                    c = LavaRamp[4];   // the skin dims over a slag blob
+                else if (surface && d == 0)
+                    c = (x + frame) % 5 == 0 ? LavaRamp[5] : LavaRamp[6];
+                else if (surface && d < 8)
+                    c = Tone(LavaRamp, Mathf.Lerp(5.2f, body, d / 8f), x, y);
                 else
+                    c = Tone(LavaRamp, body, x, y);
+                if ((!surface || d > 9) && Noise(x, y, 162 + frame) < 0.012f)
                 {
-                    float n = 0.6f * Smooth(x, y, 8, 160) + 0.4f * Smooth(x + churn * 3, y + churn, 4, 161);
-                    c = Tone(LavaRamp, n * 7f - 0.8f, x, y);
-                    if ((!surface || y > 11) && Noise(x, y, 162 + frame) < 0.012f)
-                    {
-                        c = LavaRamp[6];
-                        Dot(img, x, y - 1, LavaRamp[5]);
-                    }
+                    c = LavaRamp[6];
+                    Dot(img, x, y - 1, LavaRamp[5]);
                 }
                 img.SetPixel(x, y, c);
             }
+        }
         if (surface)
-            foreach (var (bx, phase) in LavaBubbles)
-                DrawLavaBubble(img, bx, (frame + phase) % LavaFrames);
+            foreach (var (bx, phase, size) in LavaBubbles[variant])
+                DrawLavaBubble(img, bx, LavaSurface(bx, frame), size, (frame + phase) % LavaFrames);
         return img;
     }
 
-    // One bubble's stage: a speck rising (0), a small then a grown bubble
-    // under the skin (1-2), a dome breaking the surface (3), a burst crater
-    // with splash (4) and the crater closing (5). Bubbles carry a dark rim
-    // so they read against the churn.
-    private static void DrawLavaBubble(Image img, int x, int stage)
+    // One bubble's stage over the eight-frame cycle: a speck rising (0), a
+    // small then a grown bubble under the skin (1-2), a dome swelling above
+    // the surface (3-4), a burst crater flinging droplets (5), droplets
+    // falling with a ripple (6) and the ripple spreading out (7). `top` is
+    // the surface line at the bubble, `size` its largest radius.
+    private static void DrawLavaBubble(Image img, int x, int top, int size, int stage)
     {
-        void Bubble(int cy, int r)
+        int small = Mathf.Max(1, size / 2);
+        void Disc(int cy, int r, Color fill, Color rim, int maxY)
         {
             for (int dy = -r - 1; dy <= r + 1; dy++)
                 for (int dx = -r - 1; dx <= r + 1; dx++)
                 {
-                    int d = Mathf.Max(Mathf.Abs(dx), Mathf.Abs(dy));
-                    if (Mathf.Abs(dx) == r + 1 && Mathf.Abs(dy) == r + 1)
-                        continue;   // round the corners
-                    Dot(img, x + dx, cy + dy, d > r ? LavaRamp[1] : LavaRamp[5]);
+                    if (cy + dy > maxY)
+                        continue;
+                    float d2 = dx * dx + dy * dy;
+                    if (d2 <= r * r + r * 0.8f)
+                        Dot(img, x + dx, cy + dy, fill);
+                    else if (d2 <= (r + 1) * (r + 1) + r * 0.8f)
+                        Dot(img, x + dx, cy + dy, rim);
                 }
-            Dot(img, x - r, cy - r, LavaRamp[6]);
         }
         switch (stage)
         {
             case 0:
-                Dot(img, x, 11, LavaRamp[1]);
-                Dot(img, x, 10, LavaRamp[6]);
+                Dot(img, x, top + 12, LavaRamp[6]);
+                Dot(img, x, top + 13, LavaRamp[2]);
                 break;
             case 1:
-                Bubble(8, 0);
+                Disc(top + 9, small - 1, LavaRamp[5], LavaRamp[2], TileSize);
+                Dot(img, x, top + 9, LavaRamp[6]);
                 break;
             case 2:
-                Bubble(5, 1);
+                Disc(top + 5, small, LavaRamp[5], LavaRamp[2], TileSize);
+                Dot(img, x - small / 2, top + 5 - small / 2, LavaRamp[6]);
                 break;
             case 3:
-                for (int dx = -2; dx <= 2; dx++)
-                {
-                    Dot(img, x + dx, 0, Mathf.Abs(dx) == 2 ? LavaRamp[1] : LavaRamp[6]);
-                    Dot(img, x + dx, 1, dx == -1 ? LavaRamp[6] : LavaRamp[5]);
-                    Dot(img, x + dx, 2, LavaRamp[5]);
-                    Dot(img, x + dx, 3, LavaRamp[1]);
-                }
-                for (int dy = 1; dy <= 2; dy++)
-                {
-                    Dot(img, x - 3, dy, LavaRamp[1]);
-                    Dot(img, x + 3, dy, LavaRamp[1]);
-                }
-                break;
             case 4:
-                for (int dx = -1; dx <= 1; dx++)
-                {
-                    Dot(img, x + dx, 0, LavaRamp[0]);
-                    Dot(img, x + dx, 1, LavaRamp[1]);
-                }
-                Dot(img, x - 2, 0, LavaRamp[1]);
-                Dot(img, x + 2, 0, LavaRamp[1]);
-                Dot(img, x - 3, 0, LavaRamp[6]);
-                Dot(img, x + 3, 0, LavaRamp[6]);
-                Dot(img, x - 4, 1, LavaRamp[5]);
-                Dot(img, x + 4, 1, LavaRamp[5]);
+                int r = stage == 3 ? size - 1 : size;
+                int cy = top + 1;
+                Disc(cy, r, LavaRamp[4], LavaRamp[2], cy);
+                Disc(cy, r - 2, LavaRamp[5], LavaRamp[4], cy);
+                Dot(img, x - r / 2, cy - r + 1, LavaRamp[6]);
+                Dot(img, x - r / 2 + 1, cy - r + 1, LavaRamp[6]);
                 break;
             case 5:
-                Dot(img, x, 0, LavaRamp[1]);
-                Dot(img, x - 1, 0, LavaRamp[2]);
-                Dot(img, x + 1, 0, LavaRamp[2]);
+                for (int dx = -size + 1; dx <= size - 1; dx++)
+                {
+                    bool edge = Mathf.Abs(dx) == size - 1;
+                    Dot(img, x + dx, top, edge ? LavaRamp[6] : LavaRamp[0]);
+                    Dot(img, x + dx, top + 1, edge ? LavaRamp[5] : LavaRamp[1]);
+                }
+                Dot(img, x - size, top - 1, LavaRamp[6]);
+                Dot(img, x + size, top - 1, LavaRamp[6]);
+                Dot(img, x - size + 1, top - size, LavaRamp[5]);
+                Dot(img, x + size - 1, top - size - 1, LavaRamp[6]);
+                Dot(img, x, top - size - 1, LavaRamp[6]);
+                break;
+            case 6:
+                Dot(img, x, top, LavaRamp[1]);
+                Dot(img, x - 1, top, LavaRamp[2]);
+                Dot(img, x + 1, top, LavaRamp[2]);
+                Dot(img, x - size - 1, top - 1, LavaRamp[6]);
+                Dot(img, x + size + 1, top - 1, LavaRamp[6]);
+                Dot(img, x - size, top - size + 1, LavaRamp[4]);
+                Dot(img, x + size, top - size, LavaRamp[5]);
+                break;
+            case 7:
+                Dot(img, x, top, LavaRamp[2]);
+                Dot(img, x - size - 2, top, LavaRamp[5]);
+                Dot(img, x + size + 2, top, LavaRamp[5]);
                 break;
         }
     }
