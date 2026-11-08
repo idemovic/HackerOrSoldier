@@ -137,7 +137,12 @@ public partial class PlaySession : Node2D
     private string _hudWeapon;
     private HBoxContainer _scoreStat;
     private RollingLabel _scoreCount;
-    private Label _hud;
+    private HBoxContainer _coinStat;
+    private RollingLabel _coinCount;
+    private HBoxContainer _alarmStat;
+    private Label _alarmCount;
+    private HBoxContainer _items;
+    private string _itemsShown;
     private Label _activatePrompt;
     private readonly string _activateKey = HelpOverlay.KeysFor("activate");   // keys are rebound only in the main menu
     private bool _ended;
@@ -321,8 +326,23 @@ public partial class PlaySession : Node2D
             StretchMode = TextureRect.StretchModeEnum.KeepCentered,
         }, _scoreCount);
         hudRow.AddChild(_scoreStat);
-        _hud = new Label { VerticalAlignment = VerticalAlignment.Center };
-        hudRow.AddChild(_hud);
+        _coinCount = new RollingLabel { VerticalAlignment = VerticalAlignment.Center };
+        _coinStat = HudStat(new TextureRect
+        {
+            Texture = Sprites.Get("coin"),
+            StretchMode = TextureRect.StretchModeEnum.KeepCentered,
+        }, _coinCount);
+        hudRow.AddChild(_coinStat);
+        _alarmCount = new Label { VerticalAlignment = VerticalAlignment.Center };
+        _alarmStat = HudStat(new TextureRect
+        {
+            Texture = Sprites.Get("alarm"),
+            StretchMode = TextureRect.StretchModeEnum.KeepCentered,
+        }, _alarmCount);
+        hudRow.AddChild(_alarmStat);
+        _items = new HBoxContainer();
+        _items.AddThemeConstantOverride("separation", 8);
+        hudRow.AddChild(_items);
 
         // Centered, a little below the agent the camera keeps in the middle.
         _activatePrompt = new Label
@@ -1087,33 +1107,75 @@ public partial class PlaySession : Node2D
         _hudWeapon = weaponSprite;
         _scoreStat.Visible = Score > 0;
         _scoreCount.Value = Score;
+        _coinStat.Visible = CoinsCollected > 0;
+        _coinCount.Value = CoinsCollected;
+        _alarmStat.Visible = AlarmActive;
+        _alarmCount.Text = $"{Mathf.CeilToInt(_alarmTime)}s";
         _hearts.Count = Mathf.Max(Lives, 0);
 
-        var parts = new List<string>();
-        if (_keys.Count > 0)
-            parts.Add("Keys: " + string.Join(" ", _keys));
-        if (_usbKeys.Count > 0)
-            parts.Add("USB: " + string.Join(" ", _usbKeys.Select(ObjectDefs.CircuitColorName)));
+        var items = new List<(Texture2D Icon, string Text, Color? Mark)>();
+        foreach (var color in _keys)
+            items.Add((Sprites.Trimmed(ObjectDefs.DoorKey, color), null, null));
+        foreach (var number in _usbKeys)
+            items.Add((Sprites.Trimmed(ObjectDefs.UsbKey), null, ObjectDefs.CircuitColor(number)));
         if (Agent != null && Agent.IsHiding)
-            parts.Add("Hidden");
-        if (CoinsCollected > 0)
-            parts.Add($"Coins +{CoinsCollected}");
+            items.Add((null, "Hidden", null));
         if (HasVest)
-            parts.Add("Vest");
+            items.Add((Sprites.Trimmed(ObjectDefs.Vest), null, null));
         string manual = HeldManualItem();
-        foreach (var (item, name) in new[] { (ObjectDefs.InfraGoggles, "Goggles"), (ObjectDefs.Briefcase, "Briefcase") })
+        foreach (var item in new[] { ObjectDefs.InfraGoggles, ObjectDefs.Briefcase })
         {
             int count = _heldItems.FindAll(held => held == item).Count;
             if (count == 0)
                 continue;
-            parts.Add(name + (count > 1 ? $" x{count}" : "") + (item == manual ? $" (press {_activateKey})" : ""));
+            string text = ((count > 1 ? $"x{count} " : "") + (item == manual ? $"(press {_activateKey})" : "")).Trim();
+            items.Add((Sprites.Trimmed(item), text == "" ? null : text, null));
         }
         if (GogglesActive)
-            parts.Add($"Infra {Mathf.CeilToInt(_gogglesTime)}s");
+            items.Add((Sprites.Trimmed(ObjectDefs.InfraGoggles), $"{Mathf.CeilToInt(_gogglesTime)}s", null));
         if (_disguiseTime > 0)
-            parts.Add($"Disguise {Mathf.CeilToInt(_disguiseTime)}s");
-        if (AlarmActive)
-            parts.Add($"ALARM {Mathf.CeilToInt(_alarmTime)}s");
-        _hud.Text = string.Join("  ", parts);
+            items.Add((Sprites.Trimmed(ObjectDefs.Briefcase), $"{Mathf.CeilToInt(_disguiseTime)}s", null));
+        ShowItems(items);
+    }
+
+    // Rebuilds the held items row only when what it shows changes, since the
+    // HUD updates every frame.
+    private void ShowItems(List<(Texture2D Icon, string Text, Color? Mark)> items)
+    {
+        string shown = string.Join("|", items.Select(i => $"{i.Icon?.GetInstanceId()}/{i.Text}/{i.Mark}"));
+        if (shown == _itemsShown)
+            return;
+        _itemsShown = shown;
+        foreach (var child in _items.GetChildren())
+        {
+            _items.RemoveChild(child);
+            child.QueueFree();
+        }
+        foreach (var (icon, text, mark) in items)
+        {
+            var label = text == null ? null : new Label { Text = text, VerticalAlignment = VerticalAlignment.Center };
+            if (icon == null)
+            {
+                _items.AddChild(label);
+                continue;
+            }
+            var rect = new TextureRect
+            {
+                Texture = icon,
+                StretchMode = TextureRect.StretchModeEnum.KeepCentered,
+                SizeFlagsVertical = Control.SizeFlags.ShrinkCenter,
+            };
+            if (mark is Color color)   // the USB key's circuit color, as on the pickup
+                rect.AddChild(new ColorRect
+                {
+                    Color = color,
+                    Position = new Vector2(0, icon.GetHeight() + 1),
+                    Size = new Vector2(icon.GetWidth(), 2),
+                });
+            if (label == null)
+                _items.AddChild(rect);
+            else
+                _items.AddChild(HudStat(rect, label));
+        }
     }
 }

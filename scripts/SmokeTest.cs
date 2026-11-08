@@ -1980,7 +1980,8 @@ public partial class SmokeTest : Node
         editor.SetBrushObject(CollectibleDefs.BusinessCard);
         editor.PaintCell(new Vector2I(12, 10));
         Check(editor.StartPlay(), "collectible level starts");
-        var scoreLabel = editor.Session.FindChildren("*", "", true, false).OfType<RollingLabel>().Last();
+        var scoreLabel = editor.Session.FindChildren("*", "", true, false).OfType<RollingLabel>()
+            .First(label => label.GetParent().GetChild<TextureRect>(0).Texture == Sprites.Get("score"));
         var shownScores = new HashSet<string>();
         bool popupSeen = false;
         Input.ActionPress("move_right");
