@@ -253,7 +253,7 @@ public partial class SmokeTest : Node
                 Sprites.ForObject(def.Type);
             foreach (var def in TileDefs.All)
                 TileSetBuilder.TileIcon(def.Id);
-            foreach (var key in new[] { "platform", "flame", "bullet", "plasma", "rocket", "dynamite",
+            foreach (var key in new[] { "platform", "flame", "flame_trap_lit1", "flame_trap_lit2", "flame_trap_lit3", "flame_trap_lit4", "bullet", "plasma", "rocket", "dynamite",
                          "turret_base", TurretGun.Idle, TurretGun.Firing }
                 .Concat(AgentAnimator.AllFrames).Concat(EnemyAnimator.AllFrames))
                 Check(Sprites.Get(key) != null, $"sprite '{key}' exists");
@@ -2445,6 +2445,9 @@ public partial class SmokeTest : Node
         editor.Session.Time = 4.5f;
         await Frames(5);
         Check(editor.Session.Lives == 2, "flame burst takes a life");
+        Check(FlameTrap.WarningDots(1.9f) == 0 && FlameTrap.WarningDots(2.1f) == 1
+            && FlameTrap.WarningDots(3.6f) == 4 && FlameTrap.WarningDots(5.9f) == 4
+            && FlameTrap.WarningDots(6.1f) == 0, "flame trap dots count down to the burst");
         editor.StopPlay();
     }
 
