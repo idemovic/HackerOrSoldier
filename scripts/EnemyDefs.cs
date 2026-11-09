@@ -16,6 +16,8 @@ public record EnemyDef(string Type, string Name, Color Color, int Lives, int Spe
     // The collision box around the enemy's position, fitted to its drawn
     // body so it meets walls, ledges and the agent where it looks to.
     public Rect2 Body { get; init; } = EnemyDefs.HumanBody;
+    public Sound? SpotSound { get; init; }   // when it first sees the agent
+    public Sound? StepSound { get; init; }   // while it walks
 }
 
 public static class EnemyDefs
@@ -47,7 +49,7 @@ public static class EnemyDefs
         new(Drone, "Drone", new Color(0.60f, 0.75f, 0.85f), Lives: 1, Speed: 1, EnemyLoS.All, EnemyAttack.Dynamite,
             Flies: true, DropsAmmo: true) { Body = new Rect2(-13, -13, 26, 20) },
         new(Robodog, "Robodog", new Color(0.55f, 0.55f, 0.50f), Lives: 2, Speed: 3, EnemyLoS.Row, EnemyAttack.Contact,
-            DropsAmmo: true) { Body = new Rect2(-14, -3, 28, 18) },
+            DropsAmmo: true) { Body = new Rect2(-14, -3, 28, 18), SpotSound = Sound.RobodogBark, StepSound = Sound.RobodogStep },
         new(Turret, "Turret", new Color(0.70f, 0.40f, 0.40f), Lives: 1, Speed: 0, EnemyLoS.All, EnemyAttack.Plasma) { Body = new Rect2(-13, -3, 26, 18) },
         new(Robot, "Robot", new Color(0.40f, 0.45f, 0.55f), Lives: 1, Speed: 1, EnemyLoS.Row, EnemyAttack.Plasma,
             DropsAmmo: true, InfiniteLives: true) { Body = new Rect2(-14, -15, 28, 30) },

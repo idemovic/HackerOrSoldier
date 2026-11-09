@@ -15,6 +15,7 @@ public enum Sound
     Hide, Unhide, GogglesOn, DisguiseOn, WallCrumble, FlameBurst, ElectricZap,
     Hurt, Death, VestBreak, MissionFailed, LevelComplete,
     PickupKey, PickupHealth, PickupAmmo, PickupVest, PickupItem, PickupWeapon, Coin, LetterBonus,
+    Splash, SpikesUp, SpearsTips, SpearsOut, ElectricBuzz, LavaBubble, RobodogBark, RobodogStep, PiranhaLeap,
 }
 
 public enum Wave { Square, Triangle, Saw, Noise }
@@ -35,7 +36,7 @@ public partial class Sfx : Node
     public const string MusicBus = "Music";   // future music code plays on this bus
 
     private const int Rate = 22050;
-    private const int PoolSize = 8;
+    private const int PoolSize = 16;   // steady ambience must not cut off gunshots
     private const float MaxDistance = 700f;   // about one screen: farther enemies are silent
     private const ulong ThrottleMs = 40;      // a burst of the same sound plays once
     private const float VibratoRate = 7f;
@@ -50,9 +51,11 @@ public partial class Sfx : Node
     private int _next;
     private int _next2D;
 
-    public static void Play(Sound sound) => _instance?.PlayOn(sound, null);
+    public static void Play(Sound sound) => _instance?.PlayOn(sound, null, MaxDistance);
 
-    public static void PlayAt(Sound sound, Vector2 globalPosition) => _instance?.PlayOn(sound, globalPosition);
+    // range is how far the sound carries; quiet ambience passes a short one.
+    public static void PlayAt(Sound sound, Vector2 globalPosition, float range = MaxDistance) =>
+        _instance?.PlayOn(sound, globalPosition, range);
 
     public override void _Ready()
     {
@@ -77,7 +80,7 @@ public partial class Sfx : Node
             _instance = null;
     }
 
-    private void PlayOn(Sound sound, Vector2? at)
+    private void PlayOn(Sound sound, Vector2? at, float range)
     {
         ulong now = Time.GetTicksMsec();
         if (_lastPlayed.TryGetValue(sound, out ulong last) && now - last < ThrottleMs)
@@ -88,6 +91,7 @@ public partial class Sfx : Node
         {
             var player = _players2D[_next2D = (_next2D + 1) % PoolSize];
             player.GlobalPosition = position;
+            player.MaxDistance = range;
             player.Stream = _streams[sound];
             player.Play();
         }
@@ -186,6 +190,31 @@ public partial class Sfx : Node
         {
             Note(Wave.Square, 880, 0, 0.15f, 0.25f), Note(Wave.Square, 660, 0.16f, 0.15f, 0.25f),
             Note(Wave.Square, 880, 0.32f, 0.15f, 0.25f), Note(Wave.Square, 660, 0.48f, 0.15f, 0.25f),
+        },
+
+        [Sound.Splash] = new[] { Noise(4000, 800, 0, 0.25f, 0.2f, 1.2f), Tri(300, 120, 0, 0.12f, 0.15f) },
+        [Sound.SpikesUp] = new[]
+        {
+            Noise(6000, 2500, 0, 0.04f, 0.25f, 2f), Sq(1800, 700, 0, 0.07f, 0.2f, 0.125f, decay: 2f),
+            Saw(300, 120, 0.02f, 0.1f, 0.15f),
+        },
+        [Sound.SpearsTips] = new[] { Sq(2200, 1800, 0, 0.015f, 0.12f, 0.25f), Sq(1500, 1300, 0.05f, 0.015f, 0.1f, 0.25f) },
+        [Sound.SpearsOut] = new[] { Noise(10000, 3000, 0, 0.18f, 0.22f, 1.5f), Saw(1500, 4000, 0, 0.16f, 0.14f, decay: 1.5f) },
+        [Sound.ElectricBuzz] = new[]
+        {
+            Saw(100, 110, 0, 0.22f, 0.12f, 0.02f, 0.3f), Noise(9000, 4000, 0, 0.22f, 0.1f, 0.3f),
+        },
+        [Sound.LavaBubble] = new[] { Tri(120, 260, 0, 0.12f, 0.2f), Noise(600, 300, 0.1f, 0.05f, 0.1f, 2f) },
+        [Sound.RobodogBark] = new[]
+        {
+            Saw(500, 250, 0, 0.09f, 0.22f), Sq(900, 400, 0, 0.09f, 0.12f, 0.25f), Noise(3000, 1000, 0, 0.04f, 0.1f),
+            Saw(560, 280, 0.15f, 0.09f, 0.22f), Sq(1000, 450, 0.15f, 0.09f, 0.12f, 0.25f), Noise(3000, 1000, 0.15f, 0.04f, 0.1f),
+        },
+        [Sound.RobodogStep] = new[] { Sq(1500, 900, 0, 0.02f, 0.07f, 0.25f), Noise(5000, 3000, 0, 0.015f, 0.05f) },
+        [Sound.PiranhaLeap] = new[]
+        {
+            Noise(4000, 800, 0, 0.2f, 0.18f, 1.2f),
+            Noise(6000, 3000, 0.16f, 0.03f, 0.25f), Sq(2000, 700, 0.16f, 0.04f, 0.2f, 0.125f),
         },
 
         [Sound.DoorOpen] = new[]

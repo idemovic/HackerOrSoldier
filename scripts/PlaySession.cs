@@ -21,6 +21,7 @@ public partial class PlaySession : Node2D
     private const float SpikeCycle = 10f;   // README: spike trap cycles every 10s
     private const float SpikeUpTime = 2f;   // each of the two spikes is raised 2s per cycle
     private const float SpikeMoveTime = 0.15f;   // the rise and the sink, inside the up time
+    private const float HazardHearRange = 8 * 32f;   // traps are heard within 8 tiles
     private const float SpearStateTime = 3f;   // spears: holes, tips, out - 3s each
     private const float ItemDuration = 30f; // README: briefcase and goggles last 30s
     private const float RobotCycle = 10f;   // README: robots stop and turn off every 10s
@@ -132,6 +133,9 @@ public partial class PlaySession : Node2D
     private Vector2I _spikeCoords = new(-1, -1);
     private readonly List<Vector2I> _spearCells = new();
     private int _spearFrame = -1;
+    private int _raisedSpike = -1;
+    private readonly List<Vector2I> _electricCells = new();
+    private TerrainAmbience _ambience;
     private HeartRow _hearts;
     private TextureRect _weaponIcon;
     private RollingLabel _weaponCount;
@@ -305,6 +309,15 @@ public partial class PlaySession : Node2D
                 if (_level.GetTile(x, y) == TileDefs.Spear)
                     _spearCells.Add(new Vector2I(x, y));
         UpdateSpears();
+
+        for (int y = 0; y < _level.Height; y++)
+            for (int x = 0; x < _level.Width; x++)
+                if (_level.GetTile(x, y) == TileDefs.ElectricFloor)
+                    _electricCells.Add(new Vector2I(x, y));
+        _ambience = new TerrainAmbience { Session = this };
+        _ambience.AddTimed(Sound.ElectricBuzz, _electricCells, cell => !IsFloorOff(cell), 0.3f, 0.7f);
+        AddChild(_ambience);
+        _grids.Spit.Spat += _ambience.OnLavaSpat;   // the grids outlive the session in the editor
 
         var canvas = new CanvasLayer();
         AddChild(canvas);
@@ -482,6 +495,10 @@ public partial class PlaySession : Node2D
     // level when play stops, which puts the icon tile back.
     private void UpdateSpikes()
     {
+        int raised = RaisedSpike;
+        if (raised >= 0 && _raisedSpike < 0 && _spikeCoords.X >= 0)
+            PlayTrap(Sound.SpikesUp, _spikeCells);
+        _raisedSpike = raised;
         var coords = SpikeCoords;
         if (coords == _spikeCoords)
             return;
@@ -497,9 +514,25 @@ public partial class PlaySession : Node2D
         int frame = SpearFrame;
         if (frame == _spearFrame)
             return;
+        if (_spearFrame >= 0 && frame >= 1)
+            PlayTrap(frame == 1 ? Sound.SpearsTips : Sound.SpearsOut, _spearCells);
         _spearFrame = frame;
         foreach (var cell in _spearCells)
             _grids.Main.SetCell(cell, TileSetBuilder.SourceId, TileSetBuilder.SpearCoordsFor(frame));
+    }
+
+    private void PlayTrap(Sound sound, List<Vector2I> cells)
+    {
+        if (Agent == null || _agentDown)
+            return;
+        if (TerrainAmbience.NearestWithin(cells, Agent.Position, HazardHearRange) is Vector2 at)
+            Sfx.PlayAt(sound, at, HazardHearRange);
+    }
+
+    public override void _ExitTree()
+    {
+        if (_ambience != null)
+            _grids.Spit.Spat -= _ambience.OnLavaSpat;
     }
 
     // Hidden platforms only exist while the goggles reveal them.

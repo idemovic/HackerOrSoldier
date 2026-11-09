@@ -448,6 +448,14 @@ Known simplifications (tuning constants, not README rules):
 - Settings: Sound and Music toggles beside the volume sliders; the profile
   fields SoundOn/MusicOn default on. The "SFX" and "Music" buses are created
   at startup, so music code only has to play on `Sfx.MusicBus`
+- Water, traps, live terrain and two enemies are audible: Splash when the
+  agent enters or leaves water and Swim strokes every 0.45 s while swimming;
+  SpikesUp, SpearsTips and SpearsOut at the nearest trap cell within 8 tiles;
+  ElectricBuzz from live electric floor and LavaBubble from lava spits, both
+  only within 5 tiles (TerrainAmbience, a table of sources; `PlayAt` takes an
+  optional range); the robodog barks on spotting the agent and clicks as it
+  walks (EnemyDef.SpotSound/StepSound); the piranha snaps on its leap and
+  splashes back in. The pool is 16 players so ambience leaves gunfire alone
 - Audition: `godot --headless --path . res://scenes/sfx_dump.tscn` writes
   every sound to user://sfx/<name>.wav
 

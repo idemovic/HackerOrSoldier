@@ -29,6 +29,8 @@ public partial class Agent : CharacterBody2D
     private const float SwimSpeed = 120f;
     private const float SinkSpeed = 80f;
 
+    private const float SwimStrokeTime = 0.45f;
+
     private const float ElectricInterval = 3f;
 
     // Landing faster than a normal jump's return counts as a fall worth a thud.
@@ -46,6 +48,8 @@ public partial class Agent : CharacterBody2D
     public string AnimationFrame => _animator?.Frame;
 
     private float _electricTime;
+    private float _swimStroke;
+    private bool? _wasSubmerged;   // null until the first frame, so spawning in water is silent
     private float _pushIdle = PushRearm;
     private Sprite2D _sprite;
     private AgentAnimator _animator;
@@ -74,6 +78,7 @@ public partial class Agent : CharacterBody2D
         Position = position;
         Velocity = Vector2.Zero;
         _electricTime = 0f;
+        _wasSubmerged = null;
         IsDead = false;
         SetHiding(false);   // dying inside a closet must not respawn a ghost
         _animator.Reset();
@@ -112,6 +117,10 @@ public partial class Agent : CharacterBody2D
 
         bool submerged = TileAt(0, 0) == TileDefs.Water;
         bool atSurface = submerged && TileAt(0, -Tile) != TileDefs.Water;
+        if (_wasSubmerged is bool was && was != submerged)
+            Sfx.Play(Sound.Splash);
+        _wasSubmerged = submerged;
+        _swimStroke -= dt;
 
         velocity.Y += Gravity * dt * (submerged ? WaterGravityFactor : 1f);
 
@@ -121,6 +130,7 @@ public partial class Agent : CharacterBody2D
             {
                 velocity.Y = atSurface ? JumpVelocity : -SwimSpeed;
                 Sfx.Play(atSurface ? Sound.Jump : Sound.Swim);
+                _swimStroke = SwimStrokeTime;
             }
             else if (IsOnFloor())
             {
@@ -137,6 +147,11 @@ public partial class Agent : CharacterBody2D
         float axis = Input.GetAxis("move_left", "move_right");
         if (axis != 0)
             Facing = axis > 0 ? 1 : -1;
+        if (submerged && axis != 0 && _swimStroke <= 0f)
+        {
+            Sfx.Play(Sound.Swim);
+            _swimStroke = SwimStrokeTime;
+        }
         velocity.X = axis * RunSpeed * (submerged ? 0.5f : 1f);
 
         Velocity = velocity;
