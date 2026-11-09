@@ -20,6 +20,7 @@ public partial class GameFlow : Node2D
     public Screen Current { get; private set; } = Screen.Intro;
     public PanelContainer Panel => _panel;
     public WorldMap Map => _map;
+    public PlaySession Session => _session;
 
     private SkyBackdrop _sky;
     private WorldMap _map;
@@ -37,6 +38,7 @@ public partial class GameFlow : Node2D
     private HelpOverlay _help;
     private Label _typingLabel;
     private float _typed;
+    private bool _godMode;
 
     public override void _Ready()
     {
@@ -83,6 +85,11 @@ public partial class GameFlow : Node2D
     // A click or Enter/Space finishes typing the story before anything else.
     public override void _Input(InputEvent @event)
     {
+        if (@event is InputEventKey { Pressed: true, Echo: false } key && OS.IsDebugBuild() && Cheat(key.Keycode))
+        {
+            GetViewport().SetInputAsHandled();
+            return;
+        }
         if (_typingLabel == null)
             return;
         bool press = @event is InputEventMouseButton { Pressed: true } || @event.IsActionPressed("ui_accept");
@@ -90,6 +97,51 @@ public partial class GameFlow : Node2D
             return;
         GetViewport().SetInputAsHandled();
         FinishTyping();
+    }
+
+    // Debug-build cheats for testing the campaign; release exports ignore them.
+    // In a level: F8 wins it through the normal completion path, F7 toggles
+    // god mode (no damage, full ammo; kept for later levels). On the map:
+    // Page Down and Page Up move to the next or previous stop.
+    private bool Cheat(Key key)
+    {
+        bool playing = _session != null && !_paused && _help == null;
+        int stop = Profile.Current.LevelIndex;
+        switch (key)
+        {
+            case Key.F8 when playing:
+                _session.CheatComplete();
+                return true;
+            case Key.F7 when playing:
+                _godMode = !_godMode;
+                ApplyGodMode();
+                return true;
+            case Key.Pagedown when _session == null && !Campaign.IsComplete(stop):
+                Warp(stop + 1);
+                return true;
+            case Key.Pageup when _session == null && stop > 0:
+                Warp(stop - 1);
+                return true;
+            default:
+                return false;
+        }
+    }
+
+    private void ApplyGodMode()
+    {
+        _session.Invincible = _godMode;
+        if (_godMode)
+            _session.RefillAmmo();
+        else
+            Sfx.Play(Sound.UiClick);
+    }
+
+    private void Warp(int stop)
+    {
+        bool forward = stop > Profile.Current.LevelIndex;
+        Profile.Current.LevelIndex = stop;
+        Profile.Current.Save();
+        ShowStop(fly: forward && !Campaign.IsComplete(stop));
     }
 
     public override void _UnhandledInput(InputEvent @event)
@@ -273,6 +325,8 @@ public partial class GameFlow : Node2D
         Current = Screen.Level;
         _session = new PlaySession { ProcessMode = ProcessModeEnum.Pausable };
         _session.Setup(_level, _grids, _agentScene, _run);
+        if (_godMode)
+            ApplyGodMode();
         _session.Completed += () => Callable.From(OnLevelCompleted).CallDeferred();
         _session.Failed += () => Callable.From(OnLevelFailed).CallDeferred();
         AddChild(_session);
@@ -282,9 +336,11 @@ public partial class GameFlow : Node2D
     // Hacker tag for a non-violent run. Buttons: Shop, Next level, Exit game.
     private void OnLevelCompleted()
     {
-        _run.Lives = _session.Lives;
-        _run.Ammo = _session.Ammo;   // README: ammo transfers across levels
-        Profile.Current.Coins += _session.CoinsCollected;
+        // ShowMap frees the session; its numbers are still read for the screen.
+        var session = _session;
+        _run.Lives = session.Lives;
+        _run.Ammo = session.Ammo;   // README: ammo transfers across levels
+        Profile.Current.Coins += session.CoinsCollected;
         Profile.Current.Save();
 
         int stop = Profile.Current.LevelIndex;
@@ -292,12 +348,12 @@ public partial class GameFlow : Node2D
         Current = Screen.Stats;
         DockAwayFrom(stop);
         AddPanelLabel("Mission accomplished", 14);
-        AddPanelLabel($"Level time {(int)(_session.Time / 60)}:{(int)_session.Time % 60:00}");
-        AddPanelLabel($"Level score {_session.Score}");
-        AddPanelLabel($"Kills {_session.Kills}");
-        AddPanelLabel($"Accuracy {_session.AccuracyPercent}%");
-        AddPanelLabel($"Completeness {_session.CompletenessPercent}%");
-        if (_session.IsHackerRun)
+        AddPanelLabel($"Level time {(int)(session.Time / 60)}:{(int)session.Time % 60:00}");
+        AddPanelLabel($"Level score {session.Score}");
+        AddPanelLabel($"Kills {session.Kills}");
+        AddPanelLabel($"Accuracy {session.AccuracyPercent}%");
+        AddPanelLabel($"Completeness {session.CompletenessPercent}%");
+        if (session.IsHackerRun)
             AddPanelLabel("HACKER - non-violent run");
         AddPanelLabel($"Coins {Profile.Current.Coins}");
         AddPanelButton("Shop", ShowShop);
