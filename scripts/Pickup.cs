@@ -22,6 +22,8 @@ public partial class Pickup : Area2D
         {
             Shape = new RectangleShape2D { Size = new Vector2(24, 24) },
         });
+        if (FromLevel && Source.Type == CollectibleDefs.AdminPassword)
+            AddChild(new PasswordHalo());   // before the sprite, so it draws behind it
         Source.Properties.TryGetValue("color", out var colorName);
         AddChild(new Sprite2D { Texture = Sprites.ForObject(Source.Type, colorName) });
         if (ObjectDefs.HasNumberProperty(Source.Type) && Source.Properties.TryGetValue("number", out var number))

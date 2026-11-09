@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Runtime.CompilerServices;
 using System.Threading.Tasks;
 using Godot;
 
@@ -8,7 +9,8 @@ namespace HackerOrSoldier;
 
 // Headless regression check for the editor and play loop:
 //   godot --headless --path . res://scenes/smoke_test.tscn
-// Exits 0 and prints SMOKE OK on success.
+// Exits 0 and prints SMOKE OK on success. SMOKE_ONLY=<check method name>
+// runs just that check.
 public partial class SmokeTest : Node
 {
     private int _failures;
@@ -16,6 +18,12 @@ public partial class SmokeTest : Node
 
     public override async void _Ready()
     {
+        string only = OS.GetEnvironment("SMOKE_ONLY");
+        if (only != "")
+        {
+            await RunOnly(only);
+            return;
+        }
         DataModelChecks();
         AutosaveCheck();
         await EditorLoopChecks();
@@ -73,6 +81,11 @@ public partial class SmokeTest : Node
         await BarrelCheck(ObjectDefs.Barrel);
         await BarrelCheck(ObjectDefs.SteelBarrel);
         await CollectibleCheck();
+        await ExitPasswordCheck();
+        await PasswordHaloCheck();
+        CampaignDataCheck();
+        WorldMapCheck();
+        await CampaignFlowCheck();
         await LettersBonusCheck();
         await StatsCheck();
         await TombstoneScoreCheck();
@@ -98,6 +111,16 @@ public partial class SmokeTest : Node
         await MenuSceneCheck();
         SfxChecks();
 
+        GD.Print(_failures == 0 ? "SMOKE OK" : $"SMOKE FAILED ({_failures})");
+        GetTree().Quit(_failures == 0 ? 0 : 1);
+    }
+
+    // Runs one check method by name, for quick iteration.
+    private async Task RunOnly(string method)
+    {
+        var check = GetType().GetMethod(method, System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance);
+        if (check.Invoke(this, null) is Task running)
+            await running;
         GD.Print(_failures == 0 ? "SMOKE OK" : $"SMOKE FAILED ({_failures})");
         GetTree().Quit(_failures == 0 ? 0 : 1);
     }
@@ -2009,6 +2032,103 @@ public partial class SmokeTest : Node
         editor.StopPlay();
     }
 
+    // The exit stays shut while an admin password placed in the level is
+    // uncollected; a level without one keeps an open exit.
+    private async Task ExitPasswordCheck()
+    {
+        var (editor, completed) = await ExitLevel(passwordCell: 13);
+        var session = editor.Session;
+        var exit = session.GetChildren().OfType<ExitDoor>().First();
+        Check(session.ExitLocked && exit.Locked, "an uncollected admin password locks the exit");
+        await WalkUntil("move_right", 200, () => session.HasAdminPassword);
+        Check(!completed.Value, "walking through the locked exit does not finish the level");
+        Check(exit.HintShown, "touching the locked exit shows the hint");
+        Check(!session.ExitLocked && !exit.Locked, "taking the password opens the exit");
+        Check(session.Score == 30000 && session.CoinsCollected == 10, "the password keeps its score and coins");
+        await WalkUntil("move_left", 200, () => completed.Value);
+        Check(completed.Value, "the open exit completes the level");
+        editor.StopPlay();
+
+        (editor, completed) = await ExitLevel(passwordCell: null);
+        Check(!editor.Session.ExitLocked, "a level without a password has an open exit");
+        await WalkUntil("move_right", 200, () => completed.Value);
+        Check(completed.Value, "a level without a password completes at the exit");
+        editor.StopPlay();
+
+        (editor, completed) = await ExitLevel(passwordCell: 11);
+        await WalkUntil("move_right", 200, () => completed.Value);
+        Check(completed.Value, "collecting the password while standing in the exit completes the level");
+        editor.StopPlay();
+    }
+
+    private void CampaignDataCheck()
+    {
+        Check(Campaign.Stops.Length == 15, "the campaign has fifteen stops");
+        Check(Campaign.Stops[^1].City == "Antarctica" && Campaign.Stops[^1].Lat < -70, "the last stop is in Antarctica");
+        Check(Campaign.Stops.All(s => s.Story.Length > 0 && Mathf.Abs(s.Lat) <= 90 && Mathf.Abs(s.Lon) <= 180),
+            "every stop has a story and a valid position");
+        Check(Campaign.Stops.Select(s => s.City).Distinct().Count() == 15, "every stop is a different city");
+        Check(Campaign.Origin.City == "Reykjavik" && Campaign.Intro.Length > 0 && Campaign.Outro.Length > 0,
+            "the origin, intro and outro are set");
+        Check(!Campaign.IsComplete(14) && Campaign.IsComplete(15), "the campaign completes after the fifteenth stop");
+    }
+
+    private async Task PasswordHaloCheck()
+    {
+        var (editor, _) = await ExitLevel(passwordCell: 6);
+        var pickup = editor.Session.GetChildren().OfType<Pickup>().First();
+        var halo = pickup.GetChildren().OfType<PasswordHalo>().FirstOrDefault();
+        Check(halo != null, "an uncollected admin password has a halo");
+        Check(halo != null && halo.GetIndex() < pickup.GetChildren().OfType<Sprite2D>().First(s => s is not PasswordHalo).GetIndex(),
+            "the halo draws behind the sticky note");
+        var seen = new HashSet<Texture2D>();
+        for (int i = 0; i < 90; i++)
+        {
+            await Frames(1);
+            if (halo != null)
+                seen.Add(halo.Texture);
+        }
+        Check(seen.Count >= 3, "the halo pulses through several steps");
+        var img = PasswordHalo.Frame(0).GetImage();
+        var tint = PasswordHalo.Tint;
+        bool onPalette = true;
+        for (int y = 0; y < img.GetHeight() && onPalette; y++)
+            for (int x = 0; x < img.GetWidth(); x++)
+            {
+                var px = img.GetPixel(x, y);
+                if (px.A > 0 && (Mathf.Abs(px.A - 0.75f) > 0.01f || Mathf.Abs(px.R - tint.R) > 0.01f || Mathf.Abs(px.G - tint.G) > 0.01f || Mathf.Abs(px.B - tint.B) > 0.01f))
+                    onPalette = false;
+            }
+        Check(onPalette, "the halo is one flat color with dither holes, no gradient");
+        editor.StopPlay();
+
+        (editor, _) = await ExitLevel(passwordCell: null);
+        Check(!editor.Session.GetChildren().OfType<PasswordHalo>().Any(), "no halo without a password");
+        editor.StopPlay();
+    }
+
+    private async Task<(Editor Editor, StrongBox<bool> Completed)> ExitLevel(int? passwordCell)
+    {
+        var editor = await FreshEditor();
+        var level = LevelData.NewDefault(14, 12);   // agent at 2, exit at 11
+        if (passwordCell is int cell)   // added directly: a cell holds one painted object
+            level.Objects.Add(new LevelObject { Type = CollectibleDefs.AdminPassword, X = cell, Y = 10 });
+        editor.SetLevel(level);
+        Check(editor.StartPlay(), "exit level starts");
+        var completed = new StrongBox<bool>();
+        editor.Session.Completed += () => completed.Value = true;
+        return (editor, completed);
+    }
+
+    private async Task<bool> WalkUntil(string action, int maxFrames, Func<bool> done)
+    {
+        Input.ActionPress(action);
+        for (int i = 0; i < maxFrames && !done(); i++)
+            await Frames(1);
+        Input.ActionRelease(action);
+        return done();
+    }
+
     // Collecting all five AGENT letters is worth 40k score and 5 coins.
     private async Task LettersBonusCheck()
     {
@@ -2530,14 +2650,122 @@ public partial class SmokeTest : Node
         AddChild(game);
         await ToSignal(GetTree(), SceneTree.SignalName.ProcessFrame);
         Check(IsInstanceValid(game), "game scene builds");
-        await Frames(3);   // the containers settle their layout
-        var panel = game.FindChildren("*", nameof(PanelContainer), true, false).OfType<PanelContainer>().FirstOrDefault();
-        var screen = GetViewport().GetVisibleRect();
-        var box = panel?.GetGlobalRect() ?? default;
-        Check(panel != null && screen.Encloses(box), "the campaign panel fits on screen");
-        Check(panel != null && box.GetCenter().DistanceTo(screen.GetCenter()) < 2, "the campaign panel is centered");
         game.QueueFree();
         await ToSignal(GetTree(), SceneTree.SignalName.ProcessFrame);
+    }
+
+    private void WorldMapCheck()
+    {
+        var bounds = new Rect2(0, 0, WorldMap.Width, WorldMap.Height);
+        var points = Enumerable.Range(-1, Campaign.Stops.Length + 1).Select(WorldMap.StopPoint).ToList();
+        Check(points.All(bounds.HasPoint), "every stop projects inside the map");
+        Check(WorldMap.StopPoint(14).Y > 330 && WorldMap.StopPoint(14).Y < WorldMap.Height,
+            "the Antarctic stop sits near the bottom edge, inside the map");
+        var offLand = Enumerable.Range(0, Campaign.Stops.Length)
+            .Where(i => !NearLand(WorldMap.StopPoint(i), 3)).Select(i => Campaign.Stops[i].City).ToList();
+        Check(offLand.Count == 0, $"every stop is on or beside land{(offLand.Count > 0 ? ": " + string.Join(", ", offLand) : "")}");
+
+        const int Sydney = 9, SanFrancisco = 10;
+        var end = WorldMap.LegEnd(Sydney, SanFrancisco);
+        Check(end.X > WorldMap.StopPoint(Sydney).X, "Sydney to San Francisco heads east");
+        Check(end.X > WorldMap.Width, "the Pacific leg runs off the right edge to wrap");
+        Check(Mathf.PosMod(end.X, WorldMap.Width) is > 100 and < 160, "the wrapped leg ends at San Francisco");
+        Check(Enumerable.Range(0, Campaign.Stops.Length).All(i => Mathf.Abs(WorldMap.LegEnd(i - 1, i).X - WorldMap.StopPoint(i - 1).X) <= WorldMap.Width / 2f),
+            "no leg is longer than half the world");
+
+        Check(!WorldMap.DialogAtTop(-1) && !WorldMap.DialogAtTop(0), "the London dialog docks at the bottom");
+        Check(WorldMap.DialogAtTop(14), "the Antarctica dialog docks at the top");
+        Check(Enumerable.Range(0, Campaign.Stops.Length).All(i => WorldMap.DialogAtTop(i) == (WorldMap.StopPoint(i).Y > WorldMap.Height / 2f)),
+            "a dialog docks on the half away from its stop");
+    }
+
+    private static bool NearLand(Vector2 point, int radius)
+    {
+        for (int dy = -radius; dy <= radius; dy++)
+            for (int dx = -radius; dx <= radius; dx++)
+                if (WorldGeography.IsLand((int)point.X + dx, (int)point.Y + dy))
+                    return true;
+        return false;
+    }
+
+    // The campaign screens: intro, flight, city dialog with typed story, last stop, outro.
+    private async Task CampaignFlowCheck()
+    {
+        var saved = Profile.Current;
+        Profile.Current = new Profile();
+        var screen = GetViewport().GetVisibleRect();
+
+        var flow = await NewFlow();
+        Check(flow.Current == GameFlow.Screen.Intro, "a new game opens on the intro");
+        Check(flow.Map.Visible && flow.Map.PlanePosition.DistanceTo(WorldMap.StopPoint(-1)) < 1, "the plane waits at the Agency HQ");
+        var panel = flow.Panel;
+        Check(screen.Encloses(panel.GetGlobalRect()), "the intro panel fits on screen");
+        Check(panel.GetGlobalRect().GetCenter().Y > screen.GetCenter().Y, "the intro docks away from the northern HQ");
+        var story = panel.FindChildren("*", nameof(Label), true, false).OfType<Label>().First(l => l.Text == Campaign.Intro);
+        var buttons = panel.FindChildren("*", nameof(Button), true, false).OfType<Button>().ToList();
+        Check(story.VisibleCharacters < story.GetTotalCharacterCount() && buttons.All(b => b.Disabled),
+            "the story is still typing and the buttons are off");
+        await Frames(30);
+        int typed = story.VisibleCharacters;
+        Check(typed > 0 && typed < story.GetTotalCharacterCount() / 2 && typed < 40,
+            $"the story types out at about 40 characters per second ({typed} after half a second)");
+        flow.FinishTyping();
+        Check(story.VisibleCharacters == -1 && buttons.All(b => !b.Disabled), "finishing the story enables the buttons");
+
+        buttons.First(b => b.Text == "Continue").EmitSignal(BaseButton.SignalName.Pressed);
+        await Frames(3);
+        Check(flow.Current == GameFlow.Screen.Flight && flow.Map.Flying && !panel.Visible, "Continue starts the flight with no panel");
+        await Frames(30);
+        Check(flow.Map.Flying && flow.Map.PlanePosition.DistanceTo(WorldMap.StopPoint(-1)) > 3, "the plane is in the air");
+        Input.ParseInputEvent(new InputEventKey { Pressed = true, Keycode = Key.Enter, PhysicalKeycode = Key.Enter });
+        await Frames(3);
+        Input.ParseInputEvent(new InputEventKey { Pressed = false, Keycode = Key.Enter, PhysicalKeycode = Key.Enter });
+        Check(flow.Current == GameFlow.Screen.City && panel.Visible, "a key press skips the flight and opens the city dialog");
+        Check(flow.Map.PlanePosition.DistanceTo(WorldMap.StopPoint(0)) < 1, "the plane landed in London");
+        var labels = panel.FindChildren("*", nameof(Label), true, false).OfType<Label>().Select(l => l.Text).ToList();
+        Check(labels.Contains("London") && labels.Contains(Campaign.Stops[0].Story), "the dialog has the city and its story");
+        Check(labels.Any(t => t.StartsWith("Mission:")) || labels.Any(t => t.Contains("not built")), "the dialog names the mission");
+        Check(screen.Encloses(panel.GetGlobalRect()), "the city dialog fits on screen");
+        Check(panel.GetGlobalRect().Position.Y > WorldMap.StopPoint(0).Y, "the dialog does not cover London");
+        flow.QueueFree();
+
+        Profile.Current = new Profile { LevelIndex = 1 };
+        flow = await NewFlow();
+        Check(flow.Current == GameFlow.Screen.City && !flow.Map.Flying && flow.Map.PlanePosition.DistanceTo(WorldMap.StopPoint(1)) < 1,
+            "a retry or continue parks the plane at the stop, no flight");
+        flow.QueueFree();
+
+        Profile.Current = new Profile { LevelIndex = 14 };
+        flow = await NewFlow();
+        flow.FinishTyping();
+        await Frames(2);
+        panel = flow.Panel;
+        Check(flow.Current == GameFlow.Screen.City && flow.Map.Taken == 14, "a profile on the last stop shows Antarctica with 14 passwords");
+        Check(screen.Encloses(panel.GetGlobalRect()), "the Antarctica dialog fits on screen");
+        Check(panel.GetGlobalRect().End.Y < WorldMap.StopPoint(14).Y, "the Antarctica dialog docks at the top, clear of the base");
+        buttons = panel.FindChildren("*", nameof(Button), true, false).OfType<Button>().ToList();
+        Check(buttons.Count == 1 && buttons[0].Text == "Main menu", "a stop without a level file offers only the main menu");
+        Check(panel.FindChildren("*", nameof(Label), true, false).OfType<Label>().Any(l => l.Text.Contains("Create level 15")),
+            "it says which level to create");
+        flow.QueueFree();
+
+        Profile.Current = new Profile { LevelIndex = 15 };
+        flow = await NewFlow();
+        flow.FinishTyping();
+        Check(flow.Current == GameFlow.Screen.Outro && flow.Map.Taken == 15, "after the fifteenth stop the outro shows all passwords");
+        Check(flow.Panel.FindChildren("*", nameof(Label), true, false).OfType<Label>().Any(l => l.Text == Campaign.Outro),
+            "the outro text shows");
+        flow.QueueFree();
+        await Frames(2);
+        Profile.Current = saved;
+    }
+
+    private async Task<GameFlow> NewFlow()
+    {
+        var flow = GD.Load<PackedScene>("res://scenes/game.tscn").Instantiate<GameFlow>();
+        AddChild(flow);
+        await Frames(4);   // the containers settle their layout
+        return flow;
     }
 
     // Scenarios are written against the legacy 12-row layout (floor at

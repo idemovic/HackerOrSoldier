@@ -90,6 +90,8 @@ public partial class PlaySession : Node2D
     public bool AlarmActive => _alarmTime > 0;
     public bool DisguiseActive => _disguiseTime > 0;
     public bool AgentDown => _agentDown;
+    public bool ExitLocked => _passwordsLeft > 0;
+    public bool HasAdminPassword => _hasPassword;
     public float DropChance { get; set; } = 0.3f;   // README: some enemies "sometimes" drop an ammo pack
     public System.Collections.Generic.IReadOnlyList<Enemy> Enemies => _enemies;
     public System.Collections.Generic.IReadOnlyList<WallSwitch> Switches => _switches;
@@ -108,6 +110,9 @@ public partial class PlaySession : Node2D
     private readonly HashSet<string> _keys = new();
     private readonly List<string> _heldItems = new();
     private readonly List<LockedDoor> _doors = new();
+    private readonly List<ExitDoor> _exits = new();
+    private int _passwordsLeft;   // admin passwords placed in the level and not yet taken
+    private bool _hasPassword;
     private readonly List<Enemy> _enemies = new();
     private readonly List<Computer> _computers = new();
     private readonly List<WallSwitch> _switches = new();
@@ -202,6 +207,7 @@ public partial class PlaySession : Node2D
                 case ObjectDefs.ExitDoor:
                     var exit = new ExitDoor { Position = pos };
                     exit.Reached += () => End(SignalName.Completed);
+                    _exits.Add(exit);
                     AddChild(exit);
                     break;
                 case ObjectDefs.Checkpoint:
@@ -293,9 +299,13 @@ public partial class PlaySession : Node2D
                     AddChild(pickup);
                     if (CollectibleDefs.Get(obj.Type) != null)
                         _collectibleTotal++;
+                    if (obj.Type == CollectibleDefs.AdminPassword)
+                        _passwordsLeft++;
                     break;
             }
         }
+        foreach (var exit in _exits)
+            exit.SetLocked(_passwordsLeft > 0);
 
         MapFloorCircuits();
 
@@ -1074,6 +1084,13 @@ public partial class PlaySession : Node2D
                     CoinsCollected += collectible.Coins;
                     if (pickup.FromLevel)
                         _collectibleGot++;
+                    if (pickup.Source.Type == CollectibleDefs.AdminPassword)
+                    {
+                        _hasPassword = true;
+                        if (pickup.FromLevel && --_passwordsLeft == 0)
+                            foreach (var exit in _exits)
+                                exit.SetLocked(false);
+                    }
                     if (CollectibleDefs.IsLetter(pickup.Source.Type))
                     {
                         _letters.Add(pickup.Source.Type);
@@ -1157,6 +1174,8 @@ public partial class PlaySession : Node2D
             items.Add((null, "Hidden", null));
         if (HasVest)
             items.Add((Sprites.Trimmed(ObjectDefs.Vest), null, null));
+        if (_hasPassword)
+            items.Add((Sprites.Trimmed(CollectibleDefs.AdminPassword), null, null));
         string manual = HeldManualItem();
         foreach (var item in new[] { ObjectDefs.InfraGoggles, ObjectDefs.Briefcase })
         {

@@ -3,13 +3,26 @@ using Godot;
 
 namespace HackerOrSoldier;
 
-// Campaign mode: plays the saved levels in file order. Briefing screen
-// before each level, statistics screen (with shop) after it, pause menu
-// with restart, fail screen with retry. Progress and coins persist in the
-// profile; lives and ammo carry across levels within a run.
+// Campaign mode: a world journey through the saved levels in file order, one
+// per stop of Campaign.Stops. Between levels the world map is the backdrop:
+// the plane flies to the next city, its story types out in the panel (docked
+// away from the city), and Start begins the level. Statistics screen (with
+// shop) after a level, pause menu with restart, fail screen with retry.
+// Progress and coins persist in the profile; lives and ammo carry across
+// levels within a run.
 public partial class GameFlow : Node2D
 {
+    // Which screen is up. Pause overlays Level.
+    public enum Screen { Intro, Flight, City, Level, Stats, Shop, Outro, Failed }
+
+    private const float TypeCharsPerSecond = 40f;
+
+    public Screen Current { get; private set; } = Screen.Intro;
+    public PanelContainer Panel => _panel;
+    public WorldMap Map => _map;
+
     private SkyBackdrop _sky;
+    private WorldMap _map;
     private LevelGrids _grids;
     private PackedScene _agentScene;
     private PlaySession _session;
@@ -23,6 +36,8 @@ public partial class GameFlow : Node2D
     private Theme _theme;
     private bool _paused;
     private HelpOverlay _help;
+    private Label _typingLabel;
+    private float _typed;
 
     public override void _Ready()
     {
@@ -33,7 +48,9 @@ public partial class GameFlow : Node2D
         _agentScene = GD.Load<PackedScene>("res://scenes/agent.tscn");
         _sky = new SkyBackdrop();
         AddChild(_sky);   // behind the grids: empty cells show the sky
-        GetViewport().SizeChanged += OnScreenResized;
+        _map = new WorldMap();
+        AddChild(_map);
+        _map.Landed += OnLanded;
         _grids = new LevelGrids(this);
         _grids.Hidden.Modulate = new Color(1, 1, 1, 0);
 
@@ -44,20 +61,37 @@ public partial class GameFlow : Node2D
         _theme.SetStylebox("panel", "PanelContainer", panelBox);
         _ui = new CanvasLayer();
         AddChild(_ui);
-        // The center container fits the panel to each screen's content and
-        // keeps it centered; the fixed width makes long text wrap instead of
-        // pushing the panel off screen.
-        var center = new CenterContainer { MouseFilter = Control.MouseFilterEnum.Ignore };
-        center.SetAnchorsPreset(Control.LayoutPreset.FullRect);
-        _ui.AddChild(center);
-        _panel = new PanelContainer { Theme = _theme };
-        center.AddChild(_panel);
+        // The container fits the panel to each screen's content and docks it
+        // at the top, bottom or middle; the fixed width makes long text wrap
+        // instead of pushing the panel off screen.
+        var dock = new MarginContainer { MouseFilter = Control.MouseFilterEnum.Ignore };
+        dock.SetAnchorsPreset(Control.LayoutPreset.FullRect);
+        foreach (var side in new[] { "left", "right", "top", "bottom" })
+            dock.AddThemeConstantOverride($"margin_{side}", 6);
+        _ui.AddChild(dock);
+        _panel = new PanelContainer { Theme = _theme, SizeFlagsHorizontal = Control.SizeFlags.ShrinkCenter };
+        dock.AddChild(_panel);
         _panelBox = new VBoxContainer { CustomMinimumSize = new Vector2(360, 0) };
         _panel.AddChild(_panelBox);
 
-        _files = LevelStore.ListFiles().OrderBy(f => f).ToArray();
+        _files = LevelStore.ListFiles().OrderBy(f => f).Take(Campaign.Stops.Length).ToArray();
         _run = RunState.NewRun();
-        ShowBriefing();
+        if (Profile.Current.LevelIndex == 0)
+            ShowIntro();
+        else
+            ShowStop(fly: false);
+    }
+
+    // A click or Enter/Space finishes typing the story before anything else.
+    public override void _Input(InputEvent @event)
+    {
+        if (_typingLabel == null)
+            return;
+        bool press = @event is InputEventMouseButton { Pressed: true } || @event.IsActionPressed("ui_accept");
+        if (!press)
+            return;
+        GetViewport().SetInputAsHandled();
+        FinishTyping();
     }
 
     public override void _UnhandledInput(InputEvent @event)
@@ -81,6 +115,13 @@ public partial class GameFlow : Node2D
     // closes it.
     public override void _Process(double delta)
     {
+        if (_typingLabel != null)
+        {
+            _typed += (float)delta * TypeCharsPerSecond;
+            _typingLabel.VisibleCharacters = (int)_typed;
+            if (_typed >= _typingLabel.GetTotalCharacterCount())
+                FinishTyping();
+        }
         bool held = _session != null && !_paused && Input.IsActionPressed(HelpOverlay.Action);
         if (held && _help == null)
         {
@@ -96,32 +137,69 @@ public partial class GameFlow : Node2D
         }
     }
 
-    // README: the level briefing shows the level name and description.
-    private void ShowBriefing()
+    private void ShowIntro()
     {
-        ClearSession();
-        ClearPanel();
-        if (_files.Length == 0)
+        Current = Screen.Intro;
+        ShowMap(taken: 0, parkedAt: -1);
+        DockAwayFrom(-1);
+        AddPanelLabel("Operation White Silence", 14);
+        var story = AddPanelLabel(Campaign.Intro);
+        AddPanelButton("Continue", () => ShowStop(fly: true));
+        BeginTyping(story);
+    }
+
+    // The map for the stop the profile is on: the plane flies in from the
+    // previous city, or is already parked there (a retry or a restart).
+    private void ShowStop(bool fly)
+    {
+        int stop = Profile.Current.LevelIndex;
+        if (Campaign.IsComplete(stop))
         {
-            AddPanelLabel("No levels yet.");
-            AddPanelLabel("Create one in the level editor first.");
-            AddPanelButton("Main menu", GoToMenu);
+            ShowOutro();
             return;
         }
-        if (Profile.Current.LevelIndex >= _files.Length)
+        ShowMap(taken: stop, parkedAt: fly ? stop - 1 : stop);
+        if (!fly)
         {
-            AddPanelLabel("Campaign complete!");
-            AddPanelLabel("All levels finished. Make more in the editor.");
+            ShowCityDialog();
+            return;
+        }
+        Current = Screen.Flight;
+        _panel.Visible = false;
+        _map.Fly(stop - 1, stop);
+    }
+
+    private void OnLanded()
+    {
+        if (Current == Screen.Flight)
+            ShowCityDialog();
+    }
+
+    // README: the level briefing shows the level name and description, now
+    // under the city's story.
+    private void ShowCityDialog()
+    {
+        Current = Screen.City;
+        int stop = Profile.Current.LevelIndex;
+        ClearPanel();
+        DockAwayFrom(stop);
+        AddPanelLabel(Campaign.Stops[stop].City, 14);
+        var story = AddPanelLabel(Campaign.Stops[stop].Story);
+        if (stop >= _files.Length)
+        {
+            AddPanelLabel($"Mission not built yet. Create level {stop + 1} in the editor.");
             AddPanelButton("Main menu", GoToMenu);
+            BeginTyping(story);
             return;
         }
 
-        _level = LevelStore.Load(_files[Profile.Current.LevelIndex]);
+        _level = LevelStore.Load(_files[stop]);
         if (_level == null || _level.Validate() != null)
         {
-            AddPanelLabel($"Level '{_files[Profile.Current.LevelIndex]}' failed to load.");
+            AddPanelLabel($"Level '{_files[stop]}' failed to load.");
             AddPanelButton("Skip it", NextLevel);
             AddPanelButton("Main menu", GoToMenu);
+            BeginTyping(story);
             return;
         }
 
@@ -131,15 +209,69 @@ public partial class GameFlow : Node2D
         AddPanelLabel($"Lives {_run.Lives}   Ammo {_run.Ammo}   Coins {Profile.Current.Coins}");
         AddPanelButton("Start", StartLevel);
         AddPanelButton("Main menu", GoToMenu);
+        BeginTyping(story);
+    }
+
+    private void ShowOutro()
+    {
+        Current = Screen.Outro;
+        ShowMap(taken: Campaign.Stops.Length, parkedAt: Campaign.Stops.Length - 1);
+        DockAwayFrom(Campaign.Stops.Length - 1);
+        AddPanelLabel("Mission complete", 14);
+        var story = AddPanelLabel(Campaign.Outro);
+        AddPanelButton("Main menu", GoToMenu);
+        BeginTyping(story);
+    }
+
+    // Shows the map as the backdrop with the plane parked, and clears the panel.
+    private void ShowMap(int taken, int parkedAt)
+    {
+        ClearSession();
+        ClearPanel();
+        _sky.Visible = false;
+        _map.Visible = true;
+        _map.SetProgress(taken);
+        _map.Park(parkedAt);
+    }
+
+    private void DockAwayFrom(int stop) =>
+        _panel.SizeFlagsVertical = WorldMap.DialogAtTop(stop) ? Control.SizeFlags.ShrinkBegin : Control.SizeFlags.ShrinkEnd;
+
+    // Types the label out and keeps the screen's buttons off until it is done.
+    private void BeginTyping(Label story)
+    {
+        _typingLabel = story;
+        _typed = 0f;
+        story.VisibleCharacters = 0;
+        foreach (var button in _panelBox.GetChildren().OfType<Button>())
+            button.Disabled = true;
+    }
+
+    public void FinishTyping()
+    {
+        if (_typingLabel == null)
+            return;
+        _typingLabel.VisibleCharacters = -1;
+        _typingLabel = null;
+        Button first = null;
+        foreach (var button in _panelBox.GetChildren().OfType<Button>())
+        {
+            button.Disabled = false;
+            first ??= button;
+        }
+        first?.GrabFocus();
     }
 
     private void StartLevel()
     {
         ClearPanel();
         _panel.Visible = false;
+        _map.Visible = false;
+        _sky.Visible = true;
         _sky.Apply(_level);
         _grids.Fill(_level);
 
+        Current = Screen.Level;
         _session = new PlaySession { ProcessMode = ProcessModeEnum.Pausable };
         _session.Setup(_level, _grids, _agentScene, _run);
         _session.Completed += () => Callable.From(OnLevelCompleted).CallDeferred();
@@ -156,8 +288,10 @@ public partial class GameFlow : Node2D
         Profile.Current.Coins += _session.CoinsCollected;
         Profile.Current.Save();
 
-        ClearPanel();
-        _panel.Visible = true;
+        int stop = Profile.Current.LevelIndex;
+        ShowMap(taken: stop + 1, parkedAt: stop);
+        Current = Screen.Stats;
+        DockAwayFrom(stop);
         AddPanelLabel("Mission accomplished", 14);
         AddPanelLabel($"Level time {(int)(_session.Time / 60)}:{(int)_session.Time % 60:00}");
         AddPanelLabel($"Level score {_session.Score}");
@@ -168,31 +302,30 @@ public partial class GameFlow : Node2D
             AddPanelLabel("HACKER - non-violent run");
         AddPanelLabel($"Coins {Profile.Current.Coins}");
         AddPanelButton("Shop", ShowShop);
-        AddPanelButton("Next level", () =>
-        {
-            NextLevel();
-        });
+        AddPanelButton(stop + 1 >= Campaign.Stops.Length ? "Finish" : "Next level", NextLevel);
         AddPanelButton("Exit game", () => GetTree().Quit());
-        ClearSession();
     }
 
     private void OnLevelFailed()
     {
-        ClearSession();
-        ClearPanel();
-        _panel.Visible = true;
+        int stop = Profile.Current.LevelIndex;
+        ShowMap(taken: stop, parkedAt: stop);
+        Current = Screen.Failed;
+        DockAwayFrom(stop);
         AddPanelLabel("Mission failed", 14);
         AddPanelButton("Retry", () =>
         {
             _run = RunState.NewRun();
-            ShowBriefing();
+            ShowStop(fly: false);
         });
         AddPanelButton("Main menu", GoToMenu);
     }
 
     private void ShowShop()
     {
+        Current = Screen.Shop;
         ClearPanel();
+        DockAwayFrom(Profile.Current.LevelIndex);
         AddPanelLabel("Shop", 14);
         var coinsLabel = new Label { Text = $"Coins {Profile.Current.Coins}" };
         _panelBox.AddChild(coinsLabel);
@@ -242,7 +375,7 @@ public partial class GameFlow : Node2D
         AddPanelButton("Restart level", () =>
         {
             Unpause();
-            ShowBriefing();
+            ShowStop(fly: false);
         });
         AddPanelButton("Main menu", () =>
         {
@@ -264,13 +397,12 @@ public partial class GameFlow : Node2D
     {
         Profile.Current.LevelIndex++;
         Profile.Current.Save();
-        ShowBriefing();
+        ShowStop(fly: !Campaign.IsComplete(Profile.Current.LevelIndex));
     }
 
     private void GoToMenu() => GetTree().ChangeSceneToFile("res://scenes/main_menu.tscn");
 
-    // Menu screens sit on the night sky alone, filling the screen, not on
-    // the corner of the level just left.
+    // Menu screens sit on the world map, not on the corner of the level just left.
     private void ClearSession()
     {
         if (_session != null)
@@ -281,18 +413,12 @@ public partial class GameFlow : Node2D
         _grids.Clear();
         _grids.Tint(Colors.White);
         _grids.Hidden.Modulate = new Color(1, 1, 1, 0);
-        _sky.Apply(GetViewportRect().Size, day: false);
-    }
-
-    // Between levels the sky fills the screen, so it follows a resized window.
-    private void OnScreenResized()
-    {
-        if (_session == null)
-            _sky.Apply(GetViewportRect().Size, day: false);
     }
 
     private void ClearPanel()
     {
+        _typingLabel = null;
+        _panel.SizeFlagsVertical = Control.SizeFlags.ShrinkCenter;
         foreach (var child in _panelBox.GetChildren())
         {
             _panelBox.RemoveChild(child);
@@ -301,7 +427,7 @@ public partial class GameFlow : Node2D
         _panel.Visible = true;
     }
 
-    private void AddPanelLabel(string text, int fontSize = 0)
+    private Label AddPanelLabel(string text, int fontSize = 0)
     {
         var label = new Label { Text = text, AutowrapMode = TextServer.AutowrapMode.WordSmart };
         if (fontSize > 0)
@@ -310,6 +436,7 @@ public partial class GameFlow : Node2D
             label.AddThemeFontSizeOverride("font_size", fontSize);
         }
         _panelBox.AddChild(label);
+        return label;
     }
 
     private void AddPanelButton(string text, System.Action onPressed)
