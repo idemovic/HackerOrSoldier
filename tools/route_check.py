@@ -680,7 +680,7 @@ class World:
         if node[0] == "w":
             x, y = node[1], node[2]
             for n, ticks in (((x + 1, y), 17), ((x - 1, y), 17), ((x, y + 1), 24), ((x, y - 1), 35)):
-                if n in self.water:
+                if n in self.water and not self.is_solid(n, inv, union):
                     edges.append((("w", n[0], n[1]), ticks, [(x, y), n], frozenset([(x, y), n])))
         elif node[0] == "r":
             p = self.platforms[node[1]]

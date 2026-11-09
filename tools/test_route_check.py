@@ -133,6 +133,30 @@ def test_security_door_blocks_until_hacked():
     assert any("security door 3" in t and "opened" in t for t in texts), texts
 
 
+def test_security_door_blocks_a_swimmer():
+    # The only way past the wall is the flooded passage under it; a security
+    # door standing in the water seals it until computer 1 is hacked.
+    rows = [
+        "......##......",
+        "......##......",
+        "......##......",
+        "......##......",
+        "###~~~##~~~###",
+        "###~~~~~~~~###",
+        "##############",
+    ]
+
+    def lvl(with_key):
+        objects = [obj("agent_start", 1, 3), obj("computer", 2, 3, number="1"),
+                   obj("security_door", 6, 5, number="1"), obj("exit_door", 12, 3)]
+        if with_key:
+            objects.append(obj("usb_key", 0, 3, number="1"))
+        return level(rows, *objects)
+    ok_closed, _ = run("security door 1 in water, no USB key (closed)", lvl(False))
+    ok_open, _ = run("security door 1 in water after hacking computer 1 (open)", lvl(True))
+    assert not ok_closed and ok_open
+
+
 def test_necessity_flips_without_the_gate():
     _, gated = run("necessity with a real laser gate", gated_corridor(True))
     _, fake = run("necessity when the laser is removed (fake gate)", gated_corridor(False))
