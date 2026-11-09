@@ -83,6 +83,7 @@ public partial class SmokeTest : Node
         await CollectibleCheck();
         await ExitPasswordCheck();
         await PasswordHaloCheck();
+        CampaignDataCheck();
         await LettersBonusCheck();
         await StatsCheck();
         await TombstoneScoreCheck();
@@ -116,7 +117,8 @@ public partial class SmokeTest : Node
     private async Task RunOnly(string method)
     {
         var check = GetType().GetMethod(method, System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance);
-        await (Task)check.Invoke(this, null);
+        if (check.Invoke(this, null) is Task running)
+            await running;
         GD.Print(_failures == 0 ? "SMOKE OK" : $"SMOKE FAILED ({_failures})");
         GetTree().Quit(_failures == 0 ? 0 : 1);
     }
@@ -2054,6 +2056,18 @@ public partial class SmokeTest : Node
         await WalkUntil("move_right", 200, () => completed.Value);
         Check(completed.Value, "collecting the password while standing in the exit completes the level");
         editor.StopPlay();
+    }
+
+    private void CampaignDataCheck()
+    {
+        Check(Campaign.Stops.Length == 15, "the campaign has fifteen stops");
+        Check(Campaign.Stops[^1].City == "Antarctica" && Campaign.Stops[^1].Lat < -70, "the last stop is in Antarctica");
+        Check(Campaign.Stops.All(s => s.Story.Length > 0 && Mathf.Abs(s.Lat) <= 90 && Mathf.Abs(s.Lon) <= 180),
+            "every stop has a story and a valid position");
+        Check(Campaign.Stops.Select(s => s.City).Distinct().Count() == 15, "every stop is a different city");
+        Check(Campaign.Origin.City == "Reykjavik" && Campaign.Intro.Length > 0 && Campaign.Outro.Length > 0,
+            "the origin, intro and outro are set");
+        Check(!Campaign.IsComplete(14) && Campaign.IsComplete(15), "the campaign completes after the fifteenth stop");
     }
 
     private async Task PasswordHaloCheck()
