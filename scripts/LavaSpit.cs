@@ -27,6 +27,8 @@ public partial class LavaSpit : Node2D
     private readonly RandomNumberGenerator _rng = new();
     private float _budget;
 
+    public event System.Action<Vector2I> Spat;
+
     // Returns whether the cell above blocks the spit; set by LevelGrids.
     public System.Func<Vector2I, bool> Covered { get; set; } = _ => false;
 
@@ -83,6 +85,7 @@ public partial class LavaSpit : Node2D
     // A burst of two to four droplets from one point on the surface.
     private void Spit(Vector2I cell)
     {
+        Spat?.Invoke(cell);
         float floor = cell.Y * Size + 7;
         var from = new Vector2(cell.X * Size + _rng.RandfRange(6f, Size - 6f), floor);
         float lean = _rng.RandfRange(-25f, 25f);

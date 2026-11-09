@@ -16,6 +16,10 @@ public partial class Enemy : CharacterBody2D
     private const float LurkTime = 1.5f;
     private const int LeapTiles = 3;
 
+    private const float SpotCooldownTime = 2f;   // a flickering line of sight must not re-bark
+    private const float StepInterval = 0.22f;
+    private const float StepRange = 6 * 32f;
+
     private enum LeapPhase { Lurk, Leap }
 
     public EnemyDef Def { get; set; }
@@ -25,6 +29,9 @@ public partial class Enemy : CharacterBody2D
     private int _facing = -1;
     private float _shootCooldown = 0.5f;   // small delay before the first attack
     private float _contactCooldown;
+    private float _spotCooldown;
+    private float _stepTimer;
+    private bool _wasSpotted;
     private Sprite2D _sprite;
     private EnemyAnimator _animator;   // every enemy but the turret
     private TurretGun _gun;            // the turret only
@@ -67,6 +74,8 @@ public partial class Enemy : CharacterBody2D
         float dt = (float)delta;
         _shootCooldown -= dt;
         _contactCooldown -= dt;
+        _spotCooldown -= dt;
+        _stepTimer -= dt;
 
         if (IsTurnedOff)
         {
@@ -85,6 +94,12 @@ public partial class Enemy : CharacterBody2D
         _sprite.Modulate = Colors.White;
 
         bool spotted = SeesAgent();
+        if (spotted && !_wasSpotted && _spotCooldown <= 0f && Def.SpotSound is Sound spotSound)
+        {
+            Sfx.PlayAt(spotSound, Position);
+            _spotCooldown = SpotCooldownTime;
+        }
+        _wasSpotted = spotted;
         bool ranged = Def.Attack is EnemyAttack.Pistol or EnemyAttack.MiniGun or EnemyAttack.Plasma;
         float speed = Def.Speed * SpeedUnit * (Session.AlarmActive ? 2f : 1f);   // README: alarm doubles enemy speed
 
@@ -122,6 +137,12 @@ public partial class Enemy : CharacterBody2D
             {
                 _facing = -_facing;   // do not walk off ledges
             }
+        }
+
+        if (Def.StepSound is Sound stepSound && _stepTimer <= 0f && IsOnFloor() && Mathf.Abs(Velocity.X) > 1f)
+        {
+            Sfx.PlayAt(stepSound, Position, StepRange);
+            _stepTimer = StepInterval;
         }
 
         // The turret swings its barrel onto the agent before it may fire.
@@ -308,7 +329,7 @@ public partial class Enemy : CharacterBody2D
                 _leapPhase = LeapPhase.Leap;
                 _leapVelocity = -_launchSpeed;
                 if (InLiquid)
-                    Sfx.PlayAt(Sound.Swim, Position);
+                    Sfx.PlayAt(Sound.PiranhaLeap, Position);
             }
         }
         else
@@ -318,6 +339,8 @@ public partial class Enemy : CharacterBody2D
             if (_leapVelocity > 0f && Position.Y >= _home.Y)
             {
                 Position = _home;
+                if (InLiquid)
+                    Sfx.PlayAt(Sound.Splash, Position);
                 _leapPhase = LeapPhase.Lurk;
                 _leapTimer = LurkTime;
             }

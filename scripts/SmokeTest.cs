@@ -2153,6 +2153,13 @@ public partial class SmokeTest : Node
         Sfx.PlayAt(Sound.Explosion, new Vector2(100, 100));
         Check(true, "playing sounds headless does not throw");
 
+        var cells = new[] { new Vector2I(10, 0), new Vector2I(2, 0), new Vector2I(3, 0) };
+        var near = TerrainAmbience.NearestWithin(cells, new Vector2(0, 16), 160f);
+        Check(near == new Vector2(80, 16), "the nearest cell within range is found");
+        Check(TerrainAmbience.NearestWithin(cells, new Vector2(0, 16), 40f) == null, "no cell beyond the range");
+        Check(TerrainAmbience.NearestWithin(cells, new Vector2(0, 16), 160f, c => c.X != 2) == new Vector2(112, 16),
+            "cells that are switched off are skipped");
+
         var saved = Profile.Current;
         Profile.Current = new Profile();
         int sfx = AudioServer.GetBusIndex(Sfx.SfxBus);
