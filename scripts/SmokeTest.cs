@@ -2691,8 +2691,9 @@ public partial class SmokeTest : Node
         Check(flow.Current == GameFlow.Screen.Flight && flow.Map.Flying && !panel.Visible, "Continue starts the flight with no panel");
         await Frames(30);
         Check(flow.Map.Flying && flow.Map.PlanePosition.DistanceTo(WorldMap.StopPoint(-1)) > 3, "the plane is in the air");
-        Input.ParseInputEvent(new InputEventKey { Pressed = true, Keycode = Key.Space, PhysicalKeycode = Key.Space });
+        Input.ParseInputEvent(new InputEventKey { Pressed = true, Keycode = Key.Enter, PhysicalKeycode = Key.Enter });
         await Frames(3);
+        Input.ParseInputEvent(new InputEventKey { Pressed = false, Keycode = Key.Enter, PhysicalKeycode = Key.Enter });
         Check(flow.Current == GameFlow.Screen.City && panel.Visible, "a key press skips the flight and opens the city dialog");
         Check(flow.Map.PlanePosition.DistanceTo(WorldMap.StopPoint(0)) < 1, "the plane landed in London");
         var labels = panel.FindChildren("*", nameof(Label), true, false).OfType<Label>().Select(l => l.Text).ToList();
