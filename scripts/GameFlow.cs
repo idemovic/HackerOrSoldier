@@ -3,8 +3,8 @@ using Godot;
 
 namespace HackerOrSoldier;
 
-// Campaign mode: a world journey through the saved levels in file order, one
-// per stop of Campaign.Stops. Between levels the world map is the backdrop:
+// Campaign mode: a world journey through the saved levels, one per stop of
+// Campaign.Stops, each naming its level file. Between levels the world map is the backdrop:
 // the plane flies to the next city, its story types out in the panel (docked
 // away from the city), and Start begins the level. Statistics screen (with
 // shop) after a level, pause menu with restart, fail screen with retry.
@@ -28,7 +28,6 @@ public partial class GameFlow : Node2D
     private PlaySession _session;
     private RunState _run;
     private LevelData _level;
-    private string[] _files;
 
     private CanvasLayer _ui;
     private PanelContainer _panel;
@@ -74,7 +73,6 @@ public partial class GameFlow : Node2D
         _panelBox = new VBoxContainer { CustomMinimumSize = new Vector2(360, 0) };
         _panel.AddChild(_panelBox);
 
-        _files = LevelStore.ListFiles().OrderBy(f => f).Take(Campaign.Stops.Length).ToArray();
         _run = RunState.NewRun();
         if (Profile.Current.LevelIndex == 0)
             ShowIntro();
@@ -185,18 +183,19 @@ public partial class GameFlow : Node2D
         DockAwayFrom(stop);
         AddPanelLabel(Campaign.Stops[stop].City, 14);
         var story = AddPanelLabel(Campaign.Stops[stop].Story);
-        if (stop >= _files.Length)
+        string file = Campaign.Stops[stop].LevelFile;
+        if (!LevelStore.Exists(file))
         {
-            AddPanelLabel($"Mission not built yet. Create level {stop + 1} in the editor.");
+            AddPanelLabel($"Mission not built yet. Save a level as {file} in the editor.");
             AddPanelButton("Main menu", GoToMenu);
             BeginTyping(story);
             return;
         }
 
-        _level = LevelStore.Load(_files[stop]);
+        _level = LevelStore.Load(file);
         if (_level == null || _level.Validate() != null)
         {
-            AddPanelLabel($"Level '{_files[stop]}' failed to load.");
+            AddPanelLabel($"Level '{file}' failed to load.");
             AddPanelButton("Skip it", NextLevel);
             AddPanelButton("Main menu", GoToMenu);
             BeginTyping(story);
