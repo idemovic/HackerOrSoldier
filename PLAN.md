@@ -466,6 +466,48 @@ Known simplifications (tuning constants, not README rules):
 - Smoke test: an agent on the far side keeps the turret silent while it
   swings round, then the plasma takes a life
 
+### World map campaign
+- The campaign is 15 stops (scripts/Campaign.cs: `Campaign.Stops`, `Intro`,
+  `Outro`, `Origin`), the Agency HQ in Reykjavik to Antarctica. Stop i is the
+  i-th level file in sorted order; files past the 15th are ignored and a stop
+  with no file says so. `Profile.LevelIndex >= 15` is a finished campaign
+- Admin password rule: the exit door (scripts/ExitDoor.cs) is locked while any
+  `FromLevel` admin password pickup is uncollected. PlaySession counts them
+  and unlocks every exit when the last is taken, completing the level at once
+  if the agent already stands in the doorway. A level with no password keeps
+  an open exit, so old levels still work. Touching a locked exit plays the
+  deny sound and shows "Find the admin password" (throttled); a red lamp on
+  the door turns green when it opens. The password shows in the HUD once held
+  and in the help overlay's exit text
+- The password pickup carries a pulsing dithered halo (scripts/PasswordHalo.cs):
+  four ring sizes in the password's green, a 2x2 ordered dither in three
+  densities, stepped through a slow cycle, drawn behind the sticky note
+- World map (scripts/WorldMap.cs, scripts/WorldGeography.cs): one
+  equirectangular projection (`WorldMap.Project`, longitude across all 640 px,
+  80N to 84S) serves the land raster, the pins and the plane. The land is
+  lon/lat polygons filled once into an image at startup: dithered two-tone
+  ocean that lightens toward coasts, dithered green land with ochre deserts and
+  snow-dusted tundra, white-cyan ice, a 1px dark coastline, a dotted 30 degree
+  graticule. Pins are lit green for taken passwords, blink for the next stop and
+  stay dim for the rest; Antarctica has a red target marker and the HQ a star.
+  Dashed route legs cover the flown route. The plane (a Sprites.cs map) flies each
+  leg in 2.6 s with ease in and out, taking the longitude difference the short
+  way, so Sydney to San Francisco crosses the date line and shows a second
+  copy at the seam. Any click or key lands it at once
+- GameFlow models the screens as `GameFlow.Screen` (Intro, Flight, City, Level,
+  Stats, Shop, Outro, Failed), each with one entry method. The panel is the
+  story dialog: it docks at the top or bottom, away from the stop
+  (`WorldMap.DialogAtTop`), the story types at 40 characters a second, and a click
+  or Enter/Space finishes it before the buttons turn on. New game opens on the
+  intro and flies to London; Continue, Retry and Restart park the plane at the
+  stop with no flight; Next level flies from the stop just finished; the
+  fifteenth stop ends on the outro
+- Looking at it: `godot --path . res://scenes/world_map_shot.tscn` (needs a
+  window) writes the map, dialog and play-mode PNGs to user://
+- Smoke test: the data table, projection and wrap, dock side, typing, the flow
+  from intro to a city dialog, and the exit and halo rules. SMOKE_ONLY=<check
+  method name> runs one check
+
 ## Milestone 6 - Steam prep (next)
 - Export presets for Windows and Linux
 - GodotSteam integration: achievements, cloud saves

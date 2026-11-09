@@ -172,7 +172,7 @@ Items can't be destroyed nor shot.
 ### Collectibles
 Collectibles are items scattered across the level to be picked and converted instantly to score and coins, e.g. the agent picks enemy notebook and gains X score and Y coins. These collectibles are available in levels:
 - A, G, E, N, T characters (each 1k score, 0 coins - if all collected in level 40k score, 5 coins)
-- Admin password (30k score, 10 coins)
+- Admin password (30k score, 10 coins). The exit door stays locked until every admin password in the level is collected
 - Diamond (25k score, 7 coins)
 - Notebook (20k score, 6 coins)
 - Mobile (15k score, 5 coins)
@@ -249,6 +249,9 @@ Music and sounds have separate volume controls with 0-10 values (0 means no soun
 
 ### Pause
 Triggers main menu with Restart level option
+
+### World map
+The campaign is a journey of 15 levels, one per city, ending in Antarctica. A new game opens with a short story typed out in a dialog over a world map. A plane flies from the Agency HQ in Reykjavik to each city in turn, a short story for that city appears, and Start begins its level. Each level holds an admin password, and the goal of the campaign is to take it in all 15 places. The map shows the passwords taken so far as `Admin passwords N/15`. The 15th level is in Antarctica; finishing it ends the story.
 
 ### Statistics
 Displays statistics of the agent at the end of the level:
