@@ -84,6 +84,7 @@ public partial class SmokeTest : Node
         await ExitPasswordCheck();
         await PasswordHaloCheck();
         CampaignDataCheck();
+        WorldMapCheck();
         await LettersBonusCheck();
         await StatsCheck();
         await TombstoneScoreCheck();
@@ -2068,6 +2069,40 @@ public partial class SmokeTest : Node
         Check(Campaign.Origin.City == "Reykjavik" && Campaign.Intro.Length > 0 && Campaign.Outro.Length > 0,
             "the origin, intro and outro are set");
         Check(!Campaign.IsComplete(14) && Campaign.IsComplete(15), "the campaign completes after the fifteenth stop");
+    }
+
+    private void WorldMapCheck()
+    {
+        var bounds = new Rect2(0, 0, WorldMap.Width, WorldMap.Height);
+        var points = Enumerable.Range(-1, Campaign.Stops.Length + 1).Select(WorldMap.StopPoint).ToList();
+        Check(points.All(bounds.HasPoint), "every stop projects inside the map");
+        Check(WorldMap.StopPoint(14).Y > 330 && WorldMap.StopPoint(14).Y < WorldMap.Height,
+            "the Antarctic stop sits near the bottom edge, inside the map");
+        var offLand = Enumerable.Range(0, Campaign.Stops.Length)
+            .Where(i => !NearLand(WorldMap.StopPoint(i), 3)).Select(i => Campaign.Stops[i].City).ToList();
+        Check(offLand.Count == 0, $"every stop is on or beside land{(offLand.Count > 0 ? ": " + string.Join(", ", offLand) : "")}");
+
+        const int Sydney = 9, SanFrancisco = 10;
+        var end = WorldMap.LegEnd(Sydney, SanFrancisco);
+        Check(end.X > WorldMap.StopPoint(Sydney).X, "Sydney to San Francisco heads east");
+        Check(end.X > WorldMap.Width, "the Pacific leg runs off the right edge to wrap");
+        Check(Mathf.PosMod(end.X, WorldMap.Width) is > 100 and < 160, "the wrapped leg ends at San Francisco");
+        Check(Enumerable.Range(0, Campaign.Stops.Length).All(i => Mathf.Abs(WorldMap.LegEnd(i - 1, i).X - WorldMap.StopPoint(i - 1).X) <= WorldMap.Width / 2f),
+            "no leg is longer than half the world");
+
+        Check(!WorldMap.DialogAtTop(-1) && !WorldMap.DialogAtTop(0), "the London dialog docks at the bottom");
+        Check(WorldMap.DialogAtTop(14), "the Antarctica dialog docks at the top");
+        Check(Enumerable.Range(0, Campaign.Stops.Length).All(i => WorldMap.DialogAtTop(i) == (WorldMap.StopPoint(i).Y > WorldMap.Height / 2f)),
+            "a dialog docks on the half away from its stop");
+    }
+
+    private static bool NearLand(Vector2 point, int radius)
+    {
+        for (int dy = -radius; dy <= radius; dy++)
+            for (int dx = -radius; dx <= radius; dx++)
+                if (WorldGeography.IsLand((int)point.X + dx, (int)point.Y + dy))
+                    return true;
+        return false;
     }
 
     private async Task PasswordHaloCheck()

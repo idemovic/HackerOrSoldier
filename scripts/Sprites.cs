@@ -2381,6 +2381,26 @@ public static class Sprites
             "gggggggd",
             "........",
         }),
+        // World map plane, seen from above, nose to the right; the map turns it to its heading.
+        ["world_plane"] = new(new[]
+        {
+            "................",
+            ".....l..........",
+            ".....ll.........",
+            "......lw........",
+            "......lww.......",
+            ".l....lwww......",
+            ".llwwwwwwwwwwww.",
+            ".llwwwwwwwwwwwwr",
+            ".llwwwwwwwwwwww.",
+            ".l....lwww......",
+            "......lww.......",
+            "......lw........",
+            ".....ll.........",
+            ".....l..........",
+            "................",
+            "................",
+        }, Scale: 1, ShadeBody: false),
         // Projectiles face right; the shot flips them when it flies left.
         // Brass slug trailing a white streak: the pistol and rifle round.
         ["bullet"] = new(new[]
