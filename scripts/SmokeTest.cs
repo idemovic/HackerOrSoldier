@@ -82,6 +82,7 @@ public partial class SmokeTest : Node
         await BarrelCheck(ObjectDefs.SteelBarrel);
         await CollectibleCheck();
         await ExitPasswordCheck();
+        await PasswordHaloCheck();
         await LettersBonusCheck();
         await StatsCheck();
         await TombstoneScoreCheck();
@@ -2052,6 +2053,40 @@ public partial class SmokeTest : Node
         (editor, completed) = await ExitLevel(passwordCell: 11);
         await WalkUntil("move_right", 200, () => completed.Value);
         Check(completed.Value, "collecting the password while standing in the exit completes the level");
+        editor.StopPlay();
+    }
+
+    private async Task PasswordHaloCheck()
+    {
+        var (editor, _) = await ExitLevel(passwordCell: 6);
+        var pickup = editor.Session.GetChildren().OfType<Pickup>().First();
+        var halo = pickup.GetChildren().OfType<PasswordHalo>().FirstOrDefault();
+        Check(halo != null, "an uncollected admin password has a halo");
+        Check(halo != null && halo.GetIndex() < pickup.GetChildren().OfType<Sprite2D>().First(s => s is not PasswordHalo).GetIndex(),
+            "the halo draws behind the sticky note");
+        var seen = new HashSet<Texture2D>();
+        for (int i = 0; i < 90; i++)
+        {
+            await Frames(1);
+            if (halo != null)
+                seen.Add(halo.Texture);
+        }
+        Check(seen.Count >= 3, "the halo pulses through several steps");
+        var img = PasswordHalo.Frame(0).GetImage();
+        var tint = PasswordHalo.Tint;
+        bool onPalette = true;
+        for (int y = 0; y < img.GetHeight() && onPalette; y++)
+            for (int x = 0; x < img.GetWidth(); x++)
+            {
+                var px = img.GetPixel(x, y);
+                if (px.A > 0 && (Mathf.Abs(px.A - 0.75f) > 0.01f || Mathf.Abs(px.R - tint.R) > 0.01f || Mathf.Abs(px.G - tint.G) > 0.01f || Mathf.Abs(px.B - tint.B) > 0.01f))
+                    onPalette = false;
+            }
+        Check(onPalette, "the halo is one flat color with dither holes, no gradient");
+        editor.StopPlay();
+
+        (editor, _) = await ExitLevel(passwordCell: null);
+        Check(!editor.Session.GetChildren().OfType<PasswordHalo>().Any(), "no halo without a password");
         editor.StopPlay();
     }
 
