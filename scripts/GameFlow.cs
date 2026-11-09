@@ -282,9 +282,11 @@ public partial class GameFlow : Node2D
     // Hacker tag for a non-violent run. Buttons: Shop, Next level, Exit game.
     private void OnLevelCompleted()
     {
-        _run.Lives = _session.Lives;
-        _run.Ammo = _session.Ammo;   // README: ammo transfers across levels
-        Profile.Current.Coins += _session.CoinsCollected;
+        // ShowMap frees the session; its numbers are still read for the screen.
+        var session = _session;
+        _run.Lives = session.Lives;
+        _run.Ammo = session.Ammo;   // README: ammo transfers across levels
+        Profile.Current.Coins += session.CoinsCollected;
         Profile.Current.Save();
 
         int stop = Profile.Current.LevelIndex;
@@ -292,12 +294,12 @@ public partial class GameFlow : Node2D
         Current = Screen.Stats;
         DockAwayFrom(stop);
         AddPanelLabel("Mission accomplished", 14);
-        AddPanelLabel($"Level time {(int)(_session.Time / 60)}:{(int)_session.Time % 60:00}");
-        AddPanelLabel($"Level score {_session.Score}");
-        AddPanelLabel($"Kills {_session.Kills}");
-        AddPanelLabel($"Accuracy {_session.AccuracyPercent}%");
-        AddPanelLabel($"Completeness {_session.CompletenessPercent}%");
-        if (_session.IsHackerRun)
+        AddPanelLabel($"Level time {(int)(session.Time / 60)}:{(int)session.Time % 60:00}");
+        AddPanelLabel($"Level score {session.Score}");
+        AddPanelLabel($"Kills {session.Kills}");
+        AddPanelLabel($"Accuracy {session.AccuracyPercent}%");
+        AddPanelLabel($"Completeness {session.CompletenessPercent}%");
+        if (session.IsHackerRun)
             AddPanelLabel("HACKER - non-violent run");
         AddPanelLabel($"Coins {Profile.Current.Coins}");
         AddPanelButton("Shop", ShowShop);
