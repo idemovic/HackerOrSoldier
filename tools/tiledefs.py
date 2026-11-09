@@ -20,3 +20,18 @@ def _parse(text):
 
 IDS, SOLID, DESTRUCTIBLE, BACKGROUND = _parse(SOURCE.read_text(encoding="utf-8"))
 HIDDEN = IDS["HiddenPlatform"]
+
+
+def _object_types():
+    """Every object type the game knows: the string consts of ObjectDefs,
+    CollectibleDefs and EnemyDefs plus the deco_* table. An unknown type
+    would load as a pickup, so levelkit rejects it."""
+    scripts = SOURCE.parent
+    types = set()
+    for name in ("TileDefs.cs", "CollectibleDefs.cs", "EnemyDefs.cs"):
+        types |= set(re.findall(r'public const string \w+ = "([a-z_]+)";', (scripts / name).read_text(encoding="utf-8")))
+    types |= set(re.findall(r'new\("(deco_\w+)"', (scripts / "Decoration.cs").read_text(encoding="utf-8")))
+    return types
+
+
+OBJECT_TYPES = _object_types()
