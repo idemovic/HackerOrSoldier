@@ -11,11 +11,11 @@ public enum Sound
     ShotPistol, ShotRifle, ShotMinigun, Crossbow, Chainsaw, DynamiteThrow, EmptyClick,
     EnemyShot, EnemyMinigun, EnemyPlasma, EnemyHit, EnemyDie, RocketLaunch,
     BulletHit, Switch, Explosion, Alarm,
-    Splash, SpikesUp, SpearsTips, SpearsOut, ElectricBuzz, LavaBubble, RobodogBark, RobodogStep, PiranhaLeap,
     DoorOpen, Teleport, ComputerHack, PowerDown, Checkpoint,
     Hide, Unhide, GogglesOn, DisguiseOn, WallCrumble, FlameBurst, ElectricZap,
     Hurt, Death, VestBreak, MissionFailed, LevelComplete,
     PickupKey, PickupHealth, PickupAmmo, PickupVest, PickupItem, PickupWeapon, Coin, LetterBonus,
+    Splash, SpikesUp, SpearsTips, SpearsOut, ElectricBuzz, LavaBubble, RobodogBark, RobodogStep, PiranhaLeap,
 }
 
 public enum Wave { Square, Triangle, Saw, Noise }
