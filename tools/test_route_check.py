@@ -11,14 +11,16 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import route_check as rc  # noqa: E402
 
 CHARS = {".": rc.EMPTY, "#": rc.WALL, "~": rc.WATER, "L": rc.LAVA, "|": rc.SPEAR,
-         "E": rc.ELECTRIC, "D": rc.DWALL, "H": rc.HIDDEN}
+         "E": rc.ELECTRIC, "D": rc.DWALL, "H": rc.HIDDEN,
+         "d": 28, "N": 31, "m": 32, "t": 33, "b": 14}
 
 
 def level(rows, *objects):
     w, h = len(rows[0]), len(rows)
     assert all(len(r) == w for r in rows)
-    return {"name": "fixture", "width": w, "height": h,
+    return {"name": "fixture", "formatVersion": 3, "width": w, "height": h,
             "tiles": [CHARS[c] for row in rows for c in row],
+            "background": [0] * (w * h),
             "objects": [{"type": t, "x": x, "y": y, "properties": props} for t, x, y, props in objects]}
 
 
@@ -217,6 +219,59 @@ def test_electric_floor_region():
     ok_live, _ = run("unmarked electric floor (live forever, blocked)", live)
     ok_off, _ = run("electric floor on circuit 2, hacked off (passable)", marked)
     assert not ok_live and ok_off
+
+
+def test_tile_solidity_comes_from_tiledefs():
+    # Ids 26-33 post-date the old hard-coded set: the colored destructible
+    # walls, snow, mine rock and mine timber.
+    for char, tile in (("N", "snow"), ("m", "mine rock"), ("t", "mine timber")):
+        rows = corridor(16, 3, [(0, "#" * 16), (1, "#" * 16), (2, "........%s......." % char), (3, "#" * 16)])
+        lvl = level(rows, obj("agent_start", 1, 2), obj("exit_door", 14, 2))
+        ok_h, _ = run("%s blocks the hacker" % tile, lvl)
+        ok_s, _ = run("%s blocks the soldier" % tile, lvl, ("soldier",))
+        assert not ok_h and not ok_s
+
+
+def test_destructible_variants_are_destructible():
+    rows = corridor(16, 3, [(0, "#" * 16), (1, "#" * 16), (2, "........d......."), (3, "#" * 16)])
+    wall = level(rows, obj("agent_start", 1, 2), obj("exit_door", 14, 2))
+    ok_h, _ = run("steel destructible wall, hacker mode (solid)", wall)
+    ok_s, routes = run("steel destructible wall, soldier mode (shot)", wall, ("soldier",))
+    assert not ok_h and ok_s
+    assert any(t.startswith("shot destructible wall at (8,2)") for _, t, _ in routes["soldier"].events)
+
+
+def test_exit_needs_the_password():
+    rows = corridor(16, 3)
+    taken = level(rows, obj("agent_start", 1, 2), obj("exit_door", 14, 2), obj("admin_password", 7, 2))
+    ok, routes = run("password on the way to the exit", taken, ("hacker", "soldier"))
+    assert ok
+    for mode in ("hacker", "soldier"):
+        assert any("admin password" in t for _, t, _ in routes[mode].events), mode
+    out = io.StringIO()
+    rc.check(taken, ("hacker",), out=out)
+    assert any("admin password" in l and "REQUIRED" in l for l in out.getvalue().splitlines())
+
+    walled = corridor(16, 3, [(0, "#" * 16), (1, "#" * 16), (2, "........#......."), (3, "#" * 16)])
+    unreachable = level(walled, obj("agent_start", 1, 2), obj("exit_door", 5, 2), obj("admin_password", 14, 2))
+    ok, _ = run("password out of reach, exit door open but locked", unreachable, ("hacker", "soldier"))
+    assert not ok
+    ungated = level(walled, obj("agent_start", 1, 2), obj("exit_door", 5, 2))
+    ok, _ = run("no password object, the exit is not gated", ungated)
+    assert ok
+
+
+def test_v2_background_in_tiles_is_scenery():
+    # A v2 file keeps background walls (id 14) in the tile array; they must
+    # not count as solid. The v3 layer is separate and equally ignored.
+    rows = corridor(16, 3, [(2, "........b.......")])
+    v2 = level(rows, obj("agent_start", 1, 2), obj("exit_door", 14, 2))
+    v2["formatVersion"] = 2
+    del v2["background"]
+    v3 = level(corridor(16, 3), obj("agent_start", 1, 2), obj("exit_door", 14, 2))
+    v3["background"][2 * 16 + 8] = 14
+    assert run("v2 level with background in tiles", v2)[0]
+    assert run("v3 level with a background layer", v3)[0]
 
 
 if __name__ == "__main__":

@@ -19,6 +19,8 @@ import sys
 import zlib
 from collections import defaultdict
 
+import tiledefs
+
 TILE = 32
 DT = 1 / 60
 HALF_X = 8                      # the agent's 16x30 box (Agent.HalfSize)
@@ -39,7 +41,9 @@ PLATFORM_RANGE = 4 * TILE
 RIDE_STEP = 16                  # px between sampled ride positions
 
 EMPTY, WALL, DWALL, ALARM, ELECTRIC, WATER, LAVA, SPIKES, SPEAR, HIDDEN = range(10)
-SOLID_TILES = {WALL, DWALL, ALARM, ELECTRIC, HIDDEN, 10, 11, 12, 13, 17, 18, 19, 20}
+SOLID_TILES = tiledefs.SOLID                # from scripts/TileDefs.cs
+DESTRUCTIBLE_TILES = tiledefs.DESTRUCTIBLE  # DWALL and its colored variants
+BACKGROUND_TILES = tiledefs.BACKGROUND
 
 PICKUP_TOKENS = {
     "door_key": lambda p: "key:" + p.get("color", "red"),
@@ -47,6 +51,7 @@ PICKUP_TOKENS = {
     "infra_goggles": lambda p: "goggles",
     "briefcase": lambda p: "briefcase",
     "weapon_dynamite": lambda p: "dynamite",
+    "admin_password": lambda p: "password",
 }
 GROUND_ENEMIES = {"fighter", "soldier", "super_soldier", "ultimate_soldier", "robodog", "robot"}
 ROW_SHOOTERS = {"soldier", "super_soldier", "robot"}
@@ -69,6 +74,20 @@ def cell_of(px, py):
 def load_level(path):
     with open(path, encoding="utf-8") as f:
         return json.load(f)
+
+
+def split_layers(level):
+    """(tiles, background) for a v3 level, or a v2 one whose background walls
+    still sit in the tile array (LevelStore.Parse does the same move)."""
+    tiles = list(level["tiles"])
+    background = level.get("background")
+    if background is not None and level.get("formatVersion", 1) >= 3:
+        return tiles, list(background)
+    background = [0] * len(tiles)
+    for i, t in enumerate(tiles):
+        if t in BACKGROUND_TILES:
+            background[i], tiles[i] = t, EMPTY
+    return tiles, background
 
 
 class Platform:
@@ -134,7 +153,7 @@ class World:
     def __init__(self, level):
         self.width = level["width"]
         self.height = level["height"]
-        self.tiles = level["tiles"]
+        self.tiles, self.background = split_layers(level)
         self.name = level.get("name", "")
         w, h = self.width, self.height
         self.solid = set()
@@ -154,6 +173,7 @@ class World:
         self.start = None
         self.exit = None
         self.dwalls = set()
+        self.needs_password = False   # the exit door stays locked until the password is taken
         self.objects = level["objects"]
 
         for y in range(h):
@@ -161,7 +181,7 @@ class World:
                 t = self.tiles[y * w + x]
                 if t == HIDDEN:
                     self.dyn[(x, y)] = ("goggles", True)
-                elif t == DWALL:
+                elif t in DESTRUCTIBLE_TILES:
                     self.dwalls.add((x, y))
                 elif t in SOLID_TILES:
                     self.solid.add((x, y))
@@ -239,6 +259,7 @@ class World:
                 markers[cell] = props.get("number", "1")
             elif typ in PICKUP_TOKENS:
                 token = PICKUP_TOKENS[typ](props)
+                self.needs_password |= token == "password"
                 label = typ.replace("weapon_", "").replace("_", " ")
                 if "color" in props:
                     label = props["color"] + " " + label
@@ -799,6 +820,8 @@ def search(world, mode, forbid=frozenset()):
                 if p and p[0] not in inv2 and ("pickup", c) not in forbid:
                     inv2 = inv2 | {p[0]}
                     events.append(("pickup", c, p[1]))
+            if dest == EXIT and world.needs_password and "password" not in inv2:
+                continue
             if dest != EXIT:
                 if not world.node_ok(dest, inv2):
                     continue
@@ -995,6 +1018,8 @@ def render(world, routes, path, scale=8):
             color = TILE_COLORS.get(t)
             if color is None:
                 color = (110, 110, 125) if t in SOLID_TILES else (34, 36, 44)
+            if t == EMPTY and world.background[y * world.width + x]:
+                color = (40, 44, 58)
             cv.rect(x * S, y * S, (x + 1) * S, (y + 1) * S, color)
             if t in SOLID_TILES:
                 cv.rect(x * S, y * S, (x + 1) * S, y * S + 1, tuple(min(255, c + 40) for c in color))
