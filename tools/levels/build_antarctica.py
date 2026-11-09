@@ -1,4 +1,4 @@
-"""Builds levels/antarctica.json, the 80x80 finale: the base under the ice.
+"""Builds levels/antarctica.json, the 110x80 finale: the base under the ice.
 
 The agent starts on the snow above the base and works down through five
 tiers: the surface camp, the ice caverns, the outer base, the inner base and
@@ -17,14 +17,18 @@ import sys
 sys.path.insert(0, str(pathlib.Path(__file__).resolve().parents[1]))
 from levelkit import *  # noqa: E402,F403
 
+W = 110
+EXTRA = 30      # tiles added between the end chamber and the old tunnel layout
+
 L = Level(
     "White Silence",
     "The base sits under two kilometres of ice, and the machine that can shut down every network on Earth runs at "
     "the bottom of it. Five tiers lead down: the surface camp, the ice caverns, the outer base, the inner base and "
     "the machine room. On each tier the soldier fights through the syndicate's best guards, and the hacker takes "
     "the quiet drain beside them with USB keys, laser switches, the goggles for the hidden planks and a teleport "
-    "into a sealed cell. The admin password shuts the machine down for good. Then get out.",
-    "night", 80, 80)
+    "into a sealed cell. The admin password waits on a dais in the machine hall, above a pond of eels and "
+    "piranhas and under two robots. It shuts the machine down for good. Then get out.",
+    "night", W, 80)
 
 
 class Tier:
@@ -36,11 +40,14 @@ class Tier:
 
     def __init__(self, yv, flip, bg, wall, sky=False):
         self.yv, self.flip, self.bg, self.wall, self.sky = yv, flip, bg, wall, sky
+        self.sh = EXTRA     # tier code is written for an 80 wide level; sh = 0 draws in final coordinates
         self.g = yv + 5
         self.lane = yv + 13
 
     def x(self, x):
-        return 79 - x if self.flip else x
+        if x >= 18:
+            x += self.sh
+        return W - 1 - x if self.flip else x
 
     def rect(self, x0, y0, x1, y1, tile):
         a, b = sorted((self.x(x0), self.x(x1)))
@@ -69,13 +76,22 @@ class Tier:
         self.rect(x0, self.lane + 1, x1, self.lane + 1, LAVA)
         self.put("moving_platform", origin, self.lane)
 
-    def nook(self, x, number):
-        """A shelf above the drain holding a USB key, reached by a step."""
+    def bridge(self, x0, x1):
+        """A lava gap too wide to jump with a hidden plank bridge floating over it: it needs the goggles."""
+        self.rect(x0, self.lane + 1, x1, self.lane + 1, LAVA)
+        self.rect(x0 + 2, self.lane, x1 - 2, self.lane, HIDDEN)
+
+    def trail(self, x, span, number):
+        """A key corridor in the rock above the drain. The step up is at x and the USB key lies span tiles west
+        of it, so the hacker walks there and back before the door."""
         yv = self.yv
-        self.carve(x, yv + 7, x + 5, yv + 10)
+        x = x + self.sh if x >= 18 else x
+        sh, self.sh = self.sh, 0
+        self.carve(x - span, yv + 8, x + 1, yv + 9)
+        self.carve(x, yv + 10, x + 1, yv + 10)
         self.rect(x, yv + 12, x + 1, yv + 12, self.wall_floor)
-        self.rect(x + 3, yv + 10, x + 5, yv + 10, self.wall_floor)
-        self.put("usb_key", x + 4, yv + 9, number=number)
+        self.put("usb_key", x - span + 1, yv + 9, number=number)
+        self.sh = sh
 
     def rooms(self, chamber_bg):
         yv = self.yv
@@ -96,21 +112,25 @@ class Tier:
         self.put("light", 8, yv + 3)
         self.put("light", 14, yv + 3)
         self.put("light", 72, yv + 2)
+        sh, self.sh = self.sh, 0
+        self.carve(18, 1 if self.sky else yv + 1, 47, yv + 5)
+        self.carve(18, yv + 11, 47, yv + 13)
+        self.sh = sh
 
 
 def drop(yv_from, flip_from):
     """The hole in a tier end chamber floor that drops into the next tier vestibule."""
-    x0, x1 = (4, 9) if not flip_from else (70, 75)
+    x0, x1 = (4, 9) if not flip_from else (W - 10, W - 5)
     L.carve(x0, yv_from + 14, x1, yv_from + 14, BG_ROCK)
 
 
 def ground():
-    L.rect(1, 0, 78, 32, SNOW)
-    L.rect(1, 33, 78, 62, CONCRETE)
-    L.rect(1, 63, 78, 78, STEEL)
+    L.rect(1, 0, W - 2, 32, SNOW)
+    L.rect(1, 33, W - 2, 62, CONCRETE)
+    L.rect(1, 63, W - 2, 78, STEEL)
     L.border(WALL)
-    L.rect(1, 0, 78, 8, EMPTY)
-    L.rect(1, 9, 78, 9, SNOW)
+    L.rect(1, 0, W - 2, 8, EMPTY)
+    L.rect(1, 9, W - 2, 9, SNOW)
 
 
 def tier_one():
@@ -145,12 +165,11 @@ def tier_one():
 
     t.put("computer", 65, lane, number=1)
     t.doors(61, 1)
+    t.trail(63, 17, 1)
     t.put("laser", 57, lane, number=2)
     t.put("switch", 54, lane, number=2)
-    t.nook(63, 1)
     t.put("infra_goggles", 51, lane)
-    t.rect(30, lane + 1, 37, lane + 1, LAVA)
-    t.rect(32, lane + 1, 35, lane + 1, HIDDEN)
+    t.bridge(30, 37)
     t.pit(41, 48, 44)
     t.put("camera", 38, lane - 2, facing="left")
     t.put("sim_card", 33, lane - 2)
@@ -161,6 +180,22 @@ def tier_one():
     t.put("deco_machine", 8, lane)
     t.put("deco_crate_steel", 12, lane)
     t.put("letter_g", 14, 6)
+
+    t.sh = 0
+    t.put("light", 40, 6)
+    t.put("light", 28, 6)
+    t.rect(44, g, 45, g, SANDBAGS)
+    t.put("super_soldier", 41, g)
+    t.put("ultimate_soldier", 37, g)
+    t.put("ammo_pack", 39, g)
+    t.rect(33, 4, 33, g, DESTRUCTIBLE_SAND)
+    t.put("robodog", 30, g)
+    t.put("drone", 28, 5)
+    t.put("ultimate_soldier", 25, g)
+    t.put("health_kit", 22, g)
+    t.pit(24, 31, 27)
+    t.put("health_kit", 42, lane)
+    t.put("closet", 38, lane)
 
 
 def tier_two(yv, flip):
@@ -179,6 +214,7 @@ def tier_two(yv, flip):
     t.rect(38, g + 1, 51, g + 1, WATER)
     t.put("electric_eel", 44, g)
     t.put("electric_eel", 48, g)
+    t.put("robot_piranha", 41, g + 1)
     t.put("fighter", 53, g)
     t.put("robodog", 36, g)
     t.put("super_soldier", 33, g)
@@ -197,14 +233,12 @@ def tier_two(yv, flip):
     t.put("notebook", 66, lane - 2)
     t.put("closet", 63, lane)
     t.doors(61, 4)
-    t.nook(63, 4)
+    t.trail(63, 4, 4)
     t.rect(46, lane, 52, lane, ELECTRIC)
     t.put("floor_circuit", 46, lane, number=3)
     t.put("computer", 54, lane, number=3)
-    t.nook(56, 3)
-    t.put("infra_goggles", 40, lane)
-    t.rect(28, lane + 1, 35, lane + 1, LAVA)
-    t.rect(30, lane + 1, 33, lane + 1, HIDDEN)
+    t.trail(56, 8, 3)
+    t.bridge(28, 35)
     t.put("laser", 22, lane, number=5)
     t.put("switch", 19, lane, number=5)
     t.put("camera", 38, lane - 2, facing="right")
@@ -214,6 +248,22 @@ def tier_two(yv, flip):
     t.put("deco_machine", 8, lane)
     t.put("deco_crate_steel", 12, lane)
     t.put("sim_card", 14, top + 3)
+
+    t.sh = 0
+    t.put("light", 40, top + 1)
+    t.put("light", 28, top + 1)
+    t.rect(30, g - 1, 44, g, WATER)
+    t.rect(30, g + 1, 44, g + 1, WATER)
+    t.put("electric_eel", 33, g)
+    t.put("electric_eel", 41, g)
+    t.put("robot_piranha", 37, g + 1)
+    t.put("ultimate_soldier", 46, g)
+    t.put("super_soldier", 26, g)
+    t.put("drone", 24, top + 2)
+    t.put("ammo_pack", 28, g)
+    t.pit(24, 31, 27)
+    t.put("health_kit", 40, lane)
+    t.put("diamond", 36, lane - 2)
 
 
 def tier_three(yv, flip):
@@ -246,11 +296,9 @@ def tier_three(yv, flip):
     t.put("camera", 36, top)
     t.put("deco_machine", 52, g)
 
-    # USB 7 sits in a sealed cell that only the teleport reaches.
     t.put("computer", 65, lane, number=6)
     t.doors(61, 6)
-    t.nook(63, 6)
-    t.put("infra_goggles", 59, lane)
+    t.trail(63, 16, 6)
     t.put("teleport", 49, lane, number=1)
     t.carve(36, yv + 8, 42, yv + 9)
     t.put("teleport", 38, yv + 9, number=1)
@@ -268,9 +316,26 @@ def tier_three(yv, flip):
     t.put("deco_crate_steel", 12, lane)
     t.put("letter_n", 10, top + 2)
 
+    t.sh = 0
+    t.put("light", 40, top + 1)
+    t.put("light", 28, top + 1)
+    t.put("ultimate_soldier", 46, g)
+    t.put("turret", 42, top)
+    t.rect(39, g, 39, g, SANDBAGS)
+    t.put("ultimate_soldier", 36, g)
+    t.put("robodog", 33, g)
+    t.put("landmine", 29, g)
+    t.put("super_soldier", 26, g)
+    t.put("drone", 22, top + 2)
+    t.put("ammo_pack", 31, g)
+    t.bridge(32, 39)
+    t.put("health_kit", 44, lane)
+    t.put("laser", 28, lane, number=14)
+    t.put("switch", 25, lane, number=14)
+
 
 def tier_four(yv, flip):
-    # The inner base: no circuits left, so the drain is pits, planks and goggles.
+    # The inner base: pits, planks and a last key corridor.
     t = Tier(yv, flip, BG_CIRCUIT, DESTRUCTIBLE_STEEL)
     t.wall_floor = STEEL
     t.rooms(BG_HANGAR)
@@ -301,11 +366,14 @@ def tier_four(yv, flip):
     t.put("camera", 30, top)
     t.put("deco_machine", 60, g)
 
-    t.put("infra_goggles", 66, lane)
+    t.put("computer", 65, lane, number=9)
+    t.doors(61, 9)
+    t.trail(63, 18, 9)
     t.pit(54, 61, 57)
-    t.rect(44, lane + 1, 51, lane + 1, LAVA)
-    t.rect(46, lane + 1, 49, lane + 1, HIDDEN)
+    t.bridge(44, 51)
     t.pit(30, 37, 33)
+    t.put("laser", 22, lane, number=10)
+    t.put("switch", 19, lane, number=10)
     t.put("camera", 46, lane - 2, facing="left")
     t.put("smartwatch", 48, lane - 2)
     t.put("health_kit", 40, lane)
@@ -315,10 +383,24 @@ def tier_four(yv, flip):
     t.put("deco_crate_steel", 12, lane)
     t.put("letter_t", 10, top + 2)
 
+    t.sh = 0
+    t.put("light", 40, top + 1)
+    t.put("light", 28, top + 1)
+    t.put("ultimate_soldier", 46, g)
+    t.put("super_soldier", 41, g)
+    t.rect(38, g, 38, g, SANDBAGS)
+    t.put("turret", 35, top)
+    t.put("ultimate_soldier", 32, g)
+    t.put("robodog", 28, g)
+    t.put("drone", 24, top + 2)
+    t.put("ammo_pack", 36, g)
+    t.pit(30, 37, 33)
+    t.put("health_kit", 42, lane)
+
 
 def machine_room():
-    # The last tier and its end chamber: a lava pit crossed by a moving
-    # platform, the machine on the far side.
+    # The last tier ends in the machine hall: a pond with eels and piranhas under a catwalk, robots on a ledge,
+    # the password on a dais and the exit behind a security door and a laser in the low corridor beyond.
     t = Tier(63, False, BG_CIRCUIT, DESTRUCTIBLE_STEEL)
     t.wall_floor = STEEL
     t.rooms(BG_HANGAR)
@@ -346,30 +428,54 @@ def machine_room():
     t.put("camera", 30, 64)
     t.put("deco_machine", 60, g)
 
-    t.put("computer", 65, lane, number=2)
-    t.doors(61, 2)
-    t.nook(63, 2)
-    t.put("infra_goggles", 56, lane)
-    t.rect(36, lane + 1, 43, lane + 1, LAVA)
-    t.rect(38, lane + 1, 41, lane + 1, HIDDEN)
+    t.put("computer", 65, lane, number=11)
+    t.doors(61, 11)
+    t.trail(63, 14, 11)
+    t.bridge(36, 43)
     t.pit(24, 31, 27)
     t.put("camera", 46, lane - 2, facing="left")
-    t.put("smartwatch", 40, lane - 2)
     t.put("health_kit", 50, lane)
 
-    # The machine: a lava pit and a platform, the password on the far side.
-    t.rect(6, lane + 1, 13, lane + 1, LAVA)
-    t.put("moving_platform", 10, lane)
-    t.put("admin_password", 4, lane)
+    # The hall: one open space x 4..47, rows 63..76.
+    t.sh = 0
+    L.carve(4, 63, 47, 76, BG_HANGAR)
+    L.rect(4, 77, 47, 77, STEEL)
+    t.put("checkpoint", 45, lane)
+    t.put("ammo_pack", 46, lane)
+    t.put("health_kit", 44, lane)
+    t.rect(30, 75, 41, 77, WATER)
+    for x in (33, 38):
+        t.put("electric_eel", x, 76)
+    for x in (31, 36, 40):
+        t.put("robot_piranha", x, 76)
+    t.rect(42, 75, 43, 76, STEEL)
+    t.rect(44, 76, 44, 76, STEEL)
+    t.rect(28, 73, 41, 73, GIRDER)
+    t.rect(26, 75, 27, 76, STEEL)
+    t.rect(20, 73, 25, 76, STEEL)
+    t.put("admin_password", 20, 72)
+    t.put("usb_key", 23, 72, number=13)
+    t.put("deco_machine", 22, 72)
+    t.rect(30, 68, 40, 68, GIRDER)
+    t.put("robot", 35, 67)
+    t.rect(14, 68, 24, 68, GIRDER)
+    t.put("robot", 19, 67)
+    t.put("drone", 30, 65)
+    t.put("drone", 12, 66)
+    t.rect(4, 73, 18, 73, STEEL)
+    t.rect(4, 74, 18, 76, EMPTY)
+    t.carve(19, 73, 19, 76, BG_HANGAR)
+    t.put("computer", 17, lane, number=13)
+    t.put("switch", 15, lane, number=12)
+    t.doors(12, 13)
+    t.put("laser", 9, lane, number=12)
     t.put("exit_door", 5, lane)
-    t.put("checkpoint", 16, lane)
-    t.put("deco_machine", 8, lane - 6)
-    t.put("deco_machine", 12, lane - 6)
-    t.put("deco_machine", 15, lane)
-    t.put("letter_t", 11, lane - 4)
-    t.put("diamond", 9, lane - 4)
-    for x in (6, 11, 15):
+    t.put("deco_machine", 8, 72)
+    t.put("deco_machine", 14, 72)
+    for x in (6, 16, 26, 36):
         t.put("light", x, 66)
+    t.put("diamond", 31, 71)
+    t.put("letter_t", 11, 71)
 
 
 def build():
@@ -379,7 +485,7 @@ def build():
     tier_three(33, False)
     tier_four(48, True)
     machine_room()
-    L.bg_rect(1, 0, 78, 8, EMPTY)
+    L.bg_rect(1, 0, W - 2, 8, EMPTY)
     drop(3, False)
     drop(18, True)
     drop(33, False)
