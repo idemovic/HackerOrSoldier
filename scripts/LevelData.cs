@@ -223,6 +223,8 @@ public static class LevelStore
         return level;
     }
 
+    public static bool Exists(string fileName) => FileAccess.FileExists($"{DirPath}/{fileName}");
+
     public static string[] ListFiles()
     {
         var dir = DirAccess.Open(DirPath);

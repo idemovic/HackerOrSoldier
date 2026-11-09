@@ -2071,6 +2071,15 @@ public partial class SmokeTest : Node
         Check(Campaign.Origin.City == "Reykjavik" && Campaign.Intro.Length > 0 && Campaign.Outro.Length > 0,
             "the origin, intro and outro are set");
         Check(!Campaign.IsComplete(14) && Campaign.IsComplete(15), "the campaign completes after the fifteenth stop");
+        Check(Campaign.Stops.All(s => s.LevelFile.EndsWith(".json")) && Campaign.Stops.Select(s => s.LevelFile).Distinct().Count() == 15,
+            "every stop names its own level file");
+        foreach (var stop in Campaign.Stops.Where(s => LevelStore.Exists(s.LevelFile)))
+        {
+            var level = LevelStore.Load(stop.LevelFile);
+            Check(level != null && level.Validate() == null, $"{stop.City}: {stop.LevelFile} loads and validates");
+            Check(level != null && level.Objects.Count(o => o.Type == CollectibleDefs.AdminPassword) == 1,
+                $"{stop.City}: {stop.LevelFile} holds exactly one admin password");
+        }
     }
 
     private async Task PasswordHaloCheck()
@@ -2744,9 +2753,15 @@ public partial class SmokeTest : Node
         Check(screen.Encloses(panel.GetGlobalRect()), "the Antarctica dialog fits on screen");
         Check(panel.GetGlobalRect().End.Y < WorldMap.StopPoint(14).Y, "the Antarctica dialog docks at the top, clear of the base");
         buttons = panel.FindChildren("*", nameof(Button), true, false).OfType<Button>().ToList();
-        Check(buttons.Count == 1 && buttons[0].Text == "Main menu", "a stop without a level file offers only the main menu");
-        Check(panel.FindChildren("*", nameof(Label), true, false).OfType<Label>().Any(l => l.Text.Contains("Create level 15")),
-            "it says which level to create");
+        var lastLabels = panel.FindChildren("*", nameof(Label), true, false).OfType<Label>().Select(l => l.Text).ToList();
+        string lastFile = Campaign.Stops[14].LevelFile;
+        if (LevelStore.Exists(lastFile))
+            Check(buttons.Any(b => b.Text == "Start") && lastLabels.Any(t => t.StartsWith("Mission:")), "a stop with a level file offers Start");
+        else
+        {
+            Check(buttons.Count == 1 && buttons[0].Text == "Main menu", "a stop without a level file offers only the main menu");
+            Check(lastLabels.Any(t => t.Contains("not built yet") && t.Contains(lastFile)), "it names the level file to create");
+        }
         flow.QueueFree();
 
         Profile.Current = new Profile { LevelIndex = 15 };
