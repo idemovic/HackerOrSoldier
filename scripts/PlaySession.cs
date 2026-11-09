@@ -329,7 +329,7 @@ public partial class PlaySession : Node2D
         _coinCount = new RollingLabel { VerticalAlignment = VerticalAlignment.Center };
         _coinStat = HudStat(new TextureRect
         {
-            Texture = Sprites.Get("coin"),
+            Texture = Sprites.Trimmed(CollectibleDefs.CashStack),
             StretchMode = TextureRect.StretchModeEnum.KeepCentered,
         }, _coinCount);
         hudRow.AddChild(_coinStat);

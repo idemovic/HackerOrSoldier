@@ -2369,18 +2369,6 @@ public static class Sprites
             ".yo.oy..",
             "yo...oy.",
         }),
-        // HUD coin counter.
-        ["coin"] = new(new[]
-        {
-            "..oooo..",
-            ".oywyyo.",
-            "oywyyyyo",
-            "oyyyyyyo",
-            "oyyyyyyo",
-            "oyyyyyoo",
-            ".oyyyoo.",
-            "..oooo..",
-        }),
         // HUD alarm timer: a red siren light.
         ["alarm"] = new(new[]
         {
