@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Runtime.CompilerServices;
 using System.Threading.Tasks;
 using Godot;
 
@@ -8,7 +9,8 @@ namespace HackerOrSoldier;
 
 // Headless regression check for the editor and play loop:
 //   godot --headless --path . res://scenes/smoke_test.tscn
-// Exits 0 and prints SMOKE OK on success.
+// Exits 0 and prints SMOKE OK on success. SMOKE_ONLY=<check method name>
+// runs just that check.
 public partial class SmokeTest : Node
 {
     private int _failures;
@@ -16,6 +18,12 @@ public partial class SmokeTest : Node
 
     public override async void _Ready()
     {
+        string only = OS.GetEnvironment("SMOKE_ONLY");
+        if (only != "")
+        {
+            await RunOnly(only);
+            return;
+        }
         DataModelChecks();
         AutosaveCheck();
         await EditorLoopChecks();
@@ -73,6 +81,7 @@ public partial class SmokeTest : Node
         await BarrelCheck(ObjectDefs.Barrel);
         await BarrelCheck(ObjectDefs.SteelBarrel);
         await CollectibleCheck();
+        await ExitPasswordCheck();
         await LettersBonusCheck();
         await StatsCheck();
         await TombstoneScoreCheck();
@@ -98,6 +107,15 @@ public partial class SmokeTest : Node
         await MenuSceneCheck();
         SfxChecks();
 
+        GD.Print(_failures == 0 ? "SMOKE OK" : $"SMOKE FAILED ({_failures})");
+        GetTree().Quit(_failures == 0 ? 0 : 1);
+    }
+
+    // Runs one check method by name, for quick iteration.
+    private async Task RunOnly(string method)
+    {
+        var check = GetType().GetMethod(method, System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance);
+        await (Task)check.Invoke(this, null);
         GD.Print(_failures == 0 ? "SMOKE OK" : $"SMOKE FAILED ({_failures})");
         GetTree().Quit(_failures == 0 ? 0 : 1);
     }
@@ -2006,6 +2024,57 @@ public partial class SmokeTest : Node
         Check(editor.Session.CoinsCollected == 7, "diamond is worth 7 coins");
         Check(editor.Session.CompletenessPercent == 50, "completeness counts collected collectibles");
         editor.StopPlay();
+    }
+
+    // The exit stays shut while an admin password placed in the level is
+    // uncollected; a level without one keeps an open exit.
+    private async Task ExitPasswordCheck()
+    {
+        var (editor, completed) = await ExitLevel(passwordCell: 13);
+        var session = editor.Session;
+        var exit = session.GetChildren().OfType<ExitDoor>().First();
+        Check(session.ExitLocked && exit.Locked, "an uncollected admin password locks the exit");
+        await WalkUntil("move_right", 200, () => session.HasAdminPassword);
+        Check(!completed.Value, "walking through the locked exit does not finish the level");
+        Check(exit.HintShown, "touching the locked exit shows the hint");
+        Check(!session.ExitLocked && !exit.Locked, "taking the password opens the exit");
+        Check(session.Score == 30000 && session.CoinsCollected == 10, "the password keeps its score and coins");
+        await WalkUntil("move_left", 200, () => completed.Value);
+        Check(completed.Value, "the open exit completes the level");
+        editor.StopPlay();
+
+        (editor, completed) = await ExitLevel(passwordCell: null);
+        Check(!editor.Session.ExitLocked, "a level without a password has an open exit");
+        await WalkUntil("move_right", 200, () => completed.Value);
+        Check(completed.Value, "a level without a password completes at the exit");
+        editor.StopPlay();
+
+        (editor, completed) = await ExitLevel(passwordCell: 11);
+        await WalkUntil("move_right", 200, () => completed.Value);
+        Check(completed.Value, "collecting the password while standing in the exit completes the level");
+        editor.StopPlay();
+    }
+
+    private async Task<(Editor Editor, StrongBox<bool> Completed)> ExitLevel(int? passwordCell)
+    {
+        var editor = await FreshEditor();
+        var level = LevelData.NewDefault(14, 12);   // agent at 2, exit at 11
+        if (passwordCell is int cell)   // added directly: a cell holds one painted object
+            level.Objects.Add(new LevelObject { Type = CollectibleDefs.AdminPassword, X = cell, Y = 10 });
+        editor.SetLevel(level);
+        Check(editor.StartPlay(), "exit level starts");
+        var completed = new StrongBox<bool>();
+        editor.Session.Completed += () => completed.Value = true;
+        return (editor, completed);
+    }
+
+    private async Task<bool> WalkUntil(string action, int maxFrames, Func<bool> done)
+    {
+        Input.ActionPress(action);
+        for (int i = 0; i < maxFrames && !done(); i++)
+            await Frames(1);
+        Input.ActionRelease(action);
+        return done();
     }
 
     // Collecting all five AGENT letters is worth 40k score and 5 coins.

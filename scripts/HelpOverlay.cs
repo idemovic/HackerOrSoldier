@@ -33,7 +33,7 @@ public partial class HelpOverlay : CanvasLayer
 
     private static readonly Dictionary<string, string> ObjectHelp = new()
     {
-        [ObjectDefs.ExitDoor] = "Reach it to finish the mission.",
+        [ObjectDefs.ExitDoor] = "Reach it to finish. Needs the admin password.",
         [ObjectDefs.Checkpoint] = "Respawn here after losing a life.",
         [ObjectDefs.Door] = "Opens with the key of its color.",
         [ObjectDefs.Teleport] = "Takes you to the paired capsule.",
