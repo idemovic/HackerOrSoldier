@@ -2409,7 +2409,7 @@ public partial class SmokeTest : Node
         editor.StopPlay();
     }
 
-    // The electric door field follows the 10s cycle.
+    // The electric door field is on during the last second of its 5s cycle.
     private async Task ElectricDoorCheck()
     {
         var editor = await FreshEditor();
@@ -2423,7 +2423,10 @@ public partial class SmokeTest : Node
         var agent = editor.PlayerAgent;
         agent.Position = new Vector2(5 * 32 + 16, 10 * 32 + 16);
         agent.Velocity = Vector2.Zero;
-        editor.Session.Time = 8.5f;
+        editor.Session.Time = 3.5f;
+        await Frames(5);
+        Check(editor.Session.Lives == 3, "electric door field is off before the cycle's last second");
+        editor.Session.Time = 4.5f;
         await Frames(5);
         Check(editor.Session.Lives == 2, "engaged electric door field takes a life");
         editor.StopPlay();

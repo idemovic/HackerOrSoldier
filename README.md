@@ -95,7 +95,7 @@ Fulfill strictly decorative / visual aspect of the game.
 - Spike trap - two spikes take turns rising within a 10s cycle; a raised spike takes a life on its half of the tile
 - Electric floor - takes a life every 3 seconds; a connected region marked with a floor circuit number switches off when that circuit goes off, unmarked floors stay live
 - Spear - cycles through three 3s states: bare holes, spear tips showing in the holes (a harmless warning), spears out; while out they instantly kill the agent
-- Electric door - cyclically (10s) engages an electric field that takes a life
+- Electric door - cyclically (5s) engages an electric field that takes a life
 - Lava floor - instantly kills the agent
 - Flame traps - cyclically fires flame (10s) from a hole, which takes a life
 

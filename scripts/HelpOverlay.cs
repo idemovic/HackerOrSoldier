@@ -39,7 +39,7 @@ public partial class HelpOverlay : CanvasLayer
         [ObjectDefs.Teleport] = "Takes you to the paired capsule.",
         [ObjectDefs.Elevator] = "Rides up and down.",
         [ObjectDefs.MovingPlatform] = "Rides left and right.",
-        [ObjectDefs.ElectricDoor] = "Its field zaps every 10s.",
+        [ObjectDefs.ElectricDoor] = "Its field zaps every 5s.",
         [ObjectDefs.FlameTrap] = "Shoots flame every 10s.",
         [ObjectDefs.Computer] = "USB key hacks it, cuts the circuit.",
         [ObjectDefs.Switch] = "Shoot it to cut its circuit.",

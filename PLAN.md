@@ -174,8 +174,8 @@ Known simplifications (tuning constants, not README rules):
   at 60 px/s, travelling up to 4 tiles from the start cell or until blocked
   by a solid tile; carries whoever stands on them. A movement-range property
   UI can replace the fixed range later
-- Electric door: passable frame whose field engages during the last 2s of
-  each 10s cycle (same phase as the right spike) and takes a life on contact
+- Electric door: passable frame whose field engages during the last 1s of
+  each 5s cycle and takes a life on contact
 - Flame trap: burns its own cell plus the cell above during seconds 4-6 of
   each cycle (offset from spikes so both can be combined)
 - Rocket launcher: fires a rocket every 3 seconds, alternating left/right;

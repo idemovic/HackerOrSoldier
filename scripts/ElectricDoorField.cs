@@ -2,17 +2,17 @@ using Godot;
 
 namespace HackerOrSoldier;
 
-// README: an electric door cyclically (10s) engages an electric field that
-// takes a life. The field is on during the last 2 seconds of each cycle,
-// same phase as the right spike of a spike tile. Before it the pillar lights
-// come on one by one, bottom to top, each state lasting as long as the field;
-// once all four are lit the field arcs as lightning between the pillars.
+// README: an electric door cyclically (5s) engages an electric field that
+// takes a life. The field is on during the last second of each cycle.
+// Before it the pillar lights come on one by one, bottom to top, each state
+// lasting as long as the field; once all four are lit the field arcs as
+// lightning between the pillars.
 public partial class ElectricDoorField : Node2D
 {
     public PlaySession Session { get; set; }
 
-    private const float Cycle = 10f;
-    private const float LightStep = 2f;   // same as the field's on time
+    private const float Cycle = 5f;
+    private const float LightStep = 1f;   // also the field's on time
     private const float BoltReseed = 0.06f;   // how often the arcs change shape
 
     // Light centres on the pillars, bottom to top, in the 32px sprite's space.
@@ -26,7 +26,7 @@ public partial class ElectricDoorField : Node2D
 
     private bool _wasActive;
 
-    public bool Active => Session.RaisedSpike == 1;
+    public bool Active => Session.Time % Cycle >= Cycle - LightStep;
 
     public override void _Ready()
     {
