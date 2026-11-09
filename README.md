@@ -253,6 +253,8 @@ Triggers main menu with Restart level option
 ### World map
 The campaign is a journey of 15 levels, one per city, ending in Antarctica. A new game opens with a short story typed out in a dialog over a world map. A plane flies from the Agency HQ in Reykjavik to each city in turn, a short story for that city appears, and Start begins its level. Each level holds an admin password, and the goal of the campaign is to take it in all 15 places. The map shows the passwords taken so far as `Admin passwords N/15`. The 15th level is in Antarctica; finishing it ends the story.
 
+Debug builds (run from Godot or a debug export) have test cheats; release exports ignore them. In a level, F8 wins it and F7 toggles god mode (no damage, full ammo, kept for later levels). On the map, Page Down and Page Up move to the next or previous city.
+
 ### Statistics
 Displays statistics of the agent at the end of the level:
 - Level time 0:00 - x:xx

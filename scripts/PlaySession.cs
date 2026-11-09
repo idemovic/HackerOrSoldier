@@ -1011,6 +1011,9 @@ public partial class PlaySession : Node2D
         Agent.ResetForRespawn(_respawnPoint);
     }
 
+    // Debug cheat: wins the level as touching the unlocked exit does.
+    public void CheatComplete() => End(SignalName.Completed);
+
     private void End(StringName signal)
     {
         if (_ended)

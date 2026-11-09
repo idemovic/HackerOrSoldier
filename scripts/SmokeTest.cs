@@ -86,6 +86,7 @@ public partial class SmokeTest : Node
         CampaignDataCheck();
         WorldMapCheck();
         await CampaignFlowCheck();
+        await CampaignCheatCheck();
         await LettersBonusCheck();
         await StatsCheck();
         await TombstoneScoreCheck();
@@ -2773,6 +2774,94 @@ public partial class SmokeTest : Node
         flow.QueueFree();
         await Frames(2);
         Profile.Current = saved;
+    }
+
+    // The debug cheats run the whole campaign: F8 wins each level, Next flies
+    // on, and after the fifteenth the outro shows. Next saves the profile, so
+    // the player's real save is put back afterwards.
+    private async Task CampaignCheatCheck()
+    {
+        string savePath = $"user://{Profile.DefaultFileName}";
+        string realSave = FileAccess.FileExists(savePath) ? FileAccess.GetFileAsString(savePath) : null;
+        var saved = Profile.Current;
+        Profile.Current = new Profile { LevelIndex = 3 };
+
+        var flow = await NewFlow();
+        Check(flow.Current == GameFlow.Screen.City, "the cheat run opens on the Istanbul dialog");
+        await Tap(Key.Pagedown);
+        Check(flow.Current == GameFlow.Screen.Flight && Profile.Current.LevelIndex == 4, $"Page Down flies on to the next stop (on {flow.Current}, stop {Profile.Current.LevelIndex})");
+        await Tap(Key.Enter);   // any key lands the plane first
+        await Tap(Key.Pageup);
+        await Tap(Key.Pageup);
+        Check(flow.Current == GameFlow.Screen.City && Profile.Current.LevelIndex == 2 && flow.Map.Taken == 2,
+            $"Page Up warps back a stop with no flight (on {flow.Current}, stop {Profile.Current.LevelIndex})");
+        Profile.Current.LevelIndex = 0;
+        flow.QueueFree();
+
+        flow = await NewFlow();
+        Press(flow, "Continue");
+        await Frames(2);
+        int levels = 0;
+        while (flow.Current != GameFlow.Screen.Outro && levels < Campaign.Stops.Length)
+        {
+            if (flow.Current == GameFlow.Screen.Flight)
+                await Tap(Key.Enter);
+            Press(flow, "Start");
+            await Frames(3);
+            if (flow.Current != GameFlow.Screen.Level)
+                break;
+            if (levels == 0)
+            {
+                await Tap(Key.F7);
+                var session = flow.Session;
+                int lives = session.Lives;
+                session.AgentHit();
+                Check(session.Invincible && session.Ammo == PlaySession.FullAmmo && session.Lives == lives,
+                    "F7 god mode: full ammo and a hit costs no life");
+                await Tap(Key.F7);
+                Check(!flow.Session.Invincible, "F7 again turns god mode off");
+            }
+            await Tap(Key.F8);
+            await Frames(2);
+            if (flow.Current != GameFlow.Screen.Stats)
+                break;
+            levels++;
+            Press(flow, levels == Campaign.Stops.Length ? "Finish" : "Next level");
+            await Frames(2);
+        }
+        Check(levels == Campaign.Stops.Length && flow.Current == GameFlow.Screen.Outro && flow.Map.Taken == Campaign.Stops.Length,
+            $"F8 runs all {Campaign.Stops.Length} levels to the outro ({levels} won, on {flow.Current})");
+        flow.QueueFree();
+        await Frames(2);
+
+        Profile.Current = saved;
+        if (realSave != null)
+            LevelStore.WriteAtomic(savePath, realSave);
+        else
+            DirAccess.RemoveAbsolute(ProjectSettings.GlobalizePath(savePath));
+    }
+
+    private void Press(GameFlow flow, string text)
+    {
+        flow.FinishTyping();
+        flow.Panel.FindChildren("*", nameof(Button), true, false).OfType<Button>()
+            .FirstOrDefault(b => b.Text == text)?.EmitSignal(BaseButton.SignalName.Pressed);
+    }
+
+    // Parsed input is delivered on the next process frame; after a slow load
+    // several physics frames can pass first, so wait on process frames.
+    private async Task Tap(Key key)
+    {
+        Input.ParseInputEvent(new InputEventKey { Pressed = true, Keycode = key, PhysicalKeycode = key });
+        await ProcessFrames(2);
+        Input.ParseInputEvent(new InputEventKey { Pressed = false, Keycode = key, PhysicalKeycode = key });
+        await ProcessFrames(2);
+    }
+
+    private async Task ProcessFrames(int count)
+    {
+        for (int i = 0; i < count; i++)
+            await ToSignal(GetTree(), SceneTree.SignalName.ProcessFrame);
     }
 
     private async Task<GameFlow> NewFlow()
