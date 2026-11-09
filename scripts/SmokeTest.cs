@@ -133,6 +133,7 @@ public partial class SmokeTest : Node
             (23, TileDefs.BackgroundHangar, "BackgroundHangar"), (26, TileDefs.DestructibleStone, "DestructibleStone"),
             (27, TileDefs.DestructibleRed, "DestructibleRed"), (28, TileDefs.DestructibleSteel, "DestructibleSteel"),
             (29, TileDefs.DestructibleMoss, "DestructibleMoss"), (30, TileDefs.DestructibleSand, "DestructibleSand"),
+            (31, TileDefs.Snow, "Snow"), (32, TileDefs.MineRock, "MineRock"), (33, TileDefs.MineTimber, "MineTimber"),
         };
         var moved = tiles.Where(t => t.Pinned != t.Actual).Select(t => $"{t.Name} {t.Pinned}->{t.Actual}").ToList();
         Check(moved.Count == 0, $"tile numbers match the pinned ones{(moved.Count > 0 ? ": " + string.Join(", ", moved) : "")}");
@@ -335,7 +336,7 @@ public partial class SmokeTest : Node
         editor._UnhandledInput(KeyEvent(Key.Key2));
         Check(editor.Brush.TileId == TileDefs.DestructibleWall, "2 picks the second item of the category");
         editor._UnhandledInput(KeyEvent(Key.Key1, shift: true));
-        Check(editor.Brush.TileId == TileDefs.BackgroundMesh, "Shift+1 picks the eleventh item");
+        Check(editor.Brush.TileId == TileDefs.Snow, "Shift+1 picks the eleventh item");
         editor._UnhandledInput(new InputEventKey { Keycode = Key.Plus, PhysicalKeycode = Key.Key3, Pressed = true });
         Check(editor.Brush.TileId == TileDefs.StoneBlocks, "digits match by key position on layouts without a number row");
         editor._UnhandledInput(KeyEvent(Key.Key3, alt: true));

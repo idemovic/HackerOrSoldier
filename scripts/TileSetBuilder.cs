@@ -108,6 +108,10 @@ public static class TileSetBuilder
     private static readonly Color[] SteelRamp = Ramp("2e3549", "4a5570", "6f7e99", "8c9ab5", "b4c0d6");
     private static readonly Color[] IronRamp = Ramp("1a1d28", "2e3340", "444a5a", "5c6478", "7c8599");
     private static readonly Color[] ConcreteRamp = Ramp("3a3d47", "50535e", "6a6d78", "7d818e", "8f939f");
+    private static readonly Color[] SnowRamp = Ramp("6f8db3", "9db6d4", "c9daea", "e2ecf6", "ffffff");
+    private static readonly Color[] MineRockRamp = Ramp("1c1814", "302820", "463b30", "5e5040", "7a6a54");
+    private static readonly Color[] OreRamp = Ramp("8a6418", "c4962a", "f0c840", "fff0a0");
+    private static readonly Color[] WoodRamp = Ramp("2e1a0c", "4f3018", "6e4522", "8c5c30", "ad7840");
     private static readonly Color[] SandRamp = Ramp("5a4526", "8a6a3d", "b5915a", "cfa96b", "e3c080");
     private static readonly Color[] GreenRamp = Ramp("163016", "22471f", "2e5c2a", "3a7334", "4c9042");
     private static readonly Color[] TealRamp = Ramp("0b3838", "11504f", "1f8f8f", "2fb0b0", "45d6d6");
@@ -411,6 +415,15 @@ public static class TileSetBuilder
             case TileDefs.Container:
                 DrawContainer(img);
                 break;
+            case TileDefs.Snow:
+                DrawSnow(img);
+                break;
+            case TileDefs.MineRock:
+                DrawMineRock(img);
+                break;
+            case TileDefs.MineTimber:
+                DrawMineTimber(img);
+                break;
             case TileDefs.PipeWall:
                 return BuildPipeImage(PipeLinks.Left | PipeLinks.Right);
             case TileDefs.BackgroundBrick:
@@ -668,6 +681,118 @@ public static class TileSetBuilder
                     c = Tone(SandRamp, t, x, y);
                 }
                 img.SetPixel(x, y, c);
+            }
+    }
+
+    // Cut snow blocks, igloo style: two courses of soft rounded blocks in
+    // running bond over blue-shadowed seams, drifts of brighter and duller
+    // snow laid down by low-frequency noise, and a few white glints.
+    private static void DrawSnow(Image img)
+    {
+        img.Fill(new Color("5d7898"));
+        for (int course = 0; course < 2; course++)
+        {
+            int offset = course == 0 ? 0 : 8;
+            for (int col = -1; col <= 1; col++)
+            {
+                int seed = 100 + course * 2 + (col & 1);
+                DrawBlock(img, new Rect2I(col * 16 + offset, course * 16, 15, 15), SnowRamp, seed,
+                    rounded: true, wear: 0.03f, grade: 1.0f,
+                    tint: (x, y) => 0.9f + (Smooth(x, y, 8, 104) - 0.5f) * 0.8f);
+            }
+        }
+        for (int y = 0; y < TileSize; y++)
+            for (int x = 0; x < TileSize; x++)
+                if (img.GetPixel(x, y).Luminance > 0.8f && Noise(x, y, 106) < 0.012f)
+                    img.SetPixel(x, y, SnowRamp[4]);
+    }
+
+    // A hewn rock face: irregular chunks (the cells of jittered points, one
+    // per 8px square) split by dark cracks, each chunk lit on its top left
+    // edge and shaded on its bottom right, with gold ore flecks in one chunk.
+    private static void DrawMineRock(Image img)
+    {
+        const int Cell = 8, N = TileSize / Cell, OreChunk = 6;
+        Vector2 Point(int gx, int gy)
+        {
+            int wx = Mathf.PosMod(gx, N), wy = Mathf.PosMod(gy, N);
+            return new Vector2(gx * Cell + 1 + Noise(wx, wy, 120) * (Cell - 2), gy * Cell + 1 + Noise(wx, wy, 121) * (Cell - 2));
+        }
+        for (int y = 0; y < TileSize; y++)
+            for (int x = 0; x < TileSize; x++)
+            {
+                var at = new Vector2(x + 0.5f, y + 0.5f);
+                float d1 = float.MaxValue, d2 = float.MaxValue;
+                Vector2 near = default;
+                int chunk = 0;
+                for (int j = -1; j <= 1; j++)
+                    for (int i = -1; i <= 1; i++)
+                    {
+                        int gx = x / Cell + i, gy = y / Cell + j;
+                        float d = Point(gx, gy).DistanceTo(at);
+                        if (d < d1)
+                        {
+                            d2 = d1;
+                            d1 = d;
+                            near = Point(gx, gy);
+                            chunk = Mathf.PosMod(gx, N) + Mathf.PosMod(gy, N) * N;
+                        }
+                        else if (d < d2)
+                            d2 = d;
+                    }
+                Color c;
+                if (d2 - d1 < 1.2f)
+                    c = MineRockRamp[0];
+                else
+                {
+                    var off = at - near;
+                    float t = 2.2f - 0.12f * (off.X + off.Y) + (Noise(chunk, 0, 122) - 0.5f) * 0.9f;
+                    if (d2 - d1 < 2.4f)
+                        t += off.X + off.Y < 0 ? 1.0f : -0.9f;
+                    if (Noise(x, y, 123) < 0.05f)
+                        t -= 0.8f;
+                    c = Tone(MineRockRamp, t, x, y);
+                    if (chunk == OreChunk && d2 - d1 >= 2.4f && Noise(x, y, 125) < 0.3f)
+                        c = Tone(OreRamp, 1.2f + (Noise(x, y, 126) < 0.2f ? 1.8f : 0f) - 0.1f * (off.X + off.Y), x, y);
+                }
+                img.SetPixel(x, y, c);
+            }
+    }
+
+    // Mine-shaft lagging: four rough planks per tile with wood grain drawn
+    // by stretched noise, staggered butt joints and a nail either side of
+    // each joint.
+    private static void DrawMineTimber(Image img)
+    {
+        var gap = new Color("140c06");
+        int[] joints = { 5, 21, 13, 28 };
+        for (int y = 0; y < TileSize; y++)
+            for (int x = 0; x < TileSize; x++)
+            {
+                int plank = y / 8, ly = y % 8, joint = joints[plank];
+                if (ly == 7 || x == joint)
+                {
+                    img.SetPixel(x, y, gap);
+                    continue;
+                }
+                float t = ly == 0 ? 3.4f : ly == 6 ? 0.6f : 2.3f - ly * 0.12f;
+                t += (Smooth(x, ly * 8 + plank * 3, 8, 130 + plank) - 0.5f) * 1.6f;
+                if (Wrap(x - joint) == 1)
+                    t += 0.9f;
+                else if (Wrap(joint - x) == 1)
+                    t -= 0.9f;
+                if (Noise(x, y, 131) < 0.04f)
+                    t -= 1f;
+                img.SetPixel(x, y, Tone(WoodRamp, t, x, y));
+            }
+        for (int plank = 0; plank < 4; plank++)
+            foreach (int nx in new[] { joints[plank] - 3, joints[plank] + 2 })
+            {
+                int x = Wrap(nx), y = plank * 8 + 3;
+                Dot(img, x, y, IronRamp[4]);
+                Dot(img, x + 1, y, IronRamp[1]);
+                Dot(img, x, y + 1, IronRamp[1]);
+                Dot(img, x + 1, y + 1, WoodRamp[0]);
             }
     }
 

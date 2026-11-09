@@ -37,6 +37,9 @@ public static class TileDefs
     public const int DestructibleSteel = 28;
     public const int DestructibleMoss = 29;
     public const int DestructibleSand = 30;
+    public const int Snow = 31;
+    public const int MineRock = 32;
+    public const int MineTimber = 33;
 
     // The destructible wall in each brick color, plain clay first. One
     // palette slot paints them all; the status bar picks the color.
@@ -73,6 +76,9 @@ public static class TileDefs
         new(Sandbags, "Sandbags", new Color(0.65f, 0.53f, 0.32f), Solid: true),
         new(Container, "Container", new Color(0.22f, 0.45f, 0.25f), Solid: true),
         new(PipeWall, "Pipe wall", new Color(0.16f, 0.52f, 0.52f), Solid: true),
+        new(Snow, "Snow wall", new Color(0.88f, 0.92f, 0.97f), Solid: true),
+        new(MineRock, "Mine rock", new Color(0.30f, 0.25f, 0.20f), Solid: true),
+        new(MineTimber, "Mine timber", new Color(0.43f, 0.27f, 0.13f), Solid: true),
         // Background walls: scenery behind the agent, no collision.
         new(BackgroundMesh, "Background mesh", new Color(0.10f, 0.11f, 0.14f), Solid: false),
         new(BackgroundRock, "Background rock", new Color(0.24f, 0.25f, 0.29f), Solid: false),

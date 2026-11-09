@@ -95,7 +95,7 @@ public static class EditorPalette
         {
             TileDefs.Wall, TileDefs.DestructibleWall, TileDefs.StoneBlocks, TileDefs.RedBrick,
             TileDefs.SteelPlate, TileDefs.Girder, TileDefs.Concrete, TileDefs.Sandbags,
-            TileDefs.Container, TileDefs.PipeWall,
+            TileDefs.Container, TileDefs.PipeWall, TileDefs.Snow, TileDefs.MineRock, TileDefs.MineTimber,
             TileDefs.BackgroundMesh, TileDefs.BackgroundRock, TileDefs.BackgroundPanel,
             TileDefs.BackgroundBrick, TileDefs.BackgroundCircuit, TileDefs.BackgroundHangar,
         };
