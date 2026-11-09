@@ -9,6 +9,8 @@ public partial class EnemyBullet : Node2D
     public Vector2 Direction { get; set; } = Vector2.Right;
     public string SpriteKey { get; set; } = "plasma";
     public float Speed { get; set; } = 2f * Agent.RunSpeed;   // README: bullets and plasma move at 2x agent speed
+    // Above zero, hitting a wall explodes with this radius instead of fizzling.
+    public float BlastRadius { get; set; }
 
     public override void _Ready() =>
         AddChild(new Sprite2D { Texture = Sprites.Get(SpriteKey), FlipH = Direction.X < 0 });
@@ -34,8 +36,11 @@ public partial class EnemyBullet : Node2D
         }
         else if (TileDefs.Get(Session.TileAt(cell.X, cell.Y))?.Solid == true)
         {
-            Sfx.PlayAt(Sound.BulletHit, Position);
             QueueFree();
+            if (BlastRadius > 0)
+                Session.Explode(Position, BlastRadius);
+            else
+                Sfx.PlayAt(Sound.BulletHit, Position);
         }
     }
 }

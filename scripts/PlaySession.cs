@@ -27,6 +27,7 @@ public partial class PlaySession : Node2D
     private const float RobotOffTime = 1f;
     private const float AlarmDuration = 20f;         // README: alarm stays on 20s from the last trigger
     private const float ExplosionRadius = 5 * 32f;   // README: dynamite kills in a 5 square radius
+    private const float RocketBlastRadius = 32f;     // a rocket hitting a wall blasts 1 tile around
     // How long a lost life holds the screen: the agent crumples, the death
     // effect dissolves the screen to black, and only then does the respawn
     // (or the fail screen) happen behind it.
@@ -597,6 +598,7 @@ public partial class PlaySession : Node2D
             Direction = new Vector2(direction, 0),
             Speed = Agent.RunSpeed,
             SpriteKey = "rocket",
+            BlastRadius = RocketBlastRadius,
         });
 
     public void TriggerAlarm()
@@ -822,33 +824,33 @@ public partial class PlaySession : Node2D
 
     // Explosions kill outright: no degradation, no drops. Enemies with
     // infinite lives survive (README: does not apply to infinite lives).
-    public void Explode(Vector2 center)
+    public void Explode(Vector2 center, float radius = ExplosionRadius)
     {
         Sfx.PlayAt(Sound.Explosion, center);
         TriggerAlarm();
         int tile = TileSetBuilder.TileSize;
-        int minX = (int)Mathf.Floor((center.X - ExplosionRadius) / tile);
-        int maxX = (int)Mathf.Floor((center.X + ExplosionRadius) / tile);
-        int minY = (int)Mathf.Floor((center.Y - ExplosionRadius) / tile);
-        int maxY = (int)Mathf.Floor((center.Y + ExplosionRadius) / tile);
+        int minX = (int)Mathf.Floor((center.X - radius) / tile);
+        int maxX = (int)Mathf.Floor((center.X + radius) / tile);
+        int minY = (int)Mathf.Floor((center.Y - radius) / tile);
+        int maxY = (int)Mathf.Floor((center.Y + radius) / tile);
         for (int y = minY; y <= maxY; y++)
             for (int x = minX; x <= maxX; x++)
             {
                 var cellCenter = new Vector2(x * tile + tile / 2f, y * tile + tile / 2f);
-                if (TileDefs.IsDestructible(TileAt(x, y)) && center.DistanceTo(cellCenter) <= ExplosionRadius)
+                if (TileDefs.IsDestructible(TileAt(x, y)) && center.DistanceTo(cellCenter) <= radius)
                     DestroyTile(new Vector2I(x, y));
             }
         foreach (var enemy in _enemies.ToArray())
-            if (!enemy.Def.InfiniteLives && center.DistanceTo(enemy.Position) <= ExplosionRadius)
+            if (!enemy.Def.InfiniteLives && center.DistanceTo(enemy.Position) <= radius)
             {
                 _enemies.Remove(enemy);
                 enemy.QueueFree();
                 Kills++;
             }
-        if (Agent != null && center.DistanceTo(Agent.Position) <= ExplosionRadius)
+        if (Agent != null && center.DistanceTo(Agent.Position) <= radius)
             AgentHit();
 
-        AddChild(new Explosion { Position = center, Radius = ExplosionRadius, Camera = _camera });
+        AddChild(new Explosion { Position = center, Radius = radius, Camera = _camera });
     }
 
     // Goggles affect platforming, so they win when both items are held.

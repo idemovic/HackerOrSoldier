@@ -2468,6 +2468,21 @@ public partial class SmokeTest : Node
         await Frames(180);
         Check(editor.Session.Lives == 2, "rocket takes a life");
         editor.StopPlay();
+
+        // A rocket that hits a wall explodes 1 tile around: the wall it hit
+        // goes, the one behind it stays, and the far-off agent is unhurt.
+        editor = await FreshEditor();
+        editor.SetBrushTile(TileDefs.DestructibleWall);
+        editor.PaintCell(new Vector2I(16, 10));
+        editor.PaintCell(new Vector2I(17, 10));
+        editor.SetBrushObject(ObjectDefs.RocketLauncher);
+        editor.PaintCell(new Vector2I(20, 10));
+        Check(editor.StartPlay(), "rocket wall level starts");
+        await Frames(150);
+        Check(editor.Session.TileAt(17, 10) == TileDefs.Empty, "rocket explodes on the wall it hits");
+        Check(editor.Session.TileAt(16, 10) == TileDefs.DestructibleWall, "rocket blast reaches only 1 tile");
+        Check(editor.Session.Lives == 3, "rocket wall blast spares the far-off agent");
+        editor.StopPlay();
     }
 
     // Plants are walk-through, crates are solid and block the agent.
